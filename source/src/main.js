@@ -457,7 +457,7 @@ function render() {
   let gt = (gu - 0.82) / 0.18; gt = gt < 0 ? 0 : gt > 1 ? 1 : gt;
   // campfire light: low, warm, flickering
   m[60] = CAMP[0]; m[61] = CAMP[1] + 0.45; m[62] = CAMP[2];
-  m[63] = 10 * (1 + 0.12 * sin(t * 9.3) + 0.08 * sin(t * 15.1 + 2) + 0.06 * sin(t * 3.7));
+  m[63] = 9 * (1 + 0.12 * sin(t * 9.3) + 0.08 * sin(t * 15.1 + 2) + 0.06 * sin(t * 3.7));
   // the lantern: held low on the right, swinging a little round its handle; its flame is the light.
   // Holding Space lifts it up and out in front (F[LIFT] eases 0 .. 1), so its light reaches further across the ground.
   const lu = F[LIFT] * F[LIFT] * (3 - 2 * F[LIFT]), lf = 0.8 - 0.18 * lu, lr = 0.42 - 0.08 * lu, ld = 0.45 - 0.41 * lu;

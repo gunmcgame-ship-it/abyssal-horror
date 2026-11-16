@@ -193,7 +193,7 @@ const LOW = ${LV > 1};
 const MOON = vec3f(${MOON});
 const MWN = vec3f(${MWN});
 // sky light in the shadows: moonlight scattered by the air (blue, goes with the moon), and airglow + starlight (always there)
-const SKYA = vec3f(.026, .038, .080);
+const SKYA = vec3f(.018, .027, .058);
 const SKY0 = vec3f(.0030, .0036, .0052);
 const FIREC = vec3f(1., .40, .12);
 const LANTC = vec3f(1., .64, .34);
@@ -240,7 +240,7 @@ fn shadowSoft(p: vec3f) -> f32 {
 }
 fn vol(p: vec3f) -> vec4f { return textureSampleLevel(tV, sC, (p - vec3f(-192., -56., -192.)) / vec3f(384., 60., 384.), 0.); }
 // point lights: g.fire and g.lant are position + strength (flicker included); short range, fast fall-off, no shadows
-const FIRER = 22.; const LANTR = 12.;
+const FIRER = 16.; const LANTR = 10.;
 fn att(p: vec3f, l: vec4f, r: f32) -> f32 { let d = distance(l.xyz, p); let w = sat(1. - pow(d / r, 4.)); return l.w * w * w / (1. + d * d); }
 // The camp's big things as rounded boxes (camp coordinates, metres from the fire: centre + yaw, half size + rounding),
 // so the fire and the lantern cast soft shadows past them and the ground darkens a little under them.
@@ -300,11 +300,21 @@ fn plS(p: vec3f, n: vec3f, V: vec3f, pw: f32, v: vec2f) -> vec3f {
 // sky light from above (sky: how open to the sky, from the baked volume) and a little warm bounce from the ground
 fn amb(n: vec3f, sky: f32) -> vec3f { let up = n.y * .5 + .5; return (SKYA * g.mc.w + SKY0) * (.2 + .8 * sky) * (.3 + .7 * up) + g.mc.rgb * .05 * (.4 + .6 * sat(dot(n, -vec3f(MOON.x, 0., MOON.z)))) * (.5 + .5 * sky); }
 // thin, dry desert air: far rock takes on a little of the sky's blue, and at the end of the draw distance it is all sky
+// Light hanging in the air: the night air (and the fire's smoke) scatters a little of the fire and lantern light toward
+// the eye along every view ray, so both sit in a soft glow instead of just painting the ground. Closed form of the
+// point light's 1/d^2 summed along the ray from the eye, out to distance L.
+fn airGlow(rd: vec3f, L: f32, lp: vec3f, I: f32) -> f32 {
+  let o = lp - g.cam.xyz; let t0 = dot(o, rd); let h = max(length(o - rd * t0), .12);
+  return I * (atan((L - t0) / h) - atan(-t0 / h)) / h;
+}
+fn inScatter(rd: vec3f, L: f32) -> vec3f {
+  return FIREC * airGlow(rd, L, g.fire.xyz + vec3f(0., .5, 0.), g.fire.w) * .0011 + LANTC * airGlow(rd, L, g.lant.xyz, g.lant.w) * .0007;
+}
 fn fog(c: vec3f, wp: vec3f) -> vec3f {
   let v = wp - g.cam.xyz; let d = length(v); let rd = v / d;
   let T = exp(-d * .0028);
   let o = c * T + skyBase(vec3f(rd.x, .04, rd.z)) * .6 * (1. - T);
-  return mix(o, skyBase(rd), ss(195., 235., d));
+  return mix(o, skyBase(rd), ss(195., 235., d)) + inScatter(rd, d);
 }
 fn qrot(q: vec4f, v: vec3f) -> vec3f { return v + 2. * cross(q.xyz, cross(q.xyz, v) + q.w * v); }
 `;
@@ -659,6 +669,7 @@ fn stars(rd: vec3f, sc: f32, dens: f32, bright: f32, px: f32) -> vec3f {
     let ba = hd - tl; let pa = rd - tl; let hc = sat(dot(pa, ba) / max(dot(ba, ba), 1e-8)); let dd = length(pa - ba * hc) / px;
     c += vec3f(.9, .95, 1.) * exp(-dd * dd * .8) * hc * 1.5 * sin(3.14159 * s) * ext;
   }
+  c += inScatter(rd, 400.);
   return fin(c);
 }
 `;
@@ -762,10 +773,13 @@ fn tmap(x: vec3f) -> vec3f { return sat3((x * (2.51 * x + .03)) / (x * (2.43 * x
   c = mix(c, bl, .05) + bl * .06;
   // exposure: brings the adapted brightness up toward a night key, but only so far: the eyes never fully see in the dark
   let ad = textureLoad(tA, vec2i(0), 0).r;
-  c *= g.mis.x * clamp(pow(.045 / max(ad, 1e-5), .6), .6, 3.5);
+  c *= g.mis.x * clamp(pow(.032 / max(ad, 1e-5), .6), .6, 2.6);
   let q = uv - .5;
-  c *= 1. - dot(q, q) * .6;
+  c *= 1. - dot(q, q) * .85;
   c = tmap(c);
+  // the original project's contrast curve: deeper darks, a soft shoulder on the highlights
+  let l0 = dot(c, vec3f(.2126, .7152, .0722));
+  c *= mix(l0, l0 * l0 * (3. - 2. * l0), .45) / max(l0, 1e-4);
   // in the dark the eye loses colour and sees a little bluer: only the dimmest parts of the image
   let l = dot(c, vec3f(.2126, .7152, .0722));
   c = mix(vec3f(l) * vec3f(.80, .93, 1.22), c, .5 + .5 * ss(.03, .45, l));
