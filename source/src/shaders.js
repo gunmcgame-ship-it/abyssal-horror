@@ -771,9 +771,15 @@ fn tmap(x: vec3f) -> vec3f { return sat3((x * (2.51 * x + .03)) / (x * (2.43 * x
   var c = textureLoad(tS, px, 0).rgb;
   let bl = textureSampleLevel(tB, sC, uv, 0.).rgb;
   c = mix(c, bl, .05) + bl * .06;
-  // exposure: brings the adapted brightness up toward a night key, but only so far: the eyes never fully see in the dark
+  // Night vision. Where the light is dim (moon, sky, starlight) the eye sees with its rods: almost no colour, reds turn
+  // dark, everything goes grey with a slight blue cast. Only where the fire or lantern lights things up enough do the
+  // cones see colour again. Done on the scene light before exposure, so it follows how bright things really are.
+  let lp = dot(c, vec3f(.2126, .7152, .0722));
+  let sc = dot(c, vec3f(.01, .37, .62));
+  c = mix(sc * vec3f(.70, .84, 1.12), c, max(ss(.06, .5, lp), .14)); // a trace of colour survives
+  // exposure: the eyes adjust only a little; a dark scene stays dark
   let ad = textureLoad(tA, vec2i(0), 0).r;
-  c *= g.mis.x * clamp(pow(.032 / max(ad, 1e-5), .55), .6, 2.1);
+  c *= g.mis.x * clamp(pow(.032 / max(ad, 1e-5), .4), .7, 1.5);
   let q = uv - .5;
   c *= 1. - dot(q, q) * .85;
   c = tmap(c);
@@ -782,7 +788,7 @@ fn tmap(x: vec3f) -> vec3f { return sat3((x * (2.51 * x + .03)) / (x * (2.43 * x
   c *= mix(l0, l0 * l0 * (3. - 2. * l0), .3) / max(l0, 1e-4);
   // in the dark the eye loses colour and sees a little bluer: only the dimmest parts of the image
   let l = dot(c, vec3f(.2126, .7152, .0722));
-  c = mix(vec3f(l) * vec3f(.80, .93, 1.22), c, .5 + .5 * ss(.03, .45, l));
+  c = mix(vec3f(l) * vec3f(.85, .95, 1.12), c, .75 + .25 * ss(.03, .45, l));
   c = pow(max(c, vec3f(0.)), vec3f(1. / 2.2));
   let n = ign(fc.xy) + ign(fc.xy + 37.) - 1.;
   return vec4f(c + n / 255., 1.);
