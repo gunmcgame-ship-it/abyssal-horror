@@ -185,11 +185,11 @@ const TAU = 6.2831853;
 const LOW = ${LV > 1};
 const MOON = vec3f(${MOON});
 const MWN = vec3f(${MWN});
-const MOONC = vec3f(1., .88, .74) * .5;
-const SKYA = vec3f(.030, .040, .075);
+const MOONC = vec3f(1., .95, .88) * .52;
+const SKYA = vec3f(.032, .044, .085);
 const HAZE = vec3f(.011, .014, .025);
 const FIREC = vec3f(1., .40, .12);
-const LANTC = vec3f(1., .55, .22);
+const LANTC = vec3f(1., .64, .34);
 fn sat(x: f32) -> f32 { return clamp(x, 0., 1.); }
 fn ss(a: f32, b: f32, x: f32) -> f32 { let t = clamp((x - a) / (b - a), 0., 1.); return t * t * (3. - 2. * t); }
 fn ign(p: vec2f) -> f32 { return fract(52.9829189 * fract(dot(p, vec2f(.06711056, .00583715)))); }
@@ -238,7 +238,7 @@ fn plS(p: vec3f, n: vec3f, V: vec3f, pw: f32) -> vec3f {
        + LANTC * att(p, g.lant, LANTR) * pow(sat(dot(n, normalize(V + ll))), pw) * sat(dot(n, ll) * 4.);
 }
 // sky light from above (sky: how open to the sky, from the baked volume) and a little warm bounce from the ground
-fn amb(n: vec3f, sky: f32) -> vec3f { let up = n.y * .5 + .5; return SKYA * (.2 + .8 * sky) * (.3 + .7 * up) + MOONC * .035 * (.4 + .6 * sat(dot(n, -vec3f(MOON.x, 0., MOON.z)))) * (.5 + .5 * sky); }
+fn amb(n: vec3f, sky: f32) -> vec3f { let up = n.y * .5 + .5; return SKYA * (.2 + .8 * sky) * (.3 + .7 * up) + MOONC * .06 * (.4 + .6 * sat(dot(n, -vec3f(MOON.x, 0., MOON.z)))) * (.5 + .5 * sky); }
 // thin, dry night air: a faint cool haze, and at the far end of the draw distance everything fades into the sky
 fn fog(c: vec3f, wp: vec3f) -> vec3f {
   let v = wp - g.cam.xyz; let d = length(v); let rd = v / d;
@@ -286,14 +286,15 @@ fn prop(id: i32, op: vec3f, mc: f32, h: f32) -> PM {
     case 4 { m.a = vec3f(.035); m.gl = .15; m.bp = .3; }                         // tyre rubber
     case 5 { m.a = vec3f(.72, .71, .67); m.gl = .2; m.bp = .1; }               // whitewall
     case 6 { m.a = vec3f(.02, .024, .03); m.gl = 1.; m.mt = .5; m.bp = 0.; }   // window glass
-    case 7 { m.a = vec3f(.72, .74, .76); m.gl = .75; m.mt = 1.; m.bp = 0.; }   // polished aluminium
+    case 7 { m.a = vec3f(.72, .74, .76); m.gl = .95; m.mt = 1.; m.bp = 0.;   // polished aluminium, riveted panels
+      m.a *= 1. - .35 * ss(.012, .0, abs(fract(op.z / .62) - .5) - .488) - .25 * ss(.012, .0, abs(fract(op.y / .55) - .5) - .488); }
     case 8 {   // white canvas: sewn panels, soft wrinkles, thin enough to let some moonlight through
       let sw = op.x + op.z; let seam = ss(.02, .0, abs(fract(sw / .92) - .5) - .47);
       m.a = vec3f(.66, .63, .55) * (.93 + .1 * mc) * (1. - .25 * seam); m.gl = .02; m.bp = 0.; m.tl = .5;
       m.n = vec3f(sin(op.y * 7. + sw * 2.3) + .5 * sin(op.y * 17. - sw * 5.), 0., cos(op.y * 5. - sw * 3.1) + .5 * cos(sw * 13. + op.y * 3.)) * .07; }   // white canvas, weathered
     case 9 { m.a = vec3f(.45, .30, .17) * (.7 + .5 * h); m.gl = .1; m.bp = .8; }      // wood
     case 10 { m.a = vec3f(.22, .15, .09); m.bp = .8; }                          // dark wood, poles
-    case 11 { m.a = vec3f(.12, .26, .16); m.gl = .5; m.bp = .05; }             // green steel
+    case 11 { m.a = vec3f(.07, .14, .09) * (.85 + .3 * mc); m.gl = .35; m.bp = .05; }             // green steel
     case 12 { m.a = vec3f(.30, .02, .015); m.gl = .5; m.bp = 0.; }              // red tail light
     case 13 { m.a = vec3f(.33, .22, .16) * (.6 + .6 * h); m.bp = 1.4; }        // stone
     case 14 { m.a = vec3f(.035, .03, .028); m.bp = 1.2; }                      // charred wood
@@ -375,7 +376,8 @@ fn prop(id: i32, op: vec3f, mc: f32, h: f32) -> PM {
   let Fr = F0 + (1. - F0) * pow(1. - sat(dot(N, V)), 5.);
   let H = normalize(V + MOON);
   c += Fr * gloss * ((pw + 2.) / 8.) * (E * pow(sat(dot(N, H)), pw) * ndl + plS(i.wp, N, V, pw));
-  c += Fr * gloss * skyBase(reflect(-V, N)) * (.3 + .7 * ao) * 2.;
+  let R = reflect(-V, N);
+  c += Fr * gloss * select(skyBase(R), vec3f(.30, .22, .16) * (MOONC * .25 + SKYA * .6) * (1. - .4 * R.y), R.y < 0.) * (.3 + .7 * ao) * 2.;
   // the lantern's flame, seen through its glass
   if (mat == 2 && i32(round(i.ao * 127.)) == 41) { let vf = 1. - dot(-V, normalize(g.lant.xyz - vec3f(0., .012, 0.) - g.cam.xyz)); c += vec3f(1., .75, .4) * g.lant.w * 6. * exp(-vf / .00012); }
   return fin(fog(c, i.wp));
@@ -501,18 +503,18 @@ fn stars(rd: vec3f, sc: f32, dens: f32, bright: f32, px: f32) -> vec3f {
   let ext = ss(-.01, .2, rd.y);                    // stars fade into the haze at the horizon
   // Milky Way: a soft band with clumps and dark dust lanes, and more faint stars inside it
   let bw = dot(rd, MWN);
-  let band = exp(-bw * bw / .045);
-  let n1 = fbm3(rd * 5., 4); let n2 = fbm3(rd * 13. + 3., 3);
-  let dust = ss(.45, .68, fbm3(rd * 8. + 7., 4)) * exp(-bw * bw / .006);
-  let mw = band * (.35 + .9 * n1) * (.5 + .7 * n2) * (1. - .8 * dust);
-  c += vec3f(.05, .052, .062) * mw * wash * ext;
-  var st = stars(rd, 130., .012, 1., px) + stars(rd, 290., .05 + .35 * band * (1. - dust), .12, px) * wash;
+  let band = exp(-bw * bw / .022) * .8 + exp(-bw * bw / .08) * .2;
+  let n1 = fbm3(rd * 7., 5); let n2 = fbm3(rd * 22. + 3., 3);
+  let dust = ss(.42, .62, fbm3(rd * 9. + 7., 5)) * exp(-bw * bw / .008);
+  let mw = band * (.12 + 1.7 * ss(.35, .78, n1)) * (.45 + .9 * n2) * (1. - .85 * dust);
+  c += vec3f(.055, .056, .064) * mw * wash * ext;
+  var st = stars(rd, 130., .012, 1., px) + stars(rd, 290., .04 + .6 * band * (1. - dust), .1, px) * wash + stars(rd, 520., .5 * band * (1. - dust), .05, px) * wash;
   // near the horizon the air makes them twinkle
   st *= ext * (1. + .6 * (1. - up) * sin(t * 9. + dot(rd, vec3f(3000., 2100., 2700.))));
   // thin high cloud drifting across the moon: it hides the stars behind it and glows where the moon is near
   let cu = rd.xz / (rd.y + .1);
   let cn = fbm3(vec3f(cu * vec2f(.9, 1.6) + vec2f(t * .006, t * .0025), 1.), 5);
-  let cd = ss(.52, .8, cn) * ss(.0, .15, rd.y) * .8;
+  let cd = ss(.52, .8, cn) * ss(.1, .3, rd.y) * .8; // only well above the horizon: low down it would smear into streaks
   c += st * (1. - cd);
   c = mix(c, vec3f(.012, .013, .018) + vec3f(.10, .085, .065) * (pow(sat(mu), 10.) * .5 + pow(sat(mu), 120.) * 3.), cd * .7);
   // the moon: a lit sphere seen from the side the sun is not on; the bright limb faces down to the right
@@ -603,7 +605,7 @@ fn tmap(x: vec3f) -> vec3f { return sat3((x * (2.51 * x + .03)) / (x * (2.43 * x
   c = tmap(c);
   // in the dark the eye loses colour and sees a little bluer: only the dimmest parts of the image
   let l = dot(c, vec3f(.2126, .7152, .0722));
-  c = mix(vec3f(l) * vec3f(.85, .95, 1.15), c, .4 + .6 * ss(.02, .3, l));
+  c = mix(vec3f(l) * vec3f(.84, .94, 1.16), c, .3 + .7 * ss(.04, .45, l));
   c = pow(max(c, vec3f(0.)), vec3f(1. / 2.2));
   let n = ign(fc.xy) + ign(fc.xy + 37.) - 1.;
   return vec4f(c + n / 255., 1.);

@@ -163,7 +163,7 @@ function makeWorld(D, T, flyPts, POSES) {
     for (let j = 26 + rnd() * 20 | 0; j > 0; j--) leaf(big, x + rr(-0.06, 0.06), y - 0.02, z + rr(-0.06, 0.06), rr(0.4, 0.8) * s, rnd() * TAU, pow(rnd(), 0.7) * 1.35, rr(0.035, 0.05) * s, 0, 3, rnd(), rnd(), rr(0.3, 0.36));
     if (rnd() < 0.55) {
       const h = rr(1.4, 2.4) * s, ya = rnd() * TAU, ln = rr(0, 0.12);
-      leaf(big, x, y + 0.1, z, h, ya, ln, 0.03, 0, 1, rnd(), rnd(), 0.3);
+      leaf(big, x, y + 0.1, z, h, ya, ln, 0.06, 0, 1, rnd(), rnd(), 0.3);
       const tx = x + cos(ya) * sin(ln) * h, tz = z + sin(ya) * sin(ln) * h;
       for (let j = 0; j < 7; j++) { const f = rr(0.7, 0.97); leaf(big, x + (tx - x) * f, y + 0.1 + h * f, z + (tz - z) * f, rr(0.08, 0.2), rnd() * TAU, rr(0.6, 1.4), 0.025, h, 1, rnd(), rnd(), 0.45); }
     }
@@ -473,7 +473,7 @@ function meshTent() {
     grid((u, v) => { const z = -D - 0.12 + (2 * D + 0.24) * u, x = s * mix(W + 0.1, 0, v); return [x, mix(HW - 0.06, HR, v) - 0.06 * sin(PI * v) * (0.5 + 0.5 * sin(PI * 2 * u) ** 2), z]; }, 14, 6); // roof
   }
   // door flaps: the left one rolled up beside the door, the right one hanging open
-  m.tube([[-0.62, 0.15, -D - 0.06], [-0.6, 1.0, -D - 0.07], [-0.6, 1.86, -D - 0.06]], 0.065, 8, true);
+  m.tube([[-0.6, 0.15, -D - 0.11], [-0.58, 1.0, -D - 0.12], [-0.58, 1.86, -D - 0.11]], 0.065, 8, true); // clear of the wall, so it never pokes through
   grid((u, v) => { const a = 0.55, r = 0.56 * u; return [0.52 + r * cos(a), 0.05 + v * 1.82 + 0.03 * sin(u * 5 + v * 3), -D - r * sin(a) - 0.02 * sin(v * 7)]; }, 4, 8);
   P(m, 24); box(m, -W + 0.05, 0, -D + 0.05, W - 0.05, 0.012, D - 0.05);
   P(m, 10);
