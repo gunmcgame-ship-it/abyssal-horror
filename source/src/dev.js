@@ -36,6 +36,21 @@
       }
     } else if (/Digit[1-6]/.test(e.code)) stop();
   });
+  // T: the night-look sliders (LOOK in main.js), live; the line under them is the setting to copy
+  { const p = document.createElement('div'); p.style.cssText = 'position:fixed;left:12px;top:12px;z-index:9;background:rgba(0,0,0,.72);color:#ddd;font:13px monospace;padding:10px 12px;border-radius:6px;display:none;line-height:1.9';
+    const out = document.createElement('div');
+    const rows = [['moon', 'Moonlight', 0, 1.5], ['fill', 'Shadow fill', 0, 2], ['blue', 'Blue', 0, 1], ['contrast', 'Contrast', 0, 1], ['bright', 'Brightness', 0.2, 1.6]];
+    const show = () => { out.textContent = 'LOOK = ' + JSON.stringify(LOOK); };
+    for (const [k, name, a, b] of rows) {
+      const l = document.createElement('label'), r = document.createElement('input'), v = document.createElement('span');
+      r.type = 'range'; r.min = a; r.max = b; r.step = 0.01; r.value = LOOK[k]; r.style.cssText = 'width:220px;vertical-align:middle;margin:0 8px';
+      v.textContent = LOOK[k].toFixed(2); r.oninput = () => { LOOK[k] = +r.value; v.textContent = (+r.value).toFixed(2); show(); };
+      l.append(name.padEnd(12, ' '), r, v); l.style.display = 'block'; l.style.whiteSpace = 'pre'; p.append(l);
+    }
+    p.append(out); show(); document.body.append(p);
+    for (const e of ['keydown', 'pointerdown', 'mousedown', 'click']) p.addEventListener(e, (ev) => ev.stopPropagation());
+    addEventListener('keydown', (e) => { if (e.code === 'KeyT' && !e.repeat) { const on = p.style.display === 'none'; p.style.display = on ? 'block' : 'none'; if (on) document.exitPointerLock(); } });
+  }
   // for screenshots from the browser console: dev.view(x, y, z, lookX, lookY, lookZ) places the camera, dev.play() hides the menu
   window.dev = { view: lookAt, play: () => ui(false), pose: (i) => lookAt(...POSES[i]),
     // dev.bench() starts the benchmark flight; dev.state() says how far it got (and the report once it is done)

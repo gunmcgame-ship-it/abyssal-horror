@@ -187,7 +187,7 @@ fn kar(c: vec3f) -> vec4f { let w = 1. / (1. + max(c.r, max(c.g, c.b))); return 
 const S_G = /*wgsl*/`
 // mc: moonlight (rgb, after the eclipse) and how much of the moon's light is left (w, 1 uneclipsed .. ~.01 in totality)
 // ec: the earth's shadow on the moon: its centre (xy, in moon radii, x right and y up on the disc), umbra and penumbra radii
-struct G { vp: mat4x4f, sm: mat4x4f, cam: vec4f, right: vec4f, up: vec4f, fwd: vec4f, sun: vec4f, res: vec4f, mis: vec4f, fire: vec4f, lant: vec4f, mc: vec4f, ec: vec4f };
+struct G { vp: mat4x4f, sm: mat4x4f, cam: vec4f, right: vec4f, up: vec4f, fwd: vec4f, sun: vec4f, res: vec4f, mis: vec4f, fire: vec4f, lant: vec4f, mc: vec4f, ec: vec4f, tn: vec4f };
 const TAU = 6.2831853;
 const LOW = ${LV > 1};
 const MOON = vec3f(${MOON});
@@ -298,7 +298,7 @@ fn plS(p: vec3f, n: vec3f, V: vec3f, pw: f32, v: vec2f) -> vec3f {
        + LANTC * att(p, g.lant, LANTR) * pow(sat(dot(n, normalize(V + ll))), pw) * sat(dot(n, ll) * 4.) * v.y;
 }
 // sky light from above (sky: how open to the sky, from the baked volume) and a little warm bounce from the ground
-fn amb(n: vec3f, sky: f32) -> vec3f { let up = n.y * .5 + .5; return (SKYA * g.mc.w + SKY0) * (.2 + .8 * sky) * (.3 + .7 * up) + g.mc.rgb * .05 * (.4 + .6 * sat(dot(n, -vec3f(MOON.x, 0., MOON.z)))) * (.5 + .5 * sky); }
+fn amb(n: vec3f, sky: f32) -> vec3f { let up = n.y * .5 + .5; return (SKYA * g.mc.w + SKY0) * g.tn.x * (.2 + .8 * sky) * (.3 + .7 * up) + g.mc.rgb * .05 * (.4 + .6 * sat(dot(n, -vec3f(MOON.x, 0., MOON.z)))) * (.5 + .5 * sky); }
 // thin, dry desert air: far rock takes on a little of the sky's blue, and at the end of the draw distance it is all sky
 // Light hanging in the air: the night air (and the fire's smoke) scatters a little of the fire and lantern light toward
 // the eye along every view ray, so both sit in a soft glow instead of just painting the ground. Closed form of the
@@ -776,7 +776,7 @@ fn tmap(x: vec3f) -> vec3f { return sat3((x * (2.51 * x + .03)) / (x * (2.43 * x
   // cones see colour again. Done on the scene light before exposure, so it follows how bright things really are.
   let lp = dot(c, vec3f(.2126, .7152, .0722));
   let sc = dot(c, vec3f(.01, .37, .62));
-  c = mix(sc * vec3f(.70, .84, 1.12), c, max(ss(.06, .5, lp), .14)); // a trace of colour survives
+  c = mix(sc * mix(vec3f(.78, .88, 1.05), vec3f(.52, .74, 1.3), g.tn.y), c, max(ss(.06, .5, lp), .14)); // a trace of colour survives
   // exposure: the eyes adjust only a little; a dark scene stays dark
   let ad = textureLoad(tA, vec2i(0), 0).r;
   c *= g.mis.x * clamp(pow(.032 / max(ad, 1e-5), .4), .7, 1.5);
@@ -785,7 +785,7 @@ fn tmap(x: vec3f) -> vec3f { return sat3((x * (2.51 * x + .03)) / (x * (2.43 * x
   c = tmap(c);
   // the original project's contrast curve: deeper darks, a soft shoulder on the highlights
   let l0 = dot(c, vec3f(.2126, .7152, .0722));
-  c *= mix(l0, l0 * l0 * (3. - 2. * l0), .3) / max(l0, 1e-4);
+  c *= mix(l0, l0 * l0 * (3. - 2. * l0), g.tn.z) / max(l0, 1e-4);
   // in the dark the eye loses colour and sees a little bluer: only the dimmest parts of the image
   let l = dot(c, vec3f(.2126, .7152, .0722));
   c = mix(vec3f(l) * vec3f(.85, .95, 1.12), c, .75 + .25 * ss(.03, .45, l));

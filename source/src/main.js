@@ -49,8 +49,11 @@ const tMap = tex(512, 512, 'rgba8unorm', TU.TEXTURE_BINDING | TU.COPY_DST);
 
 // uniforms (struct G in shaders.js): view-projection, shadow matrix, camera, basis, moon, resolution, misc, fire, lantern,
 // moonlight, eclipse shadow
-const UB = new Float32Array(76), UBS = new Float32Array(76);
-const ubo = device.createBuffer({ size: 304, usage: BU.UNIFORM | BU.COPY_DST }), uboS = device.createBuffer({ size: 304, usage: BU.UNIFORM | BU.COPY_DST });
+const UB = new Float32Array(80), UBS = new Float32Array(80);
+const ubo = device.createBuffer({ size: 320, usage: BU.UNIFORM | BU.COPY_DST }), uboS = device.createBuffer({ size: 320, usage: BU.UNIFORM | BU.COPY_DST });
+// the night look, in one place: moonlight, sky fill in the shadows, blue of night vision, contrast in the darks,
+// overall brightness (1 = as designed). The dev build has sliders for them (T).
+const LOOK = { moon: 0.7, fill: 0.7, blue: 0.5, contrast: 0.45, bright: 0.85 };
 
 const VF = SS.VERTEX | SS.FRAGMENT;
 const bgl0 = device.createBindGroupLayout({ entries: [
@@ -402,7 +405,7 @@ function eclipse(m) {
 // ---------------------------------------------------------------- frame
 let hud = false;
 let kLift = 0, kf = 0, kb = 0, kl = 0, kr = 0, ku = 0, kd = 0, ks = 0, mdx = 0, mdy = 0, lkx = 0, lky = 0, l2x = 0, l2y = 0, hN = 0, hMax = 0, hMin = 1e9, hPer = 1e9, hLate = 0, hTot = 0, tId = -1, tN = 0, tx0 = 0, ty0 = 0, tx = 0, ty = 0;
-const TANH = 0.6, NEAR = 0.1, EXPO = 0.85;
+const TANH = 0.6, NEAR = 0.1;
 const submitList = [null];
 const rowOrd = new Uint8Array(CELLS);
 // Draws the cells of a cell-sorted buffer that are in view and within [minD, maxD) (scaled by `det`, but not for the
@@ -449,8 +452,9 @@ function render() {
   m[36] = rx; m[37] = 0; m[38] = rz; m[39] = TANH * asp;
   m[40] = ux; m[41] = uy; m[42] = uz; m[43] = TANH;
   m[44] = fx; m[45] = fy; m[46] = fz; m[47] = NEAR;
-  m[56] = EXPO; m[57] = F[DT]; m[58] = det;
-  eclipse(m);
+  m[56] = LOOK.bright; m[57] = F[DT]; m[58] = det;
+  eclipse(m); m[68] *= LOOK.moon; m[69] *= LOOK.moon; m[70] *= LOOK.moon;
+  m[76] = LOOK.fill; m[77] = LOOK.blue; m[78] = LOOK.contrast;
   const t = F[TIME];
   // the breeze (same as gust() in shaders.js): in a strong gust the lantern gutters, dimming for a second or two
   const gs = t - (cx * 0.05 + cz * 0.02), gb = 0.5 + 0.5 * sin(gs * 0.37) * sin(gs * 0.23 + 1.3), gu = 0.35 + 0.65 * gb * gb;
