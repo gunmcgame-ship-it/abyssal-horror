@@ -53,5 +53,7 @@
     },
     // put the benchmark camera at time t of the flight (for frames of the fly-through)
     flyTo: (t) => { flying = false; F[FLT] = t; flyAt(); },
+    // dev.clock(m): the eclipse clock, in game minutes after 3:35 a.m. (9 first bite, 90 totality, 111 deepest)
+    clock: (m) => (F[ECT] = m),
     state: () => ({ flying, t: F[FLT], frames: nFrame, gpu: F[GPU], size: W + 'x' + H, report: info.textContent }) };
 }

@@ -47,9 +47,10 @@ const tDetail = tex(1024, 1024, 'rgba8unorm', TU.RENDER_ATTACHMENT | TU.TEXTURE_
 const tVol = tex(NX / 2, NY / 2, 'rg8unorm', TU.TEXTURE_BINDING | TU.COPY_DST, { d: NZ / 2 });
 const tMap = tex(512, 512, 'rgba8unorm', TU.TEXTURE_BINDING | TU.COPY_DST);
 
-// uniforms (struct G in shaders.js): view-projection, shadow matrix, camera, basis, moon, resolution, misc, fire, lantern
-const UB = new Float32Array(68), UBS = new Float32Array(68);
-const ubo = device.createBuffer({ size: 272, usage: BU.UNIFORM | BU.COPY_DST }), uboS = device.createBuffer({ size: 272, usage: BU.UNIFORM | BU.COPY_DST });
+// uniforms (struct G in shaders.js): view-projection, shadow matrix, camera, basis, moon, resolution, misc, fire, lantern,
+// moonlight, eclipse shadow
+const UB = new Float32Array(76), UBS = new Float32Array(76);
+const ubo = device.createBuffer({ size: 304, usage: BU.UNIFORM | BU.COPY_DST }), uboS = device.createBuffer({ size: 304, usage: BU.UNIFORM | BU.COPY_DST });
 
 const VF = SS.VERTEX | SS.FRAGMENT;
 const bgl0 = device.createBindGroupLayout({ entries: [
@@ -105,6 +106,10 @@ const pFire = scenePipe(mFire, 'vs', 'fs', [ibFire], { strip: true, blend: ADD }
 const pSolidSh = shadowPipe(mSolid, 'vs', [vbSolid, ibSolid]), pTerrSh = shadowPipe(mSolid, 'vs', [vbSolid, ibSolid], { cull: 'front' });
 const pLeafSh = shadowPipe(mLeaf, 'vs', [ibLeaf], { strip: true, constants: { ROWS: 3 } });
 const mPost = mod(W_POST);
+// the eye's adaptation: tAd is this frame's value, tAdP last frame's (copied over after the frame)
+const tAd = tex(1, 1, 'r32float', TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING | TU.COPY_SRC), tAdP = tex(1, 1, 'r32float', TU.TEXTURE_BINDING | TU.COPY_DST);
+const mAdapt = mod(W_ADAPT), pAdapt = device.createRenderPipeline({ layout: 'auto', vertex: { module: mAdapt, entryPoint: 'vs' }, fragment: { module: mAdapt, entryPoint: 'fs', targets: [{ format: 'r32float' }] } });
+const passAdapt = { colorAttachments: [colorAtt(tAd.createView(), true)] };
 const pPost = device.createRenderPipeline({ layout: 'auto', vertex: { module: mPost, entryPoint: 'vs' }, fragment: { module: mPost, entryPoint: 'fs', targets: [{ format: FMT }] } });
 
 // ---------------------------------------------------------------- moon + shadow matrix
@@ -219,7 +224,7 @@ const FLYN = FLY.length / 6, FLYT = 60, LUTN = 1024, flyLUT = new Float32Array(L
 const flyPts = [];
 // per-frame float state lives in one preallocated array, so the frame loop allocates no heap numbers
 const F = new Float64Array(32), P6 = new Float64Array(6);
-const CX = 0, CY = 1, CZ = 2, YAW = 3, PIT = 4, FX = 5, FY = 6, FZ = 7, RX = 8, RZ = 9, UX = 10, UY = 11, UZ = 12, VX = 13, VY = 14, VZ = 15, TIME = 16, FLT = 17, LAST = 18, GPU = 19, HUDT = 20, SPL = 21, MX = 22, MY = 23, MZ = 24;
+const CX = 0, CY = 1, CZ = 2, YAW = 3, PIT = 4, FX = 5, FY = 6, FZ = 7, RX = 8, RZ = 9, UX = 10, UY = 11, UZ = 12, VX = 13, VY = 14, VZ = 15, TIME = 16, FLT = 17, LAST = 18, GPU = 19, HUDT = 20, SPL = 21, MX = 22, MY = 23, MZ = 24, DT = 25, ECT = 26;
 // aim the camera from P6 = position + look-at point
 function aim() {
   const dx = P6[3] - P6[0], dy = P6[4] - P6[1], dz = P6[5] - P6[2];
@@ -314,7 +319,7 @@ Wd.volD = Wd.gm = T.vb = T.ib = T.wp = T.wn = 0;
 // for 60 fps; both start where the last visit left them.
 const PIXMAX = 2560 * 1440, PIXMIN = mob ? 25e4 : 5e5, DETMIN = 0.4;
 let W = 0, H = 0, DW = 0, DH = 0, pix = +SV[1] || (LV > 1 ? 41e4 : mob ? 1280 * 720 : PIXMAX), det = +SV[2] || 1, dynN = 0, dynT = 0, dynG = 0, dynGN = 0, dynBad = 0, dynOk = 0, dynWait = 3;
-let passScene, passPost, bgPost, bloomPass = [], bloomBG = [], targets = [];
+let passScene, passPost, bgPost, bgAdapt, bloomPass = [], bloomBG = [], targets = [];
 const NB = 6;
 function resize() {
   DW = max(2, round(canvas.clientWidth * devicePixelRatio)); DH = max(2, round(canvas.clientHeight * devicePixelRatio));
@@ -335,7 +340,8 @@ function resize() {
   passScene = { colorAttachments: [{ view: AA > 1 ? tMS.createView() : vRes, resolveTarget: AA > 1 ? vRes : undefined, loadOp: 'clear', storeOp: AA > 1 ? 'discard' : 'store', clearValue: [0, 0, 0, 1] }],
     depthStencilAttachment: { view: vDp, depthClearValue: 0, depthLoadOp: 'clear', depthStoreOp: 'store' } };
   passPost = { colorAttachments: [{ view: null, loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 1] }] };
-  bgPost = device.createBindGroup({ layout: pPost.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: ubo } }, { binding: 1, resource: sClamp }, { binding: 2, resource: vRes }, { binding: 3, resource: vBl[0] }] });
+  bgPost = device.createBindGroup({ layout: pPost.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: ubo } }, { binding: 1, resource: sClamp }, { binding: 2, resource: vRes }, { binding: 3, resource: vBl[0] }, { binding: 4, resource: tAd.createView() }] });
+  bgAdapt = device.createBindGroup({ layout: pAdapt.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: ubo } }, { binding: 1, resource: vBl[NB - 1] }, { binding: 2, resource: tAdP.createView() }] });
   bloomPass = []; bloomBG = [];
   // down: res -> b0 -> ... -> b5 ; up: b5 -> b4 (additive) ... -> b0
   for (let i = 0; i < NB; i++) { bloomPass.push({ colorAttachments: [colorAtt(vBl[i], true)] }); bloomBG.push(blitBG(i ? vBl[i - 1] : vRes)); }
@@ -361,6 +367,33 @@ if (hasTS) {
     qRead.push(o);
   }
   tsBegin = { querySet: qs, beginningOfPassWriteIndex: 0 }; tsEnd = { querySet: qs, endOfPassWriteIndex: 1 };
+}
+
+// ---------------------------------------------------------------- the eclipse
+// The total lunar eclipse of 7 November 1957, as seen from a southern California desert canyon, but one hour earlier than
+// it really was (so the red moon hangs in a dark sky instead of setting at dawn). The sky itself stays at the moment
+// totality begins (5:05 a.m.): the moon does not move. Only the earth's shadow moves across it.
+// The game clock F[ECT] is in minutes after 3:35 a.m. and runs ECLX times faster than real time while playing:
+// first bite ~3:44 (2 minutes in), totality 5:05-5:52 (20-30 minutes in), deepest at 5:26.
+const ECLX = 4.5;
+// the shadow centre relative to the moon in moon radii, east and north, from astro (canon.mjs in the notes): it moves
+// in a straight line, 3.25, 2.18 at 3:35 to -1.03, 1.31 at 5:52. Umbra 2.67 and penumbra 4.83 moon radii.
+// The parallactic angle (56.6 degrees) turns east/north into right/up on the disc as it sits low in the west.
+const ECU = 2.67, ECP = 4.83, ECQ = 56.6 * PI / 180, MOON0 = [0.4, 0.376, 0.344];
+const essm = (a, b, x) => { const t = x < a ? 0 : x > b ? 1 : (x - a) / (b - a); return t * t * (3 - 2 * t); };
+function eclipse(m) {
+  const t = F[ECT], ee = 3.25 - 0.03124 * t, nn = 2.18 - 0.00635 * t;
+  const sx = -ee * cos(ECQ) + nn * sin(ECQ), sy = ee * sin(ECQ) + nn * cos(ECQ);
+  // the moon's light: the disc brightness of the sky shader (pen, red) averaged over the disc, relative to uneclipsed
+  let r = 0, g = 0, b = 0, n = 0;
+  for (let j = 0; j < 9; j++) for (let i = 0; i < 9; i++) {
+    const x = (i - 4) / 4, y = (j - 4) / 4; if (x * x + y * y > 1) continue;
+    const dd = hypot(x - sx, y - sy), pen = essm(ECU - 0.12, ECP, dd), k = min(dd / ECU, 1), rd = (0.04 + 0.18 * k * k * k) * (1 - pen);
+    r += pen + rd; g += pen + rd * 0.34 / 0.8; b += pen + rd * 0.12 / 0.58; n++;
+  }
+  r /= n; g /= n; b /= n;
+  m[68] = MOON0[0] * r; m[69] = MOON0[1] * g; m[70] = MOON0[2] * b; m[71] = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  m[72] = sx; m[73] = sy; m[74] = ECU; m[75] = ECP;
 }
 
 // ---------------------------------------------------------------- frame
@@ -413,7 +446,8 @@ function render() {
   m[36] = rx; m[37] = 0; m[38] = rz; m[39] = TANH * asp;
   m[40] = ux; m[41] = uy; m[42] = uz; m[43] = TANH;
   m[44] = fx; m[45] = fy; m[46] = fz; m[47] = NEAR;
-  m[56] = EXPO; m[58] = det;
+  m[56] = EXPO; m[57] = F[DT]; m[58] = det;
+  eclipse(m);
   const t = F[TIME];
   // the breeze (same as gust() in shaders.js): in a strong gust the lantern gutters, dimming for a second or two
   const gs = t - (cx * 0.05 + cz * 0.02), gb = 0.5 + 0.5 * sin(gs * 0.37) * sin(gs * 0.23 + 1.3), gu = 0.35 + 0.65 * gb * gb;
@@ -464,9 +498,11 @@ function render() {
   for (let i = 0; i < bloomPass.length; i++) {
     r = e.beginRenderPass(bloomPass[i]); r.setPipeline(i === 0 ? pDown0 : i < NB ? pDown : pUp); r.setBindGroup(0, bloomBG[i]); r.draw(3); r.end();
   }
-  // composite
+  // the eye adjusting, then the composite
+  r = e.beginRenderPass(passAdapt); r.setPipeline(pAdapt); r.setBindGroup(0, bgAdapt); r.draw(3); r.end();
   passPost.colorAttachments[0].view = ctx.getCurrentTexture().createView();
   r = e.beginRenderPass(passPost); r.setPipeline(pPost); r.setBindGroup(0, bgPost); r.draw(3); r.end();
+  e.copyTextureToTexture({ texture: tAd }, { texture: tAdP }, [1, 1]);
   if (slot) { e.resolveQuerySet(qs, 0, 2, qResolve, 0); e.copyBufferToBuffer(qResolve, 0, slot.b, 0, 16); }
   submitList[0] = e.finish();
   Q.submit(submitList);
@@ -524,7 +560,8 @@ function frame(now) {
     if (was !== pix + det) keep('abyssal', [LV, pix < top ? pix | 0 : '', det]); // nothing kept at full resolution
     dynN = dynT = dynG = dynGN = 0; resize();
   }
-  F[TIME] += dt;
+  F[TIME] += dt; F[DT] = dt;
+  if (!menu) F[ECT] += dt * ECLX / 60;
   {
     // touch: holding the finger away from where it went down keeps turning, like a joystick
     if (tId >= 0) {

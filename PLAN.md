@@ -10,7 +10,7 @@ Desktop Chrome first. Phone support must not be broken on purpose, but is not te
 
 ## 1. The concept
 
-You are a 1950s UFO hobbyist camping alone in Coldsupper Canyon National Monument, Southwest canyon country, 1957, at deep night.
+You are a 1950s UFO hobbyist camping alone in Coldsupper Canyon National Monument, a fictional red-rock canyon in the southern California desert, in the last dark hours of 7 November 1957.
 You start inside the canvas tent, step out, and explore with a real kerosene lantern as your only light.
 Something else is out there. In this version it is **never seen clearly, only hinted at**.
 A full chase and jump scare is planned for a LATER version (see section 8): leave hooks, build none of it now.
@@ -30,7 +30,8 @@ period-appropriate look (for example a 1950s typewriter or park-signage style), 
 | Focus zoom | Hold right mouse button to slowly zoom the view in (narrower field of view, about 2x), release to ease back out. For checking the ridge or a camp detail. |
 | Visible lantern | The lantern is visible in the lower right of the view, held in a hand-height position, swinging with each step and settling when you stop. Its flame is the light source. |
 | Footsteps | Different sounds for sand and rock. Lantern bobs as you walk. |
-| Time and light | Deep night, around moonset (about 2-3 a.m.). Historically accurate moon for early October 1957: a bright waxing gibbous (about 80% lit) sitting LOW on the western horizon, about to set, slightly warm-tinted by the low angle, casting long shadows. Much of the canyon floor is in moon shadow. Dense stars and Milky Way. Realistic look, no film filter. |
+| Time and light | Before dawn, 3:35-6 a.m. Pacific time, 7 November 1957: the real total lunar eclipse of that morning, with ONE deliberate cheat (owner decision): the eclipse runs one hour earlier than it really did, so the red moon hangs in a dark sky instead of setting at dawn. The full moon sits LOW in the west (13.45 degrees up, 9.4 degrees north of west, its real place at the start of totality), slightly warm, casting long shadows. The sky is frozen at that moment; only the earth's shadow moves across the moon. Real eclipse geometry (shadow path, umbra and penumbra sizes, the parallactic angle) from an almanac calculation. The moon is drawn about twice its real size. Moonlit sky is a dim day-blue; in totality only airglow and starlight are left and the Milky Way (its faint winter half, arching 57 degrees up above the moon from NNW to SSE) and stars come out. Realistic look, no film filter. |
+| Eclipse clock | The eclipse progresses while playing, 4.5 times faster than real time (one easy-to-change number): first bite about 2 minutes in, totality from about 20 to 30 minutes in, deepest at about 25. The moonlight on the land follows the eclipse (dimmer and redder). How the clock ties to the story is decided in M5. |
 | Player light | One 1950s lantern: flickers and sways when walking, SHORT range (about 10-15 m, falls off fast). Wind makes it gutter: it dims and recovers within a second or two (never fully out). No flashlight. Fuel does not run out. |
 | Landscape | Southwest canyon country: red mesas, arches, pillars, canyons. |
 | Plants | Juniper, pinyon pine, sagebrush, yucca, prickly pear, small cacti (replaces kelp, sponges, coral). |
@@ -45,7 +46,7 @@ period-appropriate look (for example a 1950s typewriter or park-signage style), 
 | Map size | Small and dense, about 300 m across (same as the original world). |
 | Hint timing | Random timer (see Hint pace). No fixed trigger spots for v1. |
 | Goal | None. Pure exploration and mood. No ending in v1. |
-| Darkness | Dark but readable: moonlight shows big shapes (mesas, rocks). Menu has a brightness slider. |
+| Darkness | Dark but readable: moonlight shows big shapes (mesas, rocks). The eyes adjust: brightness adapts to what is in view (fast toward light, slow, several seconds, toward dark), within limits so night stays night. Menu has a brightness slider. |
 | Weather and sky motion | Steady breeze with occasional gusts (moves plants and tent canvas, drives lantern flicker), occasional shooting stars, thin high clouds crossing the moon. No dust devils. |
 | Campfire | Burns low and steady the whole time. No dying fire in v1. |
 | Camp location | A landing (flat turnout) down in the canyon at the bottom of the dirt road/ramp that leads up and out. The pickup and camper trailer are parked across the ramp and block it, which explains why the player stays down in the canyon. Canyon walls form the rest of the boundary (collision on truck and camper too). |
@@ -56,7 +57,7 @@ period-appropriate look (for example a 1950s typewriter or park-signage style), 
 | Canyon shape | Winding canyon with side pockets: bends hide what's ahead, small alcoves to explore. |
 | Park details | Wooden park sign at the landing reading the park name, an old fire ring and a picnic table. Everything must be 1950s-appropriate: no modern objects, signs, materials or fonts. |
 | Other people | Nobody else is there, but there are period-appropriate traces that others have been before (for example old tire tracks, an older cold fire ring, a rusted can or bottle, a faded trail marker). |
-| Date | The first days of October 1957, right after Sputnik launched (October 4, 1957). Sputnik is heard on the radio only, NOT shown in the sky (at 2-3 a.m. it would be in Earth's shadow and invisible). |
+| Date | The morning of 7 November 1957: one month after Sputnik 1 (October 4), four days after Sputnik 2 with the dog Laika (November 3), during the big early-November 1957 UFO wave (Levelland, Texas, November 2-3, and White Sands). Sputnik is heard on the radio only for now (note: Sputnik 1's transmitter had gone silent on October 26; the beeps in November would be Sputnik 2's). OPEN QUESTION for the owner: before dawn, satellites and Sputnik 1's rocket stage are sunlit and could be shown crossing the sky. |
 | Title | Working title: "Ground Observer, 1957". Use it in the menu, page title and README. May change later; keep it in one easy-to-edit place. |
 | Menu text | The title plus a quiet date-and-place line: "<Park name>, 1957". |
 | Park name | Coldsupper Canyon National Monument. Shown on the wooden park sign at the landing and on the menu line ("Coldsupper Canyon National Monument, 1957"). |

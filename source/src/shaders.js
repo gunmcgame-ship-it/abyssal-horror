@@ -2,14 +2,16 @@
 // WGSL sources
 // ============================================================================
 
-// The moon: low in the west (-z), a little to the north (+x), 13 degrees up. Its light casts the (baked) shadows.
+// The moon: full, low in the west (-z), a little to the north (+x). Its light casts the (baked) shadows.
+// Its place is the real one at the start of totality (astro.js): 13.45 degrees up, azimuth 279.4 (9.4 degrees north of west).
 // Compass used throughout: -z west, +z east, +x north, -x south.
-const MOON = (() => { const el = 13 * PI / 180, az = 10 * PI / 180; return [cos(el) * sin(az), sin(el), -cos(el) * cos(az)]; })();
+const MOON = (() => { const el = 13.45 * PI / 180, az = 9.36 * PI / 180; return [cos(el) * sin(az), sin(el), -cos(el) * cos(az)]; })();
 // Camp: centre of the flat clearing (x, ground height, z). The terrain generator flattens the ground around it.
 const CAMP = [0, -45, 2];
-// Milky Way: the great circle from the north-west horizon, nearly overhead, down to the south-east (early October, ~2 a.m.)
-const MWN = (() => { const a = [0.7071, 0, -0.7071], b = [0.21, 1, 0.21], l = hypot(...b); b[0] /= l; b[1] /= l; b[2] /= l;
-  const n = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], m = hypot(...n); return n.map((c) => c / m); })();
+// Milky Way: the normal of its plane is the galactic north pole, 32.7 degrees up at azimuth 78 (7 November 1957, 5 a.m.,
+// southern California). The band rises from the north-north-west horizon, passes 57 degrees up in the west (above the
+// moon) and comes down in the south-south-east; its bright centre is far below the horizon, so this is the faint half.
+const MWN = (() => { const al = 32.7 * PI / 180, az = 78 * PI / 180; return [cos(al) * cos(az), sin(al), cos(al) * sin(az)]; })();
 
 const W_NOISE = /*wgsl*/`
 fn ss(a: f32, b: f32, x: f32) -> f32 { let t = clamp((x - a) / (b - a), 0., 1.); return t * t * (3. - 2. * t); }
@@ -180,14 +182,16 @@ fn kar(c: vec3f) -> vec4f { let w = 1. / (1. + max(c.r, max(c.g, c.b))); return 
 // ---------------------------------------------------------------- shared scene code
 // Light units: moonlight on a surface facing the moon is about 0.6; the post pass scales everything by the exposure.
 const S_G = /*wgsl*/`
-struct G { vp: mat4x4f, sm: mat4x4f, cam: vec4f, right: vec4f, up: vec4f, fwd: vec4f, sun: vec4f, res: vec4f, mis: vec4f, fire: vec4f, lant: vec4f };
+// mc: moonlight (rgb, after the eclipse) and how much of the moon's light is left (w, 1 uneclipsed .. ~.01 in totality)
+// ec: the earth's shadow on the moon: its centre (xy, in moon radii, x right and y up on the disc), umbra and penumbra radii
+struct G { vp: mat4x4f, sm: mat4x4f, cam: vec4f, right: vec4f, up: vec4f, fwd: vec4f, sun: vec4f, res: vec4f, mis: vec4f, fire: vec4f, lant: vec4f, mc: vec4f, ec: vec4f };
 const TAU = 6.2831853;
 const LOW = ${LV > 1};
 const MOON = vec3f(${MOON});
 const MWN = vec3f(${MWN});
-const MOONC = vec3f(1., .94, .86) * .4;
-const SKYA = vec3f(.024, .034, .068);
-const HAZE = vec3f(.011, .014, .025);
+// sky light in the shadows: moonlight scattered by the air (blue, goes with the moon), and airglow + starlight (always there)
+const SKYA = vec3f(.026, .038, .080);
+const SKY0 = vec3f(.0030, .0036, .0052);
 const FIREC = vec3f(1., .40, .12);
 const LANTC = vec3f(1., .64, .34);
 fn sat(x: f32) -> f32 { return clamp(x, 0., 1.); }
@@ -197,12 +201,14 @@ fn hs(x: f32) -> f32 { return fract(sin(x * 127.1) * 43758.5453); }
 fn fin(c: vec3f) -> vec4f { return vec4f(min(max(c, vec3f(0.)), vec3f(60.)), 1.); }
 // the breeze: 0.35 calm .. 1 in a gust, gusts travel across the canyon
 fn gust(t: f32, p: vec2f) -> f32 { let s = t - dot(p, vec2f(.05, .02)); return .35 + .65 * pow(.5 + .5 * sin(s * .37) * sin(s * .23 + 1.3), 2.); }
-// the night sky without stars: dark blue-black overhead, a faint glow at the horizon and around the moon
+// the night sky without stars. Moonlight scattered by the air makes a dim day-blue sky, lighter low down and toward the
+// moon, with a warm glow round the moon itself; under it the faint airglow, brightest along the horizon. In totality only
+// the airglow is left.
 fn skyBase(rd: vec3f) -> vec3f {
-  let up = sat(rd.y);
-  var c = mix(vec3f(.016, .020, .034), vec3f(.0022, .0034, .0085), pow(up, .4));
-  let mu = sat(dot(rd, MOON));
-  c += vec3f(.060, .050, .038) * (pow(mu, 6.) * .3 + pow(mu, 40.) * .5 + pow(mu, 400.) * 1.5);
+  let up = sat(rd.y); let mu = sat(dot(rd, MOON)); let ml = g.mc.w;
+  var c = mix(vec3f(.0050, .0056, .0070), vec3f(.0010, .0013, .0026), pow(up, .35));
+  c += mix(vec3f(.030, .040, .062), vec3f(.0060, .0105, .0260), pow(up, .45)) * (1. + .8 * mu * mu) * ml;
+  c += g.mc.rgb * vec3f(.16, .13, .10) * (pow(mu, 6.) * .3 + pow(mu, 40.) * .5 + pow(mu, 400.) * 1.5);
   return c * select(1., .6, rd.y < 0.);
 }
 `;
@@ -238,12 +244,12 @@ fn plS(p: vec3f, n: vec3f, V: vec3f, pw: f32) -> vec3f {
        + LANTC * att(p, g.lant, LANTR) * pow(sat(dot(n, normalize(V + ll))), pw) * sat(dot(n, ll) * 4.);
 }
 // sky light from above (sky: how open to the sky, from the baked volume) and a little warm bounce from the ground
-fn amb(n: vec3f, sky: f32) -> vec3f { let up = n.y * .5 + .5; return SKYA * (.2 + .8 * sky) * (.3 + .7 * up) + MOONC * .045 * (.4 + .6 * sat(dot(n, -vec3f(MOON.x, 0., MOON.z)))) * (.5 + .5 * sky); }
-// thin, dry night air: a faint cool haze, and at the far end of the draw distance everything fades into the sky
+fn amb(n: vec3f, sky: f32) -> vec3f { let up = n.y * .5 + .5; return (SKYA * g.mc.w + SKY0) * (.2 + .8 * sky) * (.3 + .7 * up) + g.mc.rgb * .05 * (.4 + .6 * sat(dot(n, -vec3f(MOON.x, 0., MOON.z)))) * (.5 + .5 * sky); }
+// thin, dry desert air: far rock takes on a little of the sky's blue, and at the end of the draw distance it is all sky
 fn fog(c: vec3f, wp: vec3f) -> vec3f {
   let v = wp - g.cam.xyz; let d = length(v); let rd = v / d;
-  let T = exp(-d * .006);
-  let o = c * T + mix(HAZE, skyBase(vec3f(rd.x, .03, rd.z)), .6) * (1. - T);
+  let T = exp(-d * .0045);
+  let o = c * T + skyBase(vec3f(rd.x, .04, rd.z)) * .8 * (1. - T);
   return mix(o, skyBase(rd), ss(195., 235., d));
 }
 fn qrot(q: vec4f, v: vec3f) -> vec3f { return v + 2. * cross(q.xyz, cross(q.xyz, v) + q.w * v); }
@@ -311,7 +317,7 @@ fn prop(id: i32, op: vec3f, mc: f32, h: f32) -> PM {
     case 24 { m.a = vec3f(.30, .28, .22); m.bp = .1; }                         // ground cloth
     case 40 { m.a = vec3f(.42, .05, .03); m.gl = .5; m.bp = .1; }              // lantern: red paint
     case 41 { m.a = vec3f(.1); m.gl = 1.; m.bp = 0.;                            // lantern: glass globe, lit from inside
-      m.e = LANTC * g.lant.w * (.35 + .5 * ss(.08, -.02, abs(op.y - .005))); }
+      m.e = LANTC * g.lant.w * (.2 + .35 * ss(.08, -.02, abs(op.y - .005))); }
     case 42 { m.a = vec3f(.30, .30, .31); m.gl = .6; m.mt = .8; m.bp = .05; } // lantern: tin and wire
     case 60 { m.a = vec3f(.10, .17, .08) * (.7 + .5 * h); m.gl = .3; m.bp = .5; }    // cactus
     case 61 { m.a = vec3f(.30, .26, .22) * (.6 + .6 * h); m.bp = 1.5; }       // juniper bark
@@ -368,7 +374,7 @@ fn prop(id: i32, op: vec3f, mc: f32, h: f32) -> PM {
   let V = normalize(g.cam.xyz - i.wp);
   let v1 = vol(i.wp + n0 * 1.5); let v2 = vol(i.wp + n0 * 4.5);
   let ao = (sat((v1.r - .5) * 8.) * .55 + sat((v2.r - .5) * 2.7) * .45) * aoK;
-  let E = MOONC * shadow9(i.wp + n0 * .35);
+  let E = g.mc.rgb * shadow9(i.wp + n0 * .35);
   let ndl = sat(dot(N, MOON));
   var c = alb * (1. - metal) * (E * (ndl + tl * sat(-dot(N, MOON))) + amb(N, v1.g) * ao + plD(i.wp + n0 * .03, N)) + emi;
   let pw = mix(8., 300., gloss);
@@ -377,7 +383,7 @@ fn prop(id: i32, op: vec3f, mc: f32, h: f32) -> PM {
   let H = normalize(V + MOON);
   c += Fr * gloss * ((pw + 2.) / 8.) * (E * pow(sat(dot(N, H)), pw) * ndl + plS(i.wp, N, V, pw));
   let R = reflect(-V, N);
-  c += Fr * gloss * select(skyBase(R), vec3f(.30, .22, .16) * (MOONC * .25 + SKYA * .6) * (1. - .4 * R.y), R.y < 0.) * (.3 + .7 * ao) * 2.;
+  c += Fr * gloss * select(skyBase(R), vec3f(.30, .22, .16) * (g.mc.rgb * .25 + SKYA * g.mc.w * .6 + SKY0) * (1. - .4 * R.y), R.y < 0.) * (.3 + .7 * ao) * 2.;
   // the lantern's flame, seen through its glass
   if (mat == 2 && i32(round(i.ao * 127.)) == 41) { let vf = 1. - dot(-V, normalize(g.lant.xyz - vec3f(0., .012, 0.) - g.cam.xyz)); c += vec3f(1., .75, .4) * g.lant.w * 6. * exp(-vf / .00012); }
   return fin(fog(c, i.wp));
@@ -445,7 +451,7 @@ fn shape2(v: f32) -> f32 { return sin(3.14159 * sat(v)); }
   let V = normalize(g.cam.xyz - i.wp); let L = MOON;
   let lt = textureSample(tD, sR, vec2f(i.uv.x * .13 + i.sd.x * 3.7, i.uv.y * .8 + i.sd.y * 5.3));
   let vv = vol(i.wp + vec3f(0., .8, 0.));
-  let E = MOONC * shadow1(i.wp + L * .3);
+  let E = g.mc.rgb * shadow1(i.wp + L * .3);
   let ndl = dot(n, L);
   let alb = i.col * (.72 + .28 * ss(0., .25, abs(i.uv.x))) * mix(.55, 1.1, i.uv.y) * (.58 + .42 * ss(0., .13, abs(i.uv.x))) * (.5 + 1.0 * lt.b) * (.65 + .7 * lt.a);
   let tr = (max(-ndl, 0.) * .85 + .15) * i.pr.y;
@@ -459,7 +465,7 @@ fn shape2(v: f32) -> f32 { return sin(3.14159 * sat(v)); }
 `;
 
 // ---------------------------------------------------------------- the night sky, drawn behind everything
-// gradient, two layers of stars, the Milky Way, thin high cloud, the moon (waxing gibbous, ~80% lit) and a rare shooting star
+// gradient, three layers of stars, the Milky Way, thin high cloud, the full moon going into eclipse, a rare shooting star
 const W_SKY = S_B + /*wgsl*/`
 struct VO { @builtin(position) cp: vec4f, @location(0) wp: vec3f };
 @vertex fn vs(@builtin(vertex_index) i: u32) -> VO {
@@ -499,7 +505,8 @@ fn stars(rd: vec3f, sc: f32, dens: f32, bright: f32, px: f32) -> vec3f {
   var c = skyBase(rd);
   let up = sat(rd.y);
   let mu = dot(rd, MOON);
-  let wash = 1. - .8 * pow(sat(mu), 4.);          // the moon washes out the faint stars near it
+  let ml = g.mc.w;
+  let wash = 1. - .8 * pow(sat(mu), 4.) * ml;     // the moon washes out the faint stars near it (not once it is eclipsed)
   let ext = ss(-.01, .2, rd.y);                    // stars fade into the haze at the horizon
   // Milky Way: a soft band with clumps and dark dust lanes, and more faint stars inside it
   let bw = dot(rd, MWN);
@@ -507,7 +514,7 @@ fn stars(rd: vec3f, sc: f32, dens: f32, bright: f32, px: f32) -> vec3f {
   let n1 = fbm3(rd * 7., 5); let n2 = fbm3(rd * 22. + 3., 3);
   let dust = ss(.42, .62, fbm3(rd * 9. + 7., 5)) * exp(-bw * bw / .008);
   let mw = band * (.3 + 1.0 * ss(.3, .8, n1)) * (.6 + .6 * n2) * (1. - .7 * dust);
-  c += vec3f(.055, .056, .064) * mw * wash * ext;
+  c += vec3f(.034, .035, .040) * mw * wash * ext;
   var st = stars(rd, 130., .012, 1., px) + stars(rd, 290., .04 + .6 * band * (1. - dust), .1, px) * wash + stars(rd, 520., .3 * band * (1. - dust), .03, px) * wash;
   // near the horizon the air makes them twinkle
   st *= ext * (1. + .6 * (1. - up) * sin(t * 9. + dot(rd, vec3f(3000., 2100., 2700.))));
@@ -516,19 +523,21 @@ fn stars(rd: vec3f, sc: f32, dens: f32, bright: f32, px: f32) -> vec3f {
   let cn = fbm3(vec3f(cu * vec2f(.9, 1.6) + vec2f(t * .006, t * .0025), 1.), 5);
   let cd = ss(.52, .8, cn) * ss(.1, .3, rd.y) * .8; // only well above the horizon: low down it would smear into streaks
   c += st * (1. - cd);
-  c = mix(c, vec3f(.012, .013, .018) + vec3f(.10, .085, .065) * (pow(sat(mu), 10.) * .5 + pow(sat(mu), 120.) * 3.), cd * .7);
-  // the moon: a lit sphere seen from the side the sun is not on; the bright limb faces down to the right
+  c = mix(c, (vec3f(.012, .013, .018) + vec3f(.10, .085, .065) * (pow(sat(mu), 10.) * .5 + pow(sat(mu), 120.) * 3.)) * (.08 + .92 * ml), cd * .7);
+  // the full moon (drawn about twice its real size). The earth's shadow (g.ec) crosses it: the soft penumbra dims it, the
+  // umbra leaves only a dull copper red, brighter toward the umbra's edge. eclipseLight() in main.js averages the same thing.
   let mr = normalize(cross(MOON, vec3f(0., 1., 0.))); let mu2 = cross(mr, MOON);
   let MR = .0078;
   let q = vec2f(dot(rd, mr), dot(rd, mu2)) / MR; let r = length(q);
   if (mu > 0. && r < 1.5) {
-    let nz = sqrt(max(1. - r * r, 0.)); let nn = vec3f(q, nz);
-    let S = vec3f(normalize(vec2f(.45, -.9)) * .8, .6);   // phase angle 53 degrees: about 80% lit
-    let lit = ss(-.03, .08, dot(nn, S));
+    let nz = sqrt(max(1. - r * r, 0.));
     let mar = fbm3(vec3f(q * 1.8, 3.), 5);
     let alb = mix(.6, 1., ss(.44, .58, mar)) * (.75 + .25 * nz);
     let disc = 1. - ss(1. - px / MR, 1. + px / MR, r);
-    let mc = vec3f(1., .80, .58) * 3.2 * alb * (lit + .006) * (1. - .5 * cd);
+    let dd = length(q - g.ec.xy);
+    let pen = ss(g.ec.z - .12, g.ec.w, dd);
+    let red = vec3f(1., .34, .12) * mix(.04, .22, pow(sat(dd / g.ec.z), 3.));
+    let mc = 3.2 * alb * (vec3f(1., .80, .58) * pen + red * (1. - pen)) * (1. - .5 * cd);
     c = mix(c, mc, disc);
   }
   // a shooting star now and then: a short streak that flares and fades
@@ -585,12 +594,35 @@ fn vn2(p: vec2f) -> f32 {
 }
 `;
 
+// ---------------------------------------------------------------- the eye adjusting to the dark
+// One pixel: the average brightness the eye is used to. Each frame it measures the scene (the smallest bloom level, a
+// log average weighted to the middle of the view) and moves toward it: quickly when it gets brighter (about a second),
+// slowly when it gets darker (several seconds), like real eyes.
+const W_ADAPT = S_G + W_FS + /*wgsl*/`
+@group(0) @binding(0) var<uniform> g: G;
+@group(0) @binding(1) var tB: texture_2d<f32>;
+@group(0) @binding(2) var tP: texture_2d<f32>;
+@fragment fn fs() -> @location(0) vec4f {
+  let d = vec2i(textureDimensions(tB)); var a = 0.; var w = 0.;
+  for (var y = 0; y < d.y; y++) { for (var x = 0; x < d.x; x++) {
+    let l = dot(textureLoad(tB, vec2i(x, y), 0).rgb, vec3f(.2126, .7152, .0722));
+    let q = (vec2f(f32(x), f32(y)) + .5) / vec2f(d) - .5; let k = 1. - 1.6 * dot(q, q);
+    a += k * log(l + 1e-4); w += k;
+  } }
+  let m = exp(a / w); let p = textureLoad(tP, vec2i(0), 0).r;
+  if (p <= 0.) { return vec4f(m, 0., 0., 1.); }
+  let tau = select(4.5, 1., m > p);
+  return vec4f(exp(mix(log(p), log(m), 1. - exp(-g.mis.y / tau))), 0., 0., 1.);
+}
+`;
+
 // ---------------------------------------------------------------- final composite
 const W_POST = S_G + W_FS + /*wgsl*/`
 @group(0) @binding(0) var<uniform> g: G;
 @group(0) @binding(1) var sC: sampler;
 @group(0) @binding(2) var tS: texture_2d<f32>;
 @group(0) @binding(3) var tB: texture_2d<f32>;
+@group(0) @binding(4) var tA: texture_2d<f32>;
 fn sat3(x: vec3f) -> vec3f { return clamp(x, vec3f(0.), vec3f(1.)); }
 fn tmap(x: vec3f) -> vec3f { return sat3((x * (2.51 * x + .03)) / (x * (2.43 * x + .59) + .14)); }
 @fragment fn fs(@builtin(position) fc: vec4f) -> @location(0) vec4f {
@@ -599,13 +631,15 @@ fn tmap(x: vec3f) -> vec3f { return sat3((x * (2.51 * x + .03)) / (x * (2.43 * x
   var c = textureLoad(tS, px, 0).rgb;
   let bl = textureSampleLevel(tB, sC, uv, 0.).rgb;
   c = mix(c, bl, .05) + bl * .06;
-  c *= g.mis.x;
+  // exposure: brings the adapted brightness up toward a night key, but only so far: the eyes never fully see in the dark
+  let ad = textureLoad(tA, vec2i(0), 0).r;
+  c *= g.mis.x * clamp(.045 / max(ad, 1e-5), .6, 6.);
   let q = uv - .5;
   c *= 1. - dot(q, q) * .6;
   c = tmap(c);
   // in the dark the eye loses colour and sees a little bluer: only the dimmest parts of the image
   let l = dot(c, vec3f(.2126, .7152, .0722));
-  c = mix(vec3f(l) * vec3f(.84, .94, 1.16), c, .45 + .55 * ss(.03, .35, l));
+  c = mix(vec3f(l) * vec3f(.80, .93, 1.22), c, .62 + .38 * ss(.02, .3, l));
   c = pow(max(c, vec3f(0.)), vec3f(1. / 2.2));
   let n = ign(fc.xy) + ign(fc.xy + 37.) - 1.;
   return vec4f(c + n / 255., 1.);
