@@ -52,7 +52,23 @@
       l.append(name.padEnd(12, ' '), r, v); l.style.display = 'block'; l.style.whiteSpace = 'pre'; p.append(l); ui2.push({ l, r, v });
     });
     const help = document.createElement('div'); help.textContent = 'Mouse: drag sliders, click scene to look   Keys: Up/Down pick, Left/Right change   T: free mouse / hide'; help.style.color = '#999';
-    p.append(out, help); show(); mark(); document.body.append(p);
+    // Copy: puts the LOOK line on the clipboard, and (through the local dev server, if it is running) saves it as
+    // look.json next to the screenshots, so Claude can read it directly
+    const copy = document.createElement('button'); copy.textContent = 'Copy settings';
+    copy.style.cssText = 'margin-top:6px;font:13px monospace;padding:4px 10px;cursor:pointer';
+    copy.onclick = async () => {
+      const t = out.textContent; let ok = false;
+      const sending = fetch('/save?name=look.json', { method: 'POST', body: JSON.stringify(LOOK) }).then((r) => r.ok, () => false);
+      // the old way first (works without permissions), then the clipboard API with a time limit (it can hang unfocused)
+      const ta = document.createElement('textarea'); ta.value = t; document.body.append(ta); ta.select();
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; } ta.remove();
+      if (!ok) ok = await Promise.race([navigator.clipboard.writeText(t).then(() => true, () => false), new Promise((r) => setTimeout(r, 1000, false))]);
+      const sent = await sending;
+      copy.textContent = (ok ? 'Copied' : 'Select the line above and copy it') + (sent ? ' + sent to Claude' : '');
+      setTimeout(() => { copy.textContent = 'Copy settings'; }, 3000);
+    };
+    out.style.userSelect = 'text';
+    p.append(out, copy, help); show(); mark(); document.body.append(p);
     for (const e of ['pointerdown', 'mousedown', 'click']) p.addEventListener(e, (ev) => ev.stopPropagation());
     addEventListener('keydown', (e) => {
       // T: show the panel and free the mouse (drag the sliders; click the scene to look around again, the panel stays);
