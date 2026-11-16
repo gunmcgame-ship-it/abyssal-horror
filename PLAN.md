@@ -148,6 +148,7 @@ Update README, title and menu text. Credit upstream.
 - Getting out of the playable area.
 - Phone and touch testing (do not remove touch code, just do not tune for it yet).
 - Real audio recordings or real voices.
+- A giant landmark pillar or spire (decided against). Normal canyon rock formations are fine.
 
 ## 7. Working rules for the agent
 - Work milestone by milestone and report what runs. Do not start the next until the owner approves.
