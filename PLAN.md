@@ -25,7 +25,10 @@ period-appropriate look (for example a 1950s typewriter or park-signage style), 
 | Topic | Decision |
 |---|---|
 | Old underwater scene | Replace completely. Upstream repo keeps the original. |
+| Feel (reference: P.T., the 2014 Silent Hills teaser) | Play style, vibe and mechanics modeled on P.T., translated to an open desert night. Concretely: first-person, very slow deliberate walk (about 1.2 m/s) with weighty start and stop, noticeable head bob and sway, slowed mouse look with a little lag, NO HUD at all during play (no crosshair, no prompts, no text, no icons), sound carries most of the dread, familiar places are subtly different when you come back. Do not copy any P.T. content, only the feel. |
 | Movement | Walk on the ground. Slow walk, no sprint, no jump, no crouch. |
+| Focus zoom | Hold right mouse button to slowly zoom the view in (narrower field of view, about 2x), release to ease back out. For checking the ridge or a camp detail. |
+| Visible lantern | The lantern is visible in the lower right of the view, held in a hand-height position, swinging with each step and settling when you stop. Its flame is the light source. |
 | Footsteps | Different sounds for sand and rock. Lantern bobs as you walk. |
 | Time and light | Deep night, around moonset (about 2-3 a.m.). Historically accurate moon for early October 1957: a bright waxing gibbous (about 80% lit) sitting LOW on the western horizon, about to set, slightly warm-tinted by the low angle, casting long shadows. Much of the canyon floor is in moon shadow. Dense stars and Milky Way. Realistic look, no film filter. |
 | Player light | One 1950s lantern: flickers and sways when walking, SHORT range (about 10-15 m, falls off fast). Wind makes it gutter: it dims and recovers within a second or two (never fully out). No flashlight. Fuel does not run out. |
@@ -35,7 +38,7 @@ period-appropriate look (for example a 1950s typewriter or park-signage style), 
 | Camp props | Low campfire, canvas tent (enterable, you start inside), a 1950s pickup truck towing a 1950s metallic camper trailer (rounded polished aluminum, Airstream-style), folding chair, cooler and gear. |
 | UFO-hobbyist props | Notebook with sketches and sighting times, a shortwave radio on the camp table, a portable reel-to-reel tape recorder inside the tent, star charts and park map pinned to the table, a film camera on a tripod aimed at the patch of sky where the stars go out (M5), Roswell newspapers (1947) and black-and-white film photos. |
 | Interaction | Look only. No reading, no pickups. Story is environmental. |
-| Radio and tape audio | Shortwave radio (camp table): static with fading 1950s-style crooner music. Tape recorder (tent): rhythmic tones and number-station-style beeps. All synthesized. |
+| Radio and tape audio | Shortwave radio (camp table): static with fading 1950s-style crooner music, and now and then Sputnik's real-style 'beep... beep... beep' signal drifting in and out (historically accurate: US shortwave listeners heard it in the first days of October 1957, at any hour). Tape recorder (tent): rhythmic tones and number-station-style beeps. All synthesized. |
 | Hints of the threat | A figure on a distant ridge (there, then gone; placeholder look), sounds (crickets and wind stop, then a distant call), signs it has been near camp (disturbed sand with no clear footprint shape, a shifted chair, a moved prop), and a patch of stars that goes out for a moment. |
 | Map edges | Canyon walls and cliffs block you (shaped terrain, not an invisible wall). |
 | Opening | You start inside the tent. Wake sequence: the radio outside clicks on by itself (static, then music fading in), something at camp knocks over with a clatter, and the crickets go quiet. It could have been an animal; not obviously scary yet. Inside the tent: rumpled sleeping bag with a pillow, your kerosene lantern already lit by the flap (it is your lantern for the whole game), the tape recorder, and photos and clippings taped to the canvas. |
@@ -53,7 +56,7 @@ period-appropriate look (for example a 1950s typewriter or park-signage style), 
 | Canyon shape | Winding canyon with side pockets: bends hide what's ahead, small alcoves to explore. |
 | Park details | Wooden park sign at the landing reading the park name, an old fire ring and a picnic table. Everything must be 1950s-appropriate: no modern objects, signs, materials or fonts. |
 | Other people | Nobody else is there, but there are period-appropriate traces that others have been before (for example old tire tracks, an older cold fire ring, a rusted can or bottle, a faded trail marker). |
-| Date | The first days of October 1957, right after Sputnik launched (October 4, 1957). |
+| Date | The first days of October 1957, right after Sputnik launched (October 4, 1957). Sputnik is heard on the radio only, NOT shown in the sky (at 2-3 a.m. it would be in Earth's shadow and invisible). |
 | Title | Working title: "Ground Observer, 1957". Use it in the menu, page title and README. May change later; keep it in one easy-to-edit place. |
 | Menu text | The title plus a quiet date-and-place line: "<Park name>, 1957". |
 | Park name | Coldsupper Canyon National Monument. Shown on the wooden park sign at the landing and on the menu line ("Coldsupper Canyon National Monument, 1957"). |
@@ -101,14 +104,14 @@ Goal: you can stand at the tent and look around a believable desert night. Free 
 3. Sky: black-blue gradient, dense stars, a Milky Way band, a low waxing gibbous moon near the western horizon (see Time and light), all procedural. One lighting source from the moon (reuse the sun shadow map, with the moon direction).
 4. Re-color terrain to red-orange sandstone and pale sand, lit only by moonlight. Dark overall. Rocks must still be readable.
 5. Camp set at the start pose (colors as in the decisions table): low campfire (warm flickering light and glow), canvas tent (enterable shape, open flap), a 1950s pickup towing a rounded metallic camper trailer, folding chair, cooler and gear. Clear the terrain there using the existing `CLEARS` mechanism so props sit on flat ground.
-6. Lantern: a single warm point light that follows the camera (hand position, slightly lower right), with short range and fast falloff, flicker, and sway. No shadows from it in M1.
+6. Lantern: a visible procedural 1950s kerosene lantern in the lower right of the view, and a single warm point light at its flame, with short range and fast falloff, flicker, and sway. No shadows from it in M1.
 7. Plants: scatter juniper, pinyon, sagebrush, yucca, prickly pear and cacti by simple procedural meshes, replacing the kelp.
 8. Keep `dev.js` benchmark working. Check frame time before moving on.
 
 Acceptance: a screenshot from the tent door shows camp lit by fire, a starry sky with moon, dark red cliffs in the distance, no water look anywhere.
 
 ### M2: Walking, canyon, boundaries
-1. Replace free-fly with walking: gravity, ground following with `Wd.gy`, eye height about 1.65 m, slow walk speed, no sprint, no jump, no crouch.
+1. Replace free-fly with walking in the P.T.-style feel (see decisions table), plus hold-right-mouse focus zoom: gravity, ground following with `Wd.gy`, eye height about 1.65 m, slow walk speed, no sprint, no jump, no crouch.
 2. Keep rock collision (`collide()`), tuned for a standing capsule.
 3. Lantern bob and sway tied to footsteps. Footstep sounds: sand versus rock, based on slope or surface type.
 4. Shape the map edge with canyon walls and cliffs so you cannot walk out. Remove the 150 m radius clamp and the depth clamp.
