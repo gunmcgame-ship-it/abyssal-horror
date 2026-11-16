@@ -234,14 +234,59 @@ fn vol(p: vec3f) -> vec4f { return textureSampleLevel(tV, sC, (p - vec3f(-192., 
 // point lights: g.fire and g.lant are position + strength (flicker included); short range, fast fall-off, no shadows
 const FIRER = 22.; const LANTR = 12.;
 fn att(p: vec3f, l: vec4f, r: f32) -> f32 { let d = distance(l.xyz, p); let w = sat(1. - pow(d / r, 4.)); return l.w * w * w / (1. + d * d); }
-fn plD(p: vec3f, n: vec3f) -> vec3f {
-  let lf = normalize(g.fire.xyz - p); let ll = normalize(g.lant.xyz - p);
-  return FIREC * att(p, g.fire, FIRER) * sat(dot(n, lf) * .8 + .2) + LANTC * att(p, g.lant, LANTR) * sat(dot(n, ll) * .8 + .2);
+// The camp's big things as rounded boxes (camp coordinates, metres from the fire: centre + yaw, half size + rounding),
+// so the fire and the lantern cast soft shadows past them and the ground darkens a little under them.
+// Keep in step with meshCamp() in world.js. The tent is a hollow shell with its door open toward the fire.
+const NCB = 11;
+var<private> CB: array<vec4f, 22> = array<vec4f, 22>(
+  vec4f(8., .75, -5.22, 0.), vec4f(.9, .4, 1.5, .08),      // pickup: hood, fenders, lower cab
+  vec4f(8., 1.54, -4.35, 0.), vec4f(.78, .3, .66, .06),    // pickup: cab
+  vec4f(8., .8, -2.7, 0.), vec4f(.74, .48, .88, .04),      // pickup: bed
+  vec4f(8., 1.52, 2.96, 0.), vec4f(.75, .62, 2.7, .42),     // trailer
+  vec4f(2.3, .2, 2.4, .4), vec4f(.32, .2, .18, .02),        // cooler
+  vec4f(-3.0, .17, -2.55, 0.), vec4f(.3, .17, .4, .05),     // firewood
+  vec4f(5.83, .24, 1.22, 0.), vec4f(.08, .23, .22, .01),    // jerry can
+  vec4f(2.75, .15, 5.3, .72), vec4f(.15, .13, .38, .05),    // duffel bag
+  vec4f(3.4, .71, -.9, .25), vec4f(.47, .02, .3, .01),     // camp table top
+  vec4f(3.4, .79, -.9, .25), vec4f(.42, .06, .24, .02),     // stove and radio on it
+  vec4f(-2.35, .14, 6.0, .3), vec4f(.25, .14, .2, .02));    // tackle box and bucket
+const CAMPV = vec3f(${CAMP});
+fn sdb(p: vec3f, i: i32) -> f32 {
+  let a = CB[i * 2]; let b = CB[i * 2 + 1]; let q0 = p - a.xyz; let c = cos(a.w); let s = sin(a.w);
+  let q = abs(vec3f(c * q0.x - s * q0.z, q0.y, s * q0.x + c * q0.z)) - b.xyz + b.w;
+  return length(max(q, vec3f(0.))) + min(max(q.x, max(q.y, q.z)), 0.) - b.w;
 }
-fn plS(p: vec3f, n: vec3f, V: vec3f, pw: f32) -> vec3f {
+fn campSD(p: vec3f) -> f32 {
+  var d = 1e3; for (var i = 0; i < NCB; i++) { d = min(d, sdb(p, i)); }
+  // tent: canvas shell, door gap toward the fire
+  let tq = p - vec3f(1., 1.17, 7.5); let tb = abs(tq) - vec3f(1.5, 1.17, 1.8);
+  let shell = abs(length(max(tb, vec3f(0.))) + min(max(tb.x, max(tb.y, tb.z)), 0.)) - .03;
+  let dq = abs(p - vec3f(1., .93, 5.7)) - vec3f(.5, .93, .3);
+  return min(d, max(shell, -(length(max(dq, vec3f(0.))) + min(max(dq.x, max(dq.y, dq.z)), 0.))));
+}
+// how much of the light at l reaches p (soft, from a few steps along the way)
+fn campVis(p: vec3f, l: vec3f, r: f32) -> f32 {
+  let q = p - CAMPV; let lq = l - CAMPV;
+  if (dot(q.xz, q.xz) > 600. || distance(p, l) > r) { return 1.; }
+  let dl = lq - q; let L = length(dl); let rd = dl / L;
+  var t = .05; var v = 1.;
+  for (var k = 0; k < 16; k++) {
+    let h = campSD(q + rd * t); v = min(v, 8. * h / t); t += clamp(h, .04, .7);
+    if (t > L - .15 || v < .02) { break; }
+  }
+  return ss(0., 1., v);
+}
+// contact darkening on and near the camp things
+fn campAO(p: vec3f) -> f32 { let q = p - CAMPV; if (dot(q.xz, q.xz) > 600.) { return 1.; } return .4 + .6 * ss(0., .7, campSD(q)); }
+fn plV(p: vec3f) -> vec2f { return vec2f(campVis(p, g.fire.xyz, FIRER), campVis(p, g.lant.xyz, LANTR)); }
+fn plD(p: vec3f, n: vec3f, v: vec2f) -> vec3f {
   let lf = normalize(g.fire.xyz - p); let ll = normalize(g.lant.xyz - p);
-  return FIREC * att(p, g.fire, FIRER) * pow(sat(dot(n, normalize(V + lf))), pw) * sat(dot(n, lf) * 4.)
-       + LANTC * att(p, g.lant, LANTR) * pow(sat(dot(n, normalize(V + ll))), pw) * sat(dot(n, ll) * 4.);
+  return FIREC * att(p, g.fire, FIRER) * sat(dot(n, lf) * .8 + .2) * v.x + LANTC * att(p, g.lant, LANTR) * sat(dot(n, ll) * .8 + .2) * v.y;
+}
+fn plS(p: vec3f, n: vec3f, V: vec3f, pw: f32, v: vec2f) -> vec3f {
+  let lf = normalize(g.fire.xyz - p); let ll = normalize(g.lant.xyz - p);
+  return FIREC * att(p, g.fire, FIRER) * pow(sat(dot(n, normalize(V + lf))), pw) * sat(dot(n, lf) * 4.) * v.x
+       + LANTC * att(p, g.lant, LANTR) * pow(sat(dot(n, normalize(V + ll))), pw) * sat(dot(n, ll) * 4.) * v.y;
 }
 // sky light from above (sky: how open to the sky, from the baked volume) and a little warm bounce from the ground
 fn amb(n: vec3f, sky: f32) -> vec3f { let up = n.y * .5 + .5; return (SKYA * g.mc.w + SKY0) * (.2 + .8 * sky) * (.3 + .7 * up) + g.mc.rgb * .05 * (.4 + .6 * sat(dot(n, -vec3f(MOON.x, 0., MOON.z)))) * (.5 + .5 * sky); }
@@ -287,12 +332,12 @@ fn prop(id: i32, op: vec3f, mc: f32, h: f32) -> PM {
   var m: PM; m.a = vec3f(.5); m.gl = .05; m.mt = 0.; m.bp = .4; m.e = vec3f(0.); m.n = vec3f(0.); m.tl = 0.;
   switch id {
     case 1 { m.a = vec3f(.80, .74, .58); m.gl = .55; m.bp = 0.; }             // cream paint
-    case 2 { m.a = vec3f(.13, .46, .43); m.gl = .55; m.bp = 0.; }             // turquoise paint
+    case 2 { m.a = vec3f(.22, .47, .44); m.gl = .5; m.bp = 0.; }              // turquoise paint
     case 3 { m.a = vec3f(.85, .85, .88); m.gl = 1.; m.mt = 1.; m.bp = 0.; }   // chrome
     case 4 { m.a = vec3f(.035); m.gl = .15; m.bp = .3; }                         // tyre rubber
     case 5 { m.a = vec3f(.72, .71, .67); m.gl = .2; m.bp = .1; }               // whitewall
     case 6 { m.a = vec3f(.02, .024, .03); m.gl = 1.; m.mt = .5; m.bp = 0.; }   // window glass
-    case 7 { m.a = vec3f(.72, .74, .76); m.gl = .95; m.mt = 1.; m.bp = 0.;   // polished aluminium, riveted panels
+    case 7 { m.a = vec3f(.80, .81, .82); m.gl = .78; m.mt = .85; m.bp = 0.;   // polished aluminium, riveted panels
       m.a *= 1. - .35 * ss(.012, .0, abs(fract(op.z / .62) - .5) - .488) - .25 * ss(.012, .0, abs(fract(op.y / .55) - .5) - .488); }
     case 8 {   // white canvas: sewn panels, soft wrinkles, thin enough to let some moonlight through
       let sw = op.x + op.z; let seam = ss(.02, .0, abs(fract(sw / .92) - .5) - .47);
@@ -319,6 +364,25 @@ fn prop(id: i32, op: vec3f, mc: f32, h: f32) -> PM {
     case 41 { m.a = vec3f(.1); m.gl = 1.; m.bp = 0.;                            // lantern: glass globe, lit from inside
       m.e = LANTC * g.lant.w * (.2 + .35 * ss(.08, -.02, abs(op.y - .005))); }
     case 42 { m.a = vec3f(.30, .30, .31); m.gl = .6; m.mt = .8; m.bp = .05; } // lantern: tin and wire
+    case 25 { m.a = vec3f(.19, .21, .12) * (1. - .3 * ss(.03, .0, abs(fract(op.z / .16) - .5) - .45)); m.bp = .3; m.n = vec3f(sin(op.z * 40.), 0., cos(op.x * 31.)) * .06; } // sleeping bag: olive drab, quilted
+    case 26 { let px = step(.5, fract(op.x / .09)); let pz = step(.5, fract(op.z / .09));                   // sleeping bag lining: red plaid flannel
+      m.a = mix(vec3f(.40, .05, .04), vec3f(.10, .03, .03), (px + pz) * .35) + vec3f(.12, .10, .02) * ss(.02, .0, abs(fract(op.x / .09) - .25) - .01); m.bp = .2; }
+    case 27 { m.a = mix(vec3f(.70, .68, .62), vec3f(.20, .26, .45), ss(.15, .1, abs(fract(op.x / .05) - .5)) * .7); m.bp = .1; }  // pillow ticking
+    case 28 {   // newspaper clipping: grey columns of text under a dark headline
+      let r = floor(op.y / .011); let c = floor((op.x + op.z) / .045);
+      let txt = step(fract(op.y / .011), .55) * step(.12, hs(c * 7.13 + r * 1.71)) * step(.08, fract((op.x + op.z) / .045));
+      m.a = vec3f(.60, .58, .50) * (1. - .45 * txt); m.bp = 0.; m.tl = .3; }
+    case 29 { m.a = vec3f(.35 + .3 * mc) * (1. - .5 * ss(.3, .7, .5 + .5 * sin(op.x * 90. + sin(op.y * 70.) * 2.) * sin(op.y * 80. + op.z * 60.))); m.gl = .5; m.bp = 0.; }        // black-and-white photograph
+    case 30 { m.a = vec3f(.035, .03, .028); m.gl = .3; m.bp = .5; }                 // black leatherette (radio, tape recorder)
+    case 31 { m.a = vec3f(.62, .46, .20); m.gl = .8; m.mt = 1.; m.bp = 0.; }        // brass trim
+    case 32 { m.a = vec3f(.72, .64, .45) * (1. - .5 * ss(.004, .0, abs(fract(op.x / .02) - .5) - .45)); m.gl = .5; m.bp = 0.; } // radio dial face
+    case 34 { m.a = vec3f(.02); m.gl = .5; m.bp = 0.; }                                // black paint
+    case 35 { m.a = vec3f(.045, .12, .075); m.gl = .6; m.bp = 0.; }                      // green enamel (camp stove)
+    case 36 { m.a = vec3f(.11, .065, .035); m.gl = .45; m.bp = 0.; }                   // brown tape on the reels
+    case 37 { m.a = vec3f(.17, .18, .10) * (.85 + .3 * mc); m.bp = .2;                 // olive tarp
+      m.n = vec3f(sin(op.x * 9. + op.z * 4.), 0., cos(op.z * 11. - op.x * 3.)) * .12; }
+    case 38 { m.a = vec3f(.07, .19, .11) * (.85 + .3 * mc); m.bp = .1; m.tl = .2; }   // dark green chair canvas
+    case 39 { m.a = vec3f(.62, .57, .44); m.bp = 0.; }                                  // paper, map, logbook
     case 60 { m.a = vec3f(.10, .17, .08) * (.7 + .5 * h); m.gl = .3; m.bp = .5; }    // cactus
     case 61 { m.a = vec3f(.30, .26, .22) * (.6 + .6 * h); m.bp = 1.5; }       // juniper bark
     case 62 { m.a = vec3f(.44, .42, .38) * (.7 + .4 * h); m.bp = 1.2; }       // dead silver wood
@@ -327,6 +391,10 @@ fn prop(id: i32, op: vec3f, mc: f32, h: f32) -> PM {
     case 65 { m.a = vec3f(.32, .03, .09); m.gl = .4; m.bp = .1; }             // prickly pear fruit
     case 66 { m.a = vec3f(.20, .15, .11) * (.6 + .6 * h); m.bp = 1.5; }       // pinyon bark
     default {}
+  }
+  if ((id <= 7 && id != 4) || id == 12) {
+    let du = ss(.95, .2, op.y) * (.55 + .45 * h) * select(1., .5, id == 6);
+    m.a = mix(m.a, vec3f(.44, .34, .25), du * .6); m.gl *= 1. - .6 * du; m.mt *= 1. - .5 * du;
   }
   return m;
 }
@@ -354,17 +422,17 @@ fn prop(id: i32, op: vec3f, mc: f32, h: f32) -> PM {
     alb *= mix(vec3f(1.), vec3f(1.1, .95, .85), ss(.4, .7, A.c));
     let vert = 1. - abs(on.y);
     let varn = ss(.42, .66, sk.a * .7 + sk2.b * .5) * vert * ss(.3, .6, big2 + .2);
-    alb *= 1. - .6 * varn;
+    alb *= 1. - .5 * varn * ss(.35, .65, big);
     alb *= (.45 + 1.0 * hgt) * mix(1., .62 + .76 * F.h, fk);
     alb *= 1. - .35 * ss(.12, .0, sf) * vert;
     sgro = -ss(.14, .0, sf) * vert * 1.2;
     if (mat == 0) {
       let flt = ss(.72, .93, n0.y);
-      let sand = mix(vec3f(.50, .31, .19), vec3f(.40, .24, .14), sat(gm.a * .8 + (B.c - .5))) * (.85 + .3 * C.h);
+      let sand = mix(vec3f(.50, .31, .19), vec3f(.40, .24, .14), sat(gm.a * .6 + (B.c - .5) * .5 + (big - .5) * .8)) * (.9 + .12 * C.h + .15 * (big2 - .5));
       let sm = flt * ss(.2, .5, gm.a * .6 + A.c * .6);
       alb = mix(alb, sand, sm);
       rip = sm * cos((i.wp.x * .8 + i.wp.z * .35 + B.h * 1.5) * 22. + A.c * 9.) * .12 * ss(16., 3., dist) * ss(.35, .6, B.c);
-      bump = mix(bump, .5, sm);
+      bump = mix(bump, .28 + .2 * big, sm);
     }
   } else {
     let pm = prop(i32(round(i.ao * 127.)), i.op, B.c, B.h);
@@ -376,12 +444,13 @@ fn prop(id: i32, op: vec3f, mc: f32, h: f32) -> PM {
   let ao = (sat((v1.r - .5) * 8.) * .55 + sat((v2.r - .5) * 2.7) * .45) * aoK;
   let E = g.mc.rgb * shadow9(i.wp + n0 * .35);
   let ndl = sat(dot(N, MOON));
-  var c = alb * (1. - metal) * (E * (ndl + tl * sat(-dot(N, MOON))) + amb(N, v1.g) * ao + plD(i.wp + n0 * .03, N)) + emi;
+  let pv = plV(i.wp + n0 * .05); let cao = campAO(i.wp);
+  var c = alb * (1. - metal) * (E * (ndl + tl * sat(-dot(N, MOON))) + amb(N, v1.g) * ao * cao + plD(i.wp + n0 * .03, N, pv) * mix(1., cao, .5)) + emi;
   let pw = mix(8., 300., gloss);
   let F0 = mix(vec3f(.04), alb, metal);
   let Fr = F0 + (1. - F0) * pow(1. - sat(dot(N, V)), 5.);
   let H = normalize(V + MOON);
-  c += Fr * gloss * ((pw + 2.) / 8.) * (E * pow(sat(dot(N, H)), pw) * ndl + plS(i.wp, N, V, pw));
+  c += Fr * gloss * ((pw + 2.) / 8.) * (E * pow(sat(dot(N, H)), pw) * ndl + plS(i.wp, N, V, pw, pv));
   let R = reflect(-V, N);
   c += Fr * gloss * select(skyBase(R), vec3f(.30, .22, .16) * (g.mc.rgb * .25 + SKYA * g.mc.w * .6 + SKY0) * (1. - .4 * R.y), R.y < 0.) * (.3 + .7 * ao) * 2.;
   // the lantern's flame, seen through its glass
@@ -415,9 +484,9 @@ fn shape2(v: f32) -> f32 { return sin(3.14159 * sat(v)); }
   // per type: colour, y translucency, width profile, wave, flutter
   var col = vec3f(0.); var pr = vec4f(0.); var shp = vec2f(.75, .7); var wav = .2; var fls = .5;
   switch ty {
-    case 0 { col = mix(vec3f(.08, .11, .08), vec3f(.10, .12, .07), s1); pr = vec4f(0., .35, 0., 0.); shp = vec2f(.3, .35); wav = .15; }   // juniper sprays
+    case 0 { col = mix(vec3f(.07, .10, .095), vec3f(.09, .115, .10), s1); pr = vec4f(0., .35, 0., 0.); shp = vec2f(.3, .35); wav = .15; }   // juniper sprays
     case 1 { col = vec3f(.19, .15, .10) * (.8 + .4 * s1); pr = vec4f(0., .1, 0., 0.); shp = vec2f(.05, .1); wav = .02; fls = .1; }       // dry yucca stalk
-    case 2 { col = mix(vec3f(.24, .27, .22), vec3f(.31, .32, .26), s1); pr = vec4f(0., .4, 0., 0.); shp = vec2f(.4, .5); }               // sagebrush
+    case 2 { col = mix(vec3f(.33, .36, .31), vec3f(.42, .44, .38), s1); pr = vec4f(0., .4, 0., 0.); shp = vec2f(.4, .5); }               // sagebrush
     case 3 { col = mix(vec3f(.13, .17, .08), vec3f(.19, .21, .10), s1); col = mix(col, vec3f(.30, .26, .16), step(.82, s2)); pr = vec4f(0., .5, 0., 0.); shp = vec2f(.25, .6); wav = .03; fls = .2; }   // yucca
     case 4 { col = mix(vec3f(.06, .10, .05), vec3f(.08, .11, .06), s1); pr = vec4f(0., .35, 0., 0.); shp = vec2f(.3, .35); wav = .15; }   // pinyon needles
     case 5 { col = mix(vec3f(.36, .31, .19), vec3f(.44, .38, .24), s1); pr = vec4f(0., .6, 0., 0.); shp = vec2f(.3, .5); wav = .4; fls = 1.; }   // dry grass
@@ -457,7 +526,7 @@ fn shape2(v: f32) -> f32 { return sin(3.14159 * sat(v)); }
   let tr = (max(-ndl, 0.) * .85 + .15) * i.pr.y;
   let aov = sat((vv.r - .5) * 6.) * mix(.4, 1., i.uv.y);
   let am = (amb(n, vv.g) + amb(-n, vv.g) * i.pr.y * .5) * (.3 + .7 * aov);
-  let pd = plD(i.wp, n) + plD(i.wp, -n) * i.pr.y * .6;
+  let pv = plV(i.wp); let pd = plD(i.wp, n, pv) + plD(i.wp, -n, pv) * i.pr.y * .6;
   var c = alb * (E * (max(ndl, 0.) + tr) + am + pd);
   c += E * pow(sat(dot(n, normalize(V + L))), 30.) * .05;
   return fin(fog(c, i.wp));
@@ -514,8 +583,8 @@ fn stars(rd: vec3f, sc: f32, dens: f32, bright: f32, px: f32) -> vec3f {
   let n1 = fbm3(rd * 7., 5); let n2 = fbm3(rd * 22. + 3., 3);
   let dust = ss(.42, .62, fbm3(rd * 9. + 7., 5)) * exp(-bw * bw / .008);
   let mw = band * (.3 + 1.0 * ss(.3, .8, n1)) * (.6 + .6 * n2) * (1. - .7 * dust);
-  c += vec3f(.034, .035, .040) * mw * wash * ext;
-  var st = stars(rd, 130., .012, 1., px) + stars(rd, 290., .04 + .6 * band * (1. - dust), .1, px) * wash + stars(rd, 520., .3 * band * (1. - dust), .03, px) * wash;
+  c += vec3f(.022, .023, .027) * mw * wash * ext;
+  var st = stars(rd, 130., .012, .2, px) + stars(rd, 290., .03 + .35 * band * (1. - dust), .03, px) * wash + stars(rd, 520., .2 * band * (1. - dust), .01, px) * wash;
   // near the horizon the air makes them twinkle
   st *= ext * (1. + .6 * (1. - up) * sin(t * 9. + dot(rd, vec3f(3000., 2100., 2700.))));
   // thin high cloud drifting across the moon: it hides the stars behind it and glows where the moon is near
@@ -554,6 +623,28 @@ fn stars(rd: vec3f, sc: f32, dens: f32, bright: f32, px: f32) -> vec3f {
   }
   return fin(c);
 }
+`;
+
+// ---------------------------------------------------------------- the real bright stars and the satellite (sky.js)
+// Each is a small glowing point, drawn over the sky and hidden behind the land. They fade and twinkle low down, the
+// moon's glow drowns the faint ones near it (not once it is eclipsed).
+const W_STARS = S_B + /*wgsl*/`
+struct SO { @builtin(position) cp: vec4f, @location(0) q: vec2f, @location(1) @interpolate(flat) c: vec3f };
+@vertex fn vs(@builtin(vertex_index) vi: u32, @location(0) a: vec4f, @location(1) b: vec4f) -> SO {
+  var o: SO; let q = vec2f(f32(vi & 1u), f32(vi >> 1u)) * 2. - 1.;
+  let d = a.xyz; let t = g.cam.w; let up = sat(d.y); let px = 2. * g.up.w / g.res.y;
+  let ext = ss(-.01, .15, d.y) * (1. - .6 * pow(1. - up, 6.));
+  let tw = 1. + .55 * pow(1. - up, 2.) * sin(t * (7. + 5. * fract(b.w * 3.1)) + b.w * 40.) * sin(t * 3.1 + b.w * 17.);
+  let wash = 1. - .85 * pow(sat(dot(d, MOON)), 8.) * g.mc.w;
+  let I = a.w * ext * tw * wash;
+  let r = select(normalize(cross(d, vec3f(0., 1., 0.))), vec3f(1., 0., 0.), abs(d.y) > .999); let u = cross(r, d);
+  let sz = px * (1.1 + .25 * sqrt(min(I, 40.)));
+  let cp = g.vp * vec4f(d + (r * q.x + u * q.y) * sz * 1.8, 0.);
+  o.cp = vec4f(cp.xy, cp.w * 2e-7, cp.w);
+  o.q = q * 1.8; o.c = b.rgb * I / (1.1 + .25 * sqrt(min(I, 40.))) / (1.1 + .25 * sqrt(min(I, 40.)));
+  return o;
+}
+@fragment fn fs(i: SO) -> @location(0) vec4f { return vec4f(i.c * exp(-dot(i.q, i.q) * 1.6), 0.); }
 `;
 
 // ---------------------------------------------------------------- the campfire: flame cards turned to the camera, and rising embers (additive)

@@ -149,6 +149,7 @@ function makeWorld(D, T, flyPts, POSES) {
   rseed(4);
   // a few by camp, so it does not stand in the open
   for (const t of [[-11, 7, 0, 1.2], [10, 14, 1, 1.1], [-8, -13, 0, 1.3], [-14, -4, 0, 0.9], [14, 11, 0, 0.8]]) { const x = CAMP[0] + t[0], z = CAMP[2] + t[1]; tree(x, gy(x, z), z, t[2], t[3]); }
+  for (const [x0, z0, k] of [[-6.5, 5.5, 6], [5.5, -9.5, 7], [-9.5, -6, 6], [11.5, 4.5, 7], [-4.5, 11.5, 6], [6.5, 12, 5]]) { const x = CAMP[0] + x0, z = CAMP[2] + z0; solid(k, x, gy(x, z) - 0.04, z, k === 5 ? 1.3 : 1.5, qAxis(0, 1, 0, rnd() * TAU), 2, rnd(), 1, 0); }
   const tocc = new Set();
   for (let i = 0, made = 0; i < 80000 && made < 340; i++) {
     const p = ground(0.75, 13, 3.5); if (!p) continue;
@@ -173,7 +174,7 @@ function makeWorld(D, T, flyPts, POSES) {
     const p = ground(0.7, 9, 2); if (!p) continue;
     const u = rnd(), pat = fbm(p[0] * 0.06, 5, p[2] * 0.06, 2), q = qAxis(0, 1, 0, rnd() * TAU);
     if (u < 0.006) yucca(p[0], p[1], p[2]);
-    else if (u < 0.006 + 0.012 * pat) solid(6 + (rnd() < 0.5), p[0], p[1] - 0.04, p[2], rr(0.7, 1.3), q, 2, rnd(), 1, 0);
+    else if (u < 0.006 + 0.02 * pat) solid(6 + (rnd() < 0.5), p[0], p[1] - 0.04, p[2], rr(0.9, 1.7), q, 2, rnd(), 1, 0);
     else if (u < 0.008 + 0.017 * pat) solid(rnd() < 0.5 ? 4 : 5, p[0], p[1] - 0.04, p[2], rr(0.6, 1.4), q, 2, rnd(), 1, 0);
   }
 
@@ -207,7 +208,7 @@ function makeWorld(D, T, flyPts, POSES) {
   // campfire: flame cards (x, y, z, half width | seed, 0, height) and embers (seed, 1)
   const fire = [];
   rseed(12);
-  for (let i = 0; i < 7; i++) { const a = rnd() * TAU, r = rr(0, 0.22); fire.push(CAMP[0] + cos(a) * r, CAMP[1] + 0.04, CAMP[2] + sin(a) * r, rr(0.2, 0.3), rnd(), 0, rr(0.55, 0.95), 0); }
+  for (let i = 0; i < 10; i++) { const a = rnd() * TAU, r = rr(0, 0.26); fire.push(CAMP[0] + cos(a) * r, CAMP[1] + 0.04, CAMP[2] + sin(a) * r, rr(0.22, 0.34), rnd(), 0, rr(0.75, 1.3), 0); }
   for (let i = 0; i < 36; i++) fire.push(CAMP[0] + rr(-0.2, 0.2), CAMP[1] + 0.15, CAMP[2] + rr(-0.2, 0.2), 0, rnd(), 1, 0, 0);
 
   // --- pack leaves (36 bytes: 8 floats + 4 unorm8), sorted by culling cell
@@ -421,6 +422,18 @@ function meshTruck() {
       P(m, 3); cyl(m, [s * 0.885, 0.38, z], [s * 0.91, 0.38, z], 0.17, 16);
     }
   }
+  // door seams and handles, windshield divider, hood ornament, licence plates
+  P(m, 21);
+  for (const s of [-1, 1]) { box(m, s * 0.875, 0.64, -0.64, s * 0.893, 1.5, -0.62); box(m, s * 0.875, 0.64, 0.36, s * 0.893, 1.5, 0.38); box(m, s * 0.875, 0.63, -0.64, s * 0.893, 0.65, 0.38); }
+  P(m, 3);
+  for (const s of [-1, 1]) box(m, s * 0.88, 1.33, 0.2, s * 0.905, 1.35, 0.31);
+  box(m, -0.012, 1.5, -0.735, 0.012, 1.79, -0.69); box(m, -0.012, 1.26, -2.3, 0.012, 1.3, -1.9);
+  P(m, 23); box(m, -0.16, 0.2, -2.64, 0.16, 0.36, -2.625); box(m, -0.16, 0.56, 2.48, 0.16, 0.72, 2.495);
+  // in the bed: a tarp tied over gear, the spare tyre, a gas can
+  P(m, 37); loft(m, [[0.75, 0, 0.86, 0.5, 0.05, 3], [0.85, 0, 0.98, 0.56, 0.18, 3], [1.2, 0.05, 1.05, 0.56, 0.24, 3], [1.6, -0.03, 1.02, 0.55, 0.2, 3], [1.85, 0, 0.94, 0.5, 0.11, 3], [1.92, 0, 0.86, 0.4, 0.04, 3]], 16);
+  P(m, 18); for (const z of [0.95, 1.6]) cyl(m, [-0.6, 1.12, z], [0.6, 1.12, z], 0.009, 4, false);
+  P(m, 4); { const n0 = m.p.length / 3; cyl(m, [0.33, 0, 0], [0.47, 0, 0], 0.33, 18); for (let k = n0 * 3; k < m.p.length; k += 3) { const x = m.p[k] - 0.4, y = m.p[k + 1]; m.p[k] = 0.45 + x * 0.94 + y * 0.34; m.p[k + 1] = 1.18 - x * 0.34 + y * 0.94; m.p[k + 2] += 2.1; } }
+  P(m, 11); box(m, -0.55, 0.84, 2.0, -0.38, 1.3, 2.28);
   // canvas water bag hanging from the front bumper
   P(m, 17); loft(m, [[-2.67, 0.42, 0.3, 0.02, 0.03, 2], [-2.66, 0.42, 0.22, 0.13, 0.17, 3], [-2.6, 0.42, 0.22, 0.14, 0.18, 3], [-2.585, 0.42, 0.3, 0.02, 0.03, 2]], 14);
   P(m, 18); cyl(m, [0.36, 0.5, -2.63], [0.42, 0.42, -2.63], 0.008, 4, false); cyl(m, [0.48, 0.5, -2.63], [0.42, 0.42, -2.63], 0.008, 4, false);
@@ -444,7 +457,8 @@ function meshTrailer() {
   patch(0.86, 0.92, 1.2, PI - 1.2, 0.012, 2, 3);
   P(m, 3); patch(-0.97, 0.97, -0.03, 0.03, 0.016, 24, 1); patch(-0.97, 0.97, PI - 0.03, PI + 0.03, 0.016, 24, 1); // chrome belt line
   P(m, 7); patch(-0.12, 0.08, PI - 0.55, PI + 0.95, 0.02, 3, 6); // door (on the camp side)
-  P(m, 21); box(m, -0.95, 0.3, 0.5, 0.95, 0.5, L - 0.6);
+  P(m, 21); box(m, -0.8, 0.3, 1.2, 0.8, 0.46, L - 1.2);
+  P(m, 23); for (const s of [-1, 1]) lathe(m, [[0, 0.5], [0.15, 0.52], [0.16, 0.6], [0.16, 0.86], [0.12, 0.94], [0.03, 0.97], [0.03, 1.02], [0, 1.02]], 16, s * 0.19, 0, -0.75);
   for (const s of [-1, 1]) { P(m, 4); cyl(m, [s * 0.8, 0.34, L * 0.55], [s * 1.02, 0.34, L * 0.55], 0.34, 20); P(m, 3); cyl(m, [s * 1.02, 0.34, L * 0.55], [s * 1.04, 0.34, L * 0.55], 0.15, 14); }
   P(m, 21); for (const s of [-1, 1]) m.sweep([[s * 0.7, 0.42, 0.6], [0, 0.48, -1.25]], 0.08, 0.1); // tongue
   cyl(m, [0, 0.48, -1.2], [0, 0.48, -1.32], 0.05, 8); cyl(m, [0, 0.0, -0.8], [0, 0.55, -0.8], 0.035, 8); // coupler and jack
@@ -491,8 +505,8 @@ function meshFire() {
   for (let i = 0; i < 12; i++) { const a = i / 12 * TAU + rr(-0.1, 0.1), r = rr(0.58, 0.68); put(m, stone(i), cos(a) * r, 0.04, sin(a) * r, rnd() * TAU, rr(0.13, 0.2)); }
   P(m, 16); lathe(m, [[0, 0.012], [0.55, 0.008], [0.6, 0]], 20);
   P(m, 15); lathe(m, [[0, 0.07], [0.2, 0.06], [0.34, 0.03], [0.4, 0.01]], 20);
-  for (let i = 0; i < 4; i++) {
-    const a = i / 4 * TAU + rr(-0.3, 0.3), c = cos(a), s = sin(a), r = rr(0.055, 0.075), l = rr(0.28, 0.38), y = 0.06 + i % 2 * 0.07;
+  for (let i = 0; i < 6; i++) {
+    const a = i / 6 * TAU + rr(-0.25, 0.25), c = cos(a), s = sin(a), r = rr(0.045, 0.065), l = rr(0.4, 0.58), y = 0.06 + i % 2 * 0.07;
     P(m, 15); cyl(m, [c * 0.06, y + 0.03, s * 0.06], [c * 0.3, y, s * 0.3], r, 8);
     P(m, 14); cyl(m, [c * 0.3, y, s * 0.3], [c * (0.3 + l), y - 0.04, s * (0.3 + l)], r, 8);
   }
@@ -508,12 +522,15 @@ function meshChair() {
   const m = new Mesh();
   P(m, 9);
   for (const s of [-1, 1]) {
-    const x = s * 0.27;
-    m.sweep([[x, 0, -0.24], [x, 0.45, 0.2]], 0.035, 0.035); m.sweep([[x, 0, 0.2], [x, 0.45, -0.24]], 0.035, 0.035);
-    m.sweep([[x, 0.45, -0.26], [x, 0.45, 0.22]], 0.035, 0.035); m.sweep([[x, 0.66, -0.28], [x, 0.66, 0.22]], 0.06, 0.025);
-    m.sweep([[x, 0.45, 0.21], [x, 0.9, 0.27]], 0.035, 0.035); m.sweep([[x, 0.45, -0.24], [x, 0.66, -0.24]], 0.03, 0.03);
+    const x = s * 0.28;
+    m.sweep([[x, 0, -0.25], [x, 0.46, 0.21]], 0.045, 0.045); m.sweep([[x, 0, 0.21], [x, 0.46, -0.25]], 0.045, 0.045);
+    m.sweep([[x, 0.46, -0.27], [x, 0.46, 0.23]], 0.045, 0.045); m.sweep([[x, 0.67, -0.29], [x, 0.67, 0.23]], 0.07, 0.03);
+    m.sweep([[x, 0.46, 0.22], [x, 0.95, 0.29]], 0.045, 0.045); m.sweep([[x, 0.46, -0.25], [x, 0.67, -0.25]], 0.04, 0.04);
   }
-  P(m, 17); box(m, -0.26, 0.42, -0.23, 0.26, 0.445, 0.2); box(m, -0.26, 0.64, 0.24, 0.26, 0.86, 0.26);
+  P(m, 38);
+  const g = []; for (let i = 0; i <= 6; i++) { const r = []; for (let j = 0; j <= 4; j++) { const u = i / 6, v = j / 4; r.push(m.v(-0.26 + 0.52 * u, 0.455 - 0.05 * sin(PI * u) * sin(PI * v), -0.24 + 0.45 * v)); } g.push(r); }
+  for (let i = 0; i < 6; i++) for (let j = 0; j < 4; j++) { m.quad(g[i][j], g[i + 1][j], g[i + 1][j + 1], g[i][j + 1]); m.quad(g[i][j], g[i][j + 1], g[i + 1][j + 1], g[i + 1][j]); }
+  box(m, -0.27, 0.66, 0.25, 0.27, 0.9, 0.27);
   return m;
 }
 // green steel cooler with handles
@@ -525,10 +542,78 @@ function meshCooler() {
   box(m, -0.04, 0.3, -0.2, 0.04, 0.37, -0.19);
   return m;
 }
+// folding wooden camp table with a portable shortwave radio and a two-burner camp stove (front toward -x)
+function meshTable() {
+  const m = new Mesh();
+  P(m, 9); box(m, -0.3, 0.69, -0.47, 0.3, 0.73, 0.47);
+  for (const s of [-1, 1]) { m.sweep([[-0.26, 0, s * 0.4], [0.26, 0.69, s * 0.4]], 0.03, 0.03); m.sweep([[0.26, 0, s * 0.4], [-0.26, 0.69, s * 0.4]], 0.03, 0.03); }
+  // radio: black leatherette case, brass trim, a dial and a speaker grille on the front (toward the fire), aerial up
+  P(m, 30); box(m, -0.1, 0.73, 0.02, 0.1, 0.99, 0.44);
+  P(m, 31); box(m, -0.106, 0.75, 0.04, -0.1, 0.97, 0.42); box(m, -0.02, 0.99, 0.18, 0.02, 1.01, 0.28);
+  P(m, 32); box(m, -0.111, 0.89, 0.07, -0.106, 0.95, 0.39);
+  P(m, 34); for (let y = 0.77; y < 0.87; y += 0.018) box(m, -0.112, y, 0.08, -0.106, y + 0.008, 0.38);
+  P(m, 3); cyl(m, [0.06, 0.99, 0.38], [0.02, 1.7, 0.42], 0.004, 4, false); for (const z of [0.12, 0.32]) cyl(m, [-0.111, 0.92, z], [-0.135, 0.92, z], 0.016, 10);
+  // camp stove: green enamel box, lid up behind with wind wings, two burners, the fuel tank in front
+  P(m, 35); box(m, -0.13, 0.73, -0.45, 0.13, 0.84, -0.03); box(m, 0.13, 0.84, -0.45, 0.145, 1.1, -0.03);
+  for (const z of [-0.45, -0.03]) box(m, -0.13, 0.84, z - 0.005, 0.13, 1.0, z + 0.005);
+  P(m, 34); for (const z of [-0.34, -0.14]) cyl(m, [0, 0.84, z], [0, 0.85, z], 0.06, 12);
+  P(m, 3); cyl(m, [-0.15, 0.78, -0.4], [-0.15, 0.78, -0.08], 0.035, 12);
+  return m;
+}
+// 1950s amateur refractor: white tube on an equatorial head and a wooden tripod, aimed up at the eastern sky
+function meshTelescope() {
+  const m = new Mesh(), hy = 1.12;
+  P(m, 9); for (let i = 0; i < 3; i++) { const a = i / 3 * TAU + 0.3; m.sweep([[0, hy - 0.05, 0], [cos(a) * 0.5, 0, sin(a) * 0.5]], 0.025, 0.02); }
+  P(m, 34); cyl(m, [0, hy - 0.08, 0], [0, hy + 0.05, 0], 0.05, 12); box(m, -0.05, hy + 0.04, -0.06, 0.05, hy + 0.12, 0.06);
+  cyl(m, [0, hy + 0.08, 0], [0.15, hy - 0.08, -0.1], 0.012, 6); disc(m, [0.15, hy - 0.08, -0.1], [0.15, -0.16, -0.1], 0.05, 12); // counterweight
+  const d = [-0.3, 0.62, 0.72], l = hypot(...d); for (let k = 0; k < 3; k++) d[k] /= l;
+  const p = (t, o = 0) => [d[0] * t, hy + 0.13 + d[1] * t + o, d[2] * t];
+  P(m, 23); cyl(m, p(-0.5), p(0.62), 0.045, 16);
+  P(m, 34); cyl(m, p(0.6), p(0.82), 0.052, 16, false); cyl(m, p(-0.5), p(-0.6), 0.025, 10); cyl(m, p(-0.6), [p(-0.6)[0], p(-0.6)[1] + 0.06, p(-0.6)[2] - 0.03], 0.016, 8);
+  P(m, 23); cyl(m, p(-0.1, 0.075), p(0.2, 0.075), 0.015, 8);
+  return m;
+}
+// inside the tent: a rumpled sleeping bag turned back, a pillow, the tape recorder on a crate, and photos and newspaper
+// clippings pinned to the canvas (tent coordinates: door at -z, back wall at z = 1.8, side walls at x = +-1.5)
+function meshTentInside() {
+  const m = new Mesh(); rseed(470);
+  P(m, 25); loft(m, [[-1.05, 0.95, 0.04, 0.3, 0.03, 3], [-0.95, 0.95, 0.08, 0.36, 0.07, 3], [-0.6, 0.97, 0.1, 0.38, 0.09, 3], [-0.25, 0.92, 0.12, 0.4, 0.11, 3],
+    [0.1, 0.96, 0.09, 0.39, 0.08, 3], [0.4, 0.95, 0.06, 0.37, 0.05, 3], [0.55, 0.95, 0.04, 0.37, 0.03, 3]], 18);
+  // the top turned back at the head, plaid lining up
+  P(m, 26); const g = []; for (let i = 0; i <= 5; i++) { const r = []; for (let j = 0; j <= 4; j++) { const u = i / 5, v = j / 4; r.push(m.v(0.58 + 0.76 * v + 0.02 * sin(u * 9), 0.1 + 0.05 * sin(PI * u) + 0.02 * sin(v * 11 + u * 5), 0.45 + 0.5 * u)); } g.push(r); }
+  for (let i = 0; i < 5; i++) for (let j = 0; j < 4; j++) { m.quad(g[i][j], g[i + 1][j], g[i + 1][j + 1], g[i][j + 1]); m.quad(g[i][j], g[i][j + 1], g[i + 1][j + 1], g[i + 1][j]); }
+  P(m, 27); loft(m, [[1.0, 0.95, 0.06, 0.2, 0.02, 2.5], [1.06, 0.95, 0.1, 0.27, 0.07, 2.5], [1.32, 0.95, 0.11, 0.28, 0.08, 2.5], [1.38, 0.95, 0.07, 0.22, 0.03, 2.5]], 14);
+  // crate and tape recorder (lid open against the wall, two reels of brown tape)
+  P(m, 9); box(m, -1.38, 0, 1.1, -0.92, 0.36, 1.62);
+  P(m, 30); box(m, -1.32, 0.36, 1.18, -0.98, 0.5, 1.5); box(m, -1.32, 0.5, 1.52, -0.98, 0.78, 1.55);
+  P(m, 42); box(m, -1.31, 0.5, 1.19, -0.99, 0.505, 1.49);
+  for (const x of [-1.24, -1.06]) { P(m, 36); cyl(m, [x, 0.505, 1.33], [x, 0.52, 1.33], 0.07, 18); P(m, 42); cyl(m, [x, 0.52, 1.33], [x, 0.525, 1.33], 0.02, 8); }
+  P(m, 31); for (let i = 0; i < 4; i++) box(m, -1.28 + i * 0.05, 0.5, 1.2, -1.25 + i * 0.05, 0.52, 1.23);
+  // pinned to the back wall and the left wall: photographs (white border) and clippings
+  const pin = (x, y, w, h, kind, side) => {
+    const z = 1.74, xs = -1.44, put2 = (x0, y0, x1, y1, o) => side ? box(m, xs, y0, x0, xs + o, y1, x1) : box(m, x0, y0, z - o, x1, y1, z);
+    if (kind) { P(m, 23); put2(x - w, y - h, x + w, y + h, 0.004); P(m, 29); put2(x - w * 0.86, y - h * 0.86, x + w * 0.86, y + h * 0.86, 0.006); }
+    else { P(m, 28); put2(x - w, y - h, x + w, y + h, 0.004); }
+  };
+  for (const [x, y, w, h, k] of [[-0.9, 1.15, 0.06, 0.08, 1], [-0.7, 1.32, 0.09, 0.12, 0], [-0.45, 1.1, 0.06, 0.05, 1], [-0.25, 1.28, 0.07, 0.1, 0], [-0.05, 1.05, 0.12, 0.07, 0],
+    [0.2, 1.3, 0.05, 0.07, 1], [0.38, 1.12, 0.08, 0.11, 0], [0.6, 1.25, 0.06, 0.08, 1], [-0.55, 0.9, 0.1, 0.06, 0]]) pin(x, y, w, h, k, 0);
+  for (const [z, y, w, h, k] of [[0.9, 1.0, 0.08, 0.1, 0], [1.2, 1.15, 0.06, 0.05, 1], [0.5, 1.12, 0.06, 0.08, 1]]) pin(z, y, w, h, k, 1);
+  return m;
+}
 function meshCamp() {
   const m = new Mesh();
   put(m, meshFire(), 0, 0, 0);
-  put(m, meshTent(), 1, 0, 7.5);
+  put(m, meshTent(), 1, 0, 7.5); put(m, meshTentInside(), 1, 0, 7.5);
+  put(m, meshTable(), 3.4, 0, -0.9, 0.25);
+  put(m, meshTelescope(), -3.6, 0, 3.9, 0);
+  // on the cooler lid: an enamel mug, binoculars and the observer's logbook
+  P(m, 20); lathe(m, [[0, 0], [0.04, 0], [0.042, 0.09], [0.038, 0.09], [0.036, 0.005], [0, 0.005]], 14, 2.15, 0.4, 2.45);
+  P(m, 34); for (const s of [-1, 1]) cyl(m, [2.42 + s * 0.035, 0.44, 2.3], [2.42 + s * 0.035, 0.44, 2.45], 0.027, 10);
+  P(m, 39); box(m, 2.25, 0.4, 2.48, 2.45, 0.415, 2.62);
+  // shovel stuck in the sand by the woodpile, a galvanised bucket and a green tackle box by the tent
+  P(m, 9); cyl(m, [-3.75, 0.1, -3.5], [-3.62, 1.0, -3.42], 0.018, 6); P(m, 42); box(m, -3.85, -0.15, -3.56, -3.67, 0.12, -3.48);
+  P(m, 42); lathe(m, [[0, 0], [0.12, 0], [0.15, 0.27], [0.155, 0.28], [0.145, 0.28], [0.11, 0.01], [0, 0.01]], 18, -2.15, 0, 6.05);
+  P(m, 11); box(m, -2.65, 0, 5.85, -2.3, 0.2, 6.12); P(m, 3); box(m, -2.5, 0.2, 5.97, -2.45, 0.24, 6.0);
   put(m, meshTruck(), 8, 0, -4.2);
   put(m, meshTrailer(), 8, 0, -4.2 + 2.64 + 1.32);
   put(m, meshCooler(), 2.3, 0, 2.4, 0.4);

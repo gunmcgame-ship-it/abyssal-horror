@@ -103,6 +103,7 @@ const pLeafF = scenePipe(mLeaf, 'vs', 'fs', [ibLeaf], { strip: true, constants: 
 const pSky = scenePipe(mSky, 'vs', 'fs', [], { strip: true });
 const ADD = { color: { srcFactor: 'one', dstFactor: 'one' }, alpha: { srcFactor: 'one', dstFactor: 'one' } };
 const pFire = scenePipe(mFire, 'vs', 'fs', [ibFire], { strip: true, blend: ADD });
+const pStars = scenePipe(mod(W_STARS), 'vs', 'fs', [ibFire], { strip: true, blend: ADD });
 const pSolidSh = shadowPipe(mSolid, 'vs', [vbSolid, ibSolid]), pTerrSh = shadowPipe(mSolid, 'vs', [vbSolid, ibSolid], { cull: 'front' });
 const pLeafSh = shadowPipe(mLeaf, 'vs', [ibLeaf], { strip: true, constants: { ROWS: 3 } });
 const mPost = mod(W_POST);
@@ -224,7 +225,7 @@ const FLYN = FLY.length / 6, FLYT = 60, LUTN = 1024, flyLUT = new Float32Array(L
 const flyPts = [];
 // per-frame float state lives in one preallocated array, so the frame loop allocates no heap numbers
 const F = new Float64Array(32), P6 = new Float64Array(6);
-const CX = 0, CY = 1, CZ = 2, YAW = 3, PIT = 4, FX = 5, FY = 6, FZ = 7, RX = 8, RZ = 9, UX = 10, UY = 11, UZ = 12, VX = 13, VY = 14, VZ = 15, TIME = 16, FLT = 17, LAST = 18, GPU = 19, HUDT = 20, SPL = 21, MX = 22, MY = 23, MZ = 24, DT = 25, ECT = 26;
+const CX = 0, CY = 1, CZ = 2, YAW = 3, PIT = 4, FX = 5, FY = 6, FZ = 7, RX = 8, RZ = 9, UX = 10, UY = 11, UZ = 12, VX = 13, VY = 14, VZ = 15, TIME = 16, FLT = 17, LAST = 18, GPU = 19, HUDT = 20, SPL = 21, MX = 22, MY = 23, MZ = 24, DT = 25, ECT = 26, LIFT = 27, PLAY = 28;
 // aim the camera from P6 = position + look-at point
 function aim() {
   const dx = P6[3] - P6[0], dy = P6[4] - P6[1], dz = P6[5] - P6[2];
@@ -281,6 +282,8 @@ const ibSolids = buf(solidData, BU.VERTEX);
 const ibChunk = Wd.chunks.map((c) => buf(c.data, BU.VERTEX)), ibProp = Wd.props.map((c) => buf(c.data, BU.VERTEX));
 const ibBig = buf(new Uint8Array(Wd.big.buf), BU.VERTEX), ibBigF = buf(new Uint8Array(Wd.bigF.buf), BU.VERTEX), ibSmall = buf(new Uint8Array(Wd.small.buf), BU.VERTEX);
 const ibFireB = buf(Wd.fire, BU.VERTEX), nFire = Wd.fire.length / 8;
+// the bright stars, and the satellite in the last slot (rewritten every frame)
+const STARB = starData(), ibStars = buf(STARB, BU.VERTEX), nStars = STARB.length / 8, SATB = STARB.subarray((nStars - 1) * 8);
 // the lantern is one instance, rewritten every frame (position, scale, rotation, material 2)
 const LANT = new Float32Array([0, 0, 0, 0.85, 0, 0, 0, 1, 2, 0, 1, 0]), ibLant = buf(LANT, BU.VERTEX), LANTM = meshes[11];
 Q.writeTexture({ texture: tVol }, Wd.volD, { bytesPerRow: NX, rowsPerImage: NY / 2 }, [NX / 2, NY / 2, NZ / 2]);
@@ -398,7 +401,7 @@ function eclipse(m) {
 
 // ---------------------------------------------------------------- frame
 let hud = false;
-let kf = 0, kb = 0, kl = 0, kr = 0, ku = 0, kd = 0, ks = 0, mdx = 0, mdy = 0, lkx = 0, lky = 0, l2x = 0, l2y = 0, hN = 0, hMax = 0, hMin = 1e9, hPer = 1e9, hLate = 0, hTot = 0, tId = -1, tN = 0, tx0 = 0, ty0 = 0, tx = 0, ty = 0;
+let kLift = 0, kf = 0, kb = 0, kl = 0, kr = 0, ku = 0, kd = 0, ks = 0, mdx = 0, mdy = 0, lkx = 0, lky = 0, l2x = 0, l2y = 0, hN = 0, hMax = 0, hMin = 1e9, hPer = 1e9, hLate = 0, hTot = 0, tId = -1, tN = 0, tx0 = 0, ty0 = 0, tx = 0, ty = 0;
 const TANH = 0.6, NEAR = 0.1, EXPO = 0.85;
 const submitList = [null];
 const rowOrd = new Uint8Array(CELLS);
@@ -454,15 +457,18 @@ function render() {
   let gt = (gu - 0.82) / 0.18; gt = gt < 0 ? 0 : gt > 1 ? 1 : gt;
   // campfire light: low, warm, flickering
   m[60] = CAMP[0]; m[61] = CAMP[1] + 0.45; m[62] = CAMP[2];
-  m[63] = 8 * (1 + 0.12 * sin(t * 9.3) + 0.08 * sin(t * 15.1 + 2) + 0.06 * sin(t * 3.7));
-  // the lantern: held low on the right, swinging a little round its handle; its flame is the light
-  const sw = sin(t * 1.1) * 0.035 + sin(t * 0.47 + 1) * 0.02, hx = rz, hz = -rx; // hx, hz: forward, level
-  const lx = cx + fx * 0.8 + rx * 0.4 - ux * 0.4 + hx * sw * 0.16, ly = cy + fy * 0.8 - uy * 0.4, lz = cz + fz * 0.8 + rz * 0.4 - uz * 0.4 + hz * sw * 0.16;
+  m[63] = 10 * (1 + 0.12 * sin(t * 9.3) + 0.08 * sin(t * 15.1 + 2) + 0.06 * sin(t * 3.7));
+  // the lantern: held low on the right, swinging a little round its handle; its flame is the light.
+  // Holding Space lifts it up and out in front (F[LIFT] eases 0 .. 1), so its light reaches further across the ground.
+  const lu = F[LIFT] * F[LIFT] * (3 - 2 * F[LIFT]), lf = 0.8 - 0.18 * lu, lr = 0.4 - 0.06 * lu, ld = 0.4 - 0.36 * lu;
+  const sw = (sin(t * 1.1) * 0.035 + sin(t * 0.47 + 1) * 0.02) * (1 - 0.5 * lu), hx = rz, hz = -rx; // hx, hz: forward, level
+  const lx = cx + fx * lf + rx * lr - ux * ld + hx * sw * 0.16, ly = cy + fy * lf - uy * ld, lz = cz + fz * lf + rz * lr - uz * ld + hz * sw * 0.16;
   m[64] = lx; m[65] = ly + 0.01; m[66] = lz;
   m[67] = 2.2 * (1 + 0.05 * sin(t * 17) + 0.04 * sin(t * 23 + 1) + 0.03 * sin(t * 7.3)) * (1 - 0.55 * gt * gt * (3 - 2 * gt));
   const ss2 = sin(sw / 2), cs2 = cos(sw / 2), by = sin(-yaw / 2), bw = cos(-yaw / 2), qx = rx * ss2, qz = rz * ss2;
   LANT[0] = lx; LANT[1] = ly; LANT[2] = lz; LANT[4] = qx * bw - qz * by; LANT[5] = cs2 * by; LANT[6] = qx * by + qz * bw; LANT[7] = cs2 * bw;
   Q.writeBuffer(ibLant, 0, LANT);
+  satellite(F[PLAY], SATB); Q.writeBuffer(ibStars, (nStars - 1) * 32, SATB);
   Q.writeBuffer(ubo, 0, UB);
 
   { let cr = floor((cz - OZ) / CELLW) | 0; cr = cr < 0 ? 0 : cr > CELLS - 1 ? CELLS - 1 : cr; let n = 0; rowOrd[n++] = cr; for (let d = 1; d < CELLS; d++) { if (cr - d >= 0) rowOrd[n++] = cr - d; if (cr + d < CELLS) rowOrd[n++] = cr + d; } }
@@ -492,6 +498,7 @@ function render() {
   r.setPipeline(pLeafF); r.setVertexBuffer(0, ibBigF); drawCells(r, Wd.bigF.start, Wd.bigF.lo, Wd.bigF.hi, 5, false, 6, 58, 150);
   r.setPipeline(pLeafS); r.setVertexBuffer(0, ibSmall); drawCells(r, Wd.small.start, Wd.small.lo, Wd.small.hi, 1.5, false, 6, 0, 70);
   r.setPipeline(pSky); r.draw(4);
+  r.setPipeline(pStars); r.setVertexBuffer(0, ibStars); r.draw(4, nStars);
   r.setPipeline(pFire); r.setVertexBuffer(0, ibFireB); r.draw(4, nFire);
   r.end();
   // bloom
@@ -561,7 +568,8 @@ function frame(now) {
     dynN = dynT = dynG = dynGN = 0; resize();
   }
   F[TIME] += dt; F[DT] = dt;
-  if (!menu) F[ECT] += dt * ECLX / 60;
+  if (!menu) { F[ECT] += dt * ECLX / 60; F[PLAY] += dt; }
+  F[LIFT] = clamp(F[LIFT] + (kLift ? dt : -dt) / 0.45, 0, 1);
   {
     // touch: holding the finger away from where it went down keeps turning, like a joystick
     if (tId >= 0) {
@@ -594,7 +602,7 @@ function frame(now) {
 const key = (e, v) => {
   switch (e.code) {
     case 'KeyW': kf = v; break; case 'KeyS': kb = v; break; case 'KeyA': kl = v; break; case 'KeyD': kr = v; break;
-    case 'KeyE': ku = v; break; case 'KeyQ': kd = v; break; case 'ShiftLeft': case 'ShiftRight': ks = v; break;
+    case 'KeyE': ku = v; break; case 'KeyQ': kd = v; break; case 'ShiftLeft': case 'ShiftRight': ks = v; break; case 'Space': kLift = v; break;
     default: if (v && !e.repeat) {
       if (e.code === 'KeyH') { hud = !hud; hTot = 0; hPer = 1e9; info.textContent = ''; }
       else if (e.code === 'KeyM') mute();
@@ -606,7 +614,7 @@ const key = (e, v) => {
 // behind the menu only the stats and mute keys work
 addEventListener('keydown', (e) => { if (menu && e.code !== 'KeyH' && e.code !== 'KeyM') return; sound(); key(e, 1); });
 addEventListener('keyup', (e) => key(e, 0));
-const release = () => { kf = kb = kl = kr = ku = kd = ks = 0; tId = -1; tN = 0; };
+const release = () => { kf = kb = kl = kr = ku = kd = ks = kLift = 0; tId = -1; tN = 0; };
 const capture = () => { sound(); const p = canvas.requestPointerLock({ unadjustedMovement: true }); if (p && p.catch) p.catch(() => canvas.requestPointerLock()).catch(() => 0); };
 canvas.addEventListener('click', capture);
 addEventListener('mousemove', (e) => { if (document.pointerLockElement === canvas) { mdx += e.movementX; mdy += e.movementY; } });
