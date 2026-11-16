@@ -240,7 +240,7 @@ fn shadowSoft(p: vec3f) -> f32 {
 }
 fn vol(p: vec3f) -> vec4f { return textureSampleLevel(tV, sC, (p - vec3f(-192., -56., -192.)) / vec3f(384., 60., 384.), 0.); }
 // point lights: g.fire and g.lant are position + strength (flicker included); short range, fast fall-off, no shadows
-const FIRER = 16.; const LANTR = 10.;
+const FIRER = 16.; const LANTR = 11.;
 fn att(p: vec3f, l: vec4f, r: f32) -> f32 { let d = distance(l.xyz, p); let w = sat(1. - d * d / (r * r)); return l.w * w * w / (1. + 1.3 * d * d); }
 // The camp's big things as rounded boxes (camp coordinates, metres from the fire: centre + yaw, half size + rounding),
 // so the fire and the lantern cast soft shadows past them and the ground darkens a little under them.
@@ -308,7 +308,7 @@ fn airGlow(rd: vec3f, L: f32, lp: vec3f, I: f32) -> f32 {
   return I * (atan((L - t0) / h) - atan(-t0 / h)) / h;
 }
 fn inScatter(rd: vec3f, L: f32) -> vec3f {
-  return FIREC * airGlow(rd, L, g.fire.xyz + vec3f(0., .5, 0.), g.fire.w) * .00035 + LANTC * airGlow(rd, L, g.lant.xyz, g.lant.w) * .00025;
+  return FIREC * airGlow(rd, L, g.fire.xyz + vec3f(0., .5, 0.), g.fire.w) * .00035 + LANTC * airGlow(rd, L, g.lant.xyz, g.lant.w) * .00008;
 }
 fn fog(c: vec3f, wp: vec3f) -> vec3f {
   let v = wp - g.cam.xyz; let d = length(v); let rd = v / d;
@@ -383,7 +383,7 @@ fn prop(id: i32, op: vec3f, mc: f32, h: f32) -> PM {
     case 24 { m.a = vec3f(.30, .28, .22); m.bp = .1; }                         // ground cloth
     case 40 { m.a = vec3f(.42, .05, .03); m.gl = .5; m.bp = .1; }              // lantern: red paint
     case 41 { m.a = vec3f(.04); m.gl = 1.; m.bp = 0.;                           // lantern: clear glass globe, faintly lit from inside
-      m.e = LANTC * g.lant.w * (.03 + .05 * ss(.06, -.03, op.y)); }
+      m.e = LANTC * g.lant.w * (.01 + .017 * ss(.06, -.03, op.y)); }
     case 42 { m.a = vec3f(.30, .30, .31); m.gl = .6; m.mt = .8; m.bp = .05; } // lantern: tin and wire
     case 25 { m.a = vec3f(.19, .21, .12) * (1. - .3 * ss(.03, .0, abs(fract(op.z / .16) - .5) - .45)); m.bp = .3; m.n = vec3f(sin(op.z * 40.), 0., cos(op.x * 31.)) * .06; } // sleeping bag: olive drab, quilted
     case 26 { let px = step(.5, fract(op.x / .09)); let pz = step(.5, fract(op.z / .09));                   // sleeping bag lining: red plaid flannel
@@ -501,7 +501,7 @@ fn prop(id: i32, op: vec3f, mc: f32, h: f32) -> PM {
     let fx = dot(dv, g.right.xyz); let fy = dot(dv, g.up.xyz) + .004;
     let wd = .0055 * (1. - .7 * ss(-.004, .022, fy)) + .0008;
     let fl = exp(-(fx * fx) / (wd * wd) - pow(max(abs(fy - .008) - .012, 0.), 2.) / .00002);
-    c += mix(vec3f(1., .45, .12), vec3f(1., .85, .55), ss(.2, .8, fl)) * g.lant.w * 4. * fl + LANTC * g.lant.w * .25 * exp(-(fx * fx + fy * fy) / .0009);
+    c += mix(vec3f(1., .45, .12), vec3f(1., .85, .55), ss(.2, .8, fl)) * g.lant.w * 1.3 * fl + LANTC * g.lant.w * .08 * exp(-(fx * fx + fy * fy) / .0009);
   }
   return fin(fog(c, i.wp));
 }
