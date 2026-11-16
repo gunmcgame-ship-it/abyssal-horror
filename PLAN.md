@@ -49,6 +49,13 @@ A full chase and jump scare is planned for a LATER version (see section 8): leav
 | Canyon shape | Winding canyon with side pockets: bends hide what's ahead, small alcoves to explore. |
 | Park details | Wooden park sign at the landing (made-up park name), an old fire ring and a picnic table. Everything must be 1950s-appropriate: no modern objects, signs, materials or fonts. |
 | Other people | Nobody else is there, but there are period-appropriate traces that others have been before (for example old tire tracks, an older cold fire ring, a rusted can or bottle, a faded trail marker). |
+| Year | 1957. |
+| Title | Working title: "Ground Observer, 1957". Use it in the menu, page title and README. May change later; keep it in one easy-to-edit place. |
+| Menu text | The title plus a quiet date-and-place line: "<Park name>, 1957". |
+| Park name reference | The park name is a subtle deep-cut cosmic-horror reference, shown ONLY on the park sign and menu line. No other eldritch symbols anywhere. Exact name TBD. |
+| Ridge figure | Placeholder for now: a plain tall dark silhouette, built so its shape is easy to swap later. Owner is researching the final look. |
+| Run style | Milestone by milestone. Each milestone is one complete run with no questions asked mid-way; stop at the end for the owner to review. |
+| Self-check | Screenshot critic subagent (sees only renders, as in prompt.txt) on milestones 1 and 6 only. GPU timing check on every milestone. |
 | First milestone | Look-around only: camp and sky. Walking comes in milestone 2. |
 
 ## 3. How the current code is laid out (what to change)
