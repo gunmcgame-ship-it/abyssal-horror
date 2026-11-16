@@ -382,7 +382,7 @@ const ECLX = 4.5;
 // the shadow centre relative to the moon in moon radii, east and north, from astro (canon.mjs in the notes): it moves
 // in a straight line, 3.25, 2.18 at 3:35 to -1.03, 1.31 at 5:52. Umbra 2.67 and penumbra 4.83 moon radii.
 // The parallactic angle (56.6 degrees) turns east/north into right/up on the disc as it sits low in the west.
-const ECU = 2.67, ECP = 4.83, ECQ = 56.6 * PI / 180, MOON0 = [0.4, 0.376, 0.344];
+const ECU = 2.67, ECP = 4.83, ECQ = 56.6 * PI / 180, MOON0 = [0.27, 0.254, 0.232];
 const essm = (a, b, x) => { const t = x < a ? 0 : x > b ? 1 : (x - a) / (b - a); return t * t * (3 - 2 * t); };
 function eclipse(m) {
   const t = F[ECT], ee = 3.25 - 0.03124 * t, nn = 2.18 - 0.00635 * t;

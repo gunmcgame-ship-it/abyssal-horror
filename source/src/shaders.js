@@ -211,7 +211,7 @@ fn skyBase(rd: vec3f) -> vec3f {
   let up = sat(rd.y); let mu = sat(dot(rd, MOON)); let ml = g.mc.w;
   var c = mix(vec3f(.0050, .0056, .0070), vec3f(.0010, .0013, .0026), pow(up, .35));
   c += mix(vec3f(.030, .040, .062), vec3f(.0060, .0105, .0260), pow(up, .45)) * (1. + .8 * mu * mu) * ml;
-  c += g.mc.rgb * vec3f(.16, .13, .10) * (pow(mu, 6.) * .3 + pow(mu, 40.) * .5 + pow(mu, 400.) * 1.5);
+  c += g.mc.rgb * vec3f(.10, .08, .065) * (pow(mu, 6.) * .3 + pow(mu, 40.) * .5 + pow(mu, 400.) * 1.5);
   return c * select(1., .6, rd.y < 0.);
 }
 `;
@@ -308,7 +308,7 @@ fn airGlow(rd: vec3f, L: f32, lp: vec3f, I: f32) -> f32 {
   return I * (atan((L - t0) / h) - atan(-t0 / h)) / h;
 }
 fn inScatter(rd: vec3f, L: f32) -> vec3f {
-  return FIREC * airGlow(rd, L, g.fire.xyz + vec3f(0., .5, 0.), g.fire.w) * .0011 + LANTC * airGlow(rd, L, g.lant.xyz, g.lant.w) * .0007;
+  return FIREC * airGlow(rd, L, g.fire.xyz + vec3f(0., .5, 0.), g.fire.w) * .0005 + LANTC * airGlow(rd, L, g.lant.xyz, g.lant.w) * .00025;
 }
 fn fog(c: vec3f, wp: vec3f) -> vec3f {
   let v = wp - g.cam.xyz; let d = length(v); let rd = v / d;
@@ -654,7 +654,7 @@ fn stars(rd: vec3f, sc: f32, dens: f32, bright: f32, px: f32) -> vec3f {
     let dd = length(q - g.ec.xy);
     let pen = ss(g.ec.z - .12, g.ec.w, dd);
     let red = vec3f(1., .34, .12) * mix(.04, .22, pow(sat(dd / g.ec.z), 3.));
-    let mc = 3.2 * alb * (vec3f(1., .80, .58) * pen + red * (1. - pen)) * (1. - .5 * cd);
+    let mc = 2.2 * alb * (vec3f(1., .80, .58) * pen + red * (1. - pen)) * (1. - .5 * cd);
     c = mix(c, mc, disc);
   }
   // a shooting star now and then: a short streak that flares and fades
