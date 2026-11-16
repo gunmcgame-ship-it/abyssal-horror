@@ -6,21 +6,20 @@
 const MESAS = [
   [-37, -42, -33, -22, 9, -7, 3.5, 2], [-29, -15, -33, 5, 12, -14, 3, 2], [-36, 11, -30, 27, 9, -5, 4, 2],   // west wall of the main canyon
   [30, -45, 35, -27, 9, -9, 4, 2], [37, -20, 31, -3, 11, -16, 3, 2], [32, 5, 35, 9, 7, -8, 4, 2],          // east wall
-  [19, -15, 19, -15, 4.4, -6, 2, 1.5],   // pillar with window
-  [6, -88, 6, -88, 10, -34, 0, 0],       // mound in the kelp basin
-  [0, -106, 0, -106, 8, 3, 2, 2],        // pillar reaching the surface
-  [44, 6, 47, -8, 7, -17, 3, 1],         // ship supports
-  [33, 29, 37, 12, 9, -19, -6.5, 0],     // sloped sunlit wall beside the wreck
+  [19, -15, 19, -15, 4.4, -6, 2, 1.5],   // pillar with a window
+  [6, -88, 6, -88, 10, -34, 0, 0],       // low butte in the far basin
+  [44, 6, 47, -8, 7, -17, 3, 1],
+  [33, 29, 37, 12, 9, -19, -6.5, 0],     // sloped wall
   [74, 14, 74, 14, 8, -15, 3, 1],
-  [-84, -34, -80, -12, 10, -7, 6, 2], [-78, -6, -83, 12, 12, -13, 5, 2], [-82, 18, -79, 32, 9, -8, 6, 2],   // sponge canyon west wall
-  [-17, 62, -19, 78, 10, -6, 9, 3], [-21, 84, -18, 100, 11, -9, 8, 3],     // grotto overhang cliff
-  [22, 67, 24, 80, 7, -11, 6, 2],        // grotto coral rock
-  [-16, 122, 34, 122, 9, -27, 3, 2],     // grotto far wall
+  [-84, -34, -80, -12, 10, -7, 6, 2], [-78, -6, -83, 12, 12, -13, 5, 2], [-82, 18, -79, 32, 9, -8, 6, 2],   // west side canyon wall
+  [-17, 62, -19, 78, 10, -6, 9, 3], [-21, 84, -18, 100, 11, -9, 8, 3],     // overhang cliff
+  [22, 67, 24, 80, 7, -11, 6, 2],
+  [-16, 122, 34, 122, 9, -27, 3, 2],
 ];
 // vertical ring arches: cx, cy, cz, yaw, major radius, minor radius, y squash
 const ARCHES = [
   [-23, -9.5, -16, 0.3, 4.2, 1.4, 1.2],
-  [0, -45, -34, 1.57, 14, 2.7, 1.2],
+  [0, -45, -34, 0, 16.5, 2.8, 1.2],        // spans the main canyon west of camp: the moon sets through it
   [-40, -45, 44, 1.57, 10, 2.2, 1.3],
 ];
 // carved tunnels: ax, ay, az, radius, bx, by, bz
@@ -33,15 +32,6 @@ const CLEARS = [
   [0, -45, 0, 35, 22, 10], [0, -86, 0, -86, 46, 12], [42, 24, 74, 6, 22, 10], [72, -26, 72, -26, 26, 10],
   [-60, -36, -60, 36, 13, 8], [-60, 42, -18, 46, 12, 8], [4, 58, 8, 100, 24, 10], [-34, -74, -56, -46, 11, 8],
 ];
-const PURPLE = [6, 84];
-const zoneP = (x, z) => sstep(44, 26, hypot(x - PURPLE[0], z - PURPLE[1]));
-const MAGENTA = [[14, 6, 13], [-4, 20, 9], [6, 84, 30], [-58, 8, 10], [50, 30, 12], [8, -70, 10], [-12, -98, 9], [-36, 44, 9], [-46, -60, 9], [24, 42, 8], [-56, 26, 9], [-44, 38, 8], [-10, 44, 8], [12, 24, 8], [-50, -45, 8]];
-const magAt = (x, z) => {
-  let m = sstep(0.54, 0.66, fbm(x * 0.03, 7, z * 0.03, 3)) * 0.9;
-  for (const p of MAGENTA) m = max(m, sstep(p[2], p[2] * 0.45, hypot(x - p[0], z - p[1])));
-  return m * sstep(0.3, 0.55, fbm(x * 0.17, 1, z * 0.17, 2) + m * 0.25);
-};
-
 function primBuffer() {
   const a = [];
   for (const m of MESAS) a.push(m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7]);
@@ -81,7 +71,10 @@ function buildTerrain(D) {
   return { vb, ib, nv, wp, wn, smp, start: cnt, lo, hi };
 }
 
+
 // ---------------------------------------------------------------- instance stores
+// Camp layout, in metres from the fire (x north, z east): see meshCamp() for what stands where.
+const CHAIR = [-1.6, 1.1, -0.97]; // folding chair: x, z, yaw (it faces the fire)
 function makeWorld(D, T, flyPts, POSES) {
   const gi = (x, y, z) => x + NX * (y + NY * z);
   const smp = T.smp;
@@ -89,17 +82,13 @@ function makeWorld(D, T, flyPts, POSES) {
   const nCells = CELLS * CELLS;
   const cellOf = (x, z) => clamp(floor((x - OX) / CELLW), 0, CELLS - 1) + CELLS * clamp(floor((z - OZ) / CELLW), 0, CELLS - 1);
   const big = Array.from({ length: nCells }, () => []), small = Array.from({ length: nCells }, () => []);
-  // Medium and Low keep every 2nd / 4th leaf (but every kelp stem), made wider; the random stream is the same
+  // Medium and Low keep every 2nd / 4th leaf (but every yucca stalk), made wider; the random stream is the same
   let nth = 0;
   const leaf = (L, x, y, z, len, yaw, tilt, wid, hA, type, s1, s2, bend) => { if (type === 1 || !(nth++ % THIN)) L[cellOf(x, z)].push(x, y, z, len, yaw, tilt, type === 1 ? wid : wid * (1 + LV / 2), hA, type, s1, s2, bend); };
-  const glint = (...a) => { nth++ % THIN || glints.push(...a); };
   const solids = []; // per mesh id: arrays of 12 floats
   const props = Array.from({ length: 6 }, () => Array.from({ length: nCells }, () => []));
   const solid = (mesh, x, y, z, sc, q, mat, seed, ts = 1, bob = 0) => { (mesh > 3 && mesh < 10 ? props[mesh - 4][cellOf(x, z)] : (solids[mesh] ||= [])).push(x, y, z, sc, q[0], q[1], q[2], q[3], mat, seed, ts, bob); };
   const chunks = Array.from({ length: NCHUNK }, () => Array.from({ length: nCells }, () => []));
-  const glints = [];
-  const rel = (i, f, r) => { const p = POSES[i]; let fx = p[3] - p[0], fz = p[5] - p[2]; const l = hypot(fx, fz); fx /= l; fz /= l; return [p[0] + fx * f - fz * r, p[2] + fz * f + fx * r]; };
-  const bubbles = [], kelpAbs = new Float32Array((NX / 2) * (NY / 2) * (NZ / 2));
 
   // --- surface queries
   const fl = [];
@@ -112,216 +101,112 @@ function makeWorld(D, T, flyPts, POSES) {
     }
     return fl;
   };
-  const grad = (x, y, z) => {
-    const e = 0.6; let nx = Dw(x - e, y, z) - Dw(x + e, y, z), ny = Dw(x, y - e, z) - Dw(x, y + e, z), nz = Dw(x, y, z - e) - Dw(x, y, z + e);
-    const l = hypot(nx, ny, nz) || 1; return [nx / l, ny / l, nz / l];
-  };
-  // march from outside along -n to the surface
-  const snap = (x, y, z, n) => {
-    let px = x + n[0] * 2.5, py = y + n[1] * 2.5, pz = z + n[2] * 2.5, prev = Dw(px, py, pz);
-    if (prev > 0) return null;
-    for (let i = 0; i < 24; i++) {
-      const qx = px - n[0] * 0.25, qy = py - n[1] * 0.25, qz = pz - n[2] * 0.25, d = Dw(qx, qy, qz);
-      if (d > 0) { const t = prev / (prev - d); const p = [mix(px, qx, t), mix(py, qy, t), mix(pz, qz, t)]; return p.concat(grad(p[0], p[1], p[2])); }
-      px = qx; py = qy; pz = qz; prev = d;
-    }
-    return null;
-  };
+  const gy = (x, z) => { const f = floorsAt(x, z); return f.length ? f[f.length - 2] : -45; };
   const pickV = () => ((rnd() * T.nv) | 0) * 3;
-  const tangent = (n) => { let t = abs(n[1]) < 0.9 ? [n[2], 0, -n[0]] : [1, 0, 0]; const l = hypot(...t); t = t.map((v) => v / l); return [t, [n[1] * t[2] - n[2] * t[1], n[2] * t[0] - n[0] * t[2], n[0] * t[1] - n[1] * t[0]]]; };
   const nearFly = (x, y, z, r) => { for (const p of flyPts) if (hypot(x - p[0], z - p[2]) < r && y < p[1] + 3 && y > p[1] - 13) return true; return false; };
   const nearPose = (x, z, r = 3) => { for (const p of POSES) if (hypot(x - p[0], z - p[2]) < r) return true; return false; };
-  // --- kelp columns
-  const column = (x, y, z, H, kind, dens = 1) => {
-    const strands = 2 + (rnd() < 0.6) + (rnd() < 0.3), ph = rnd() * TAU, tw = rr(0.1, 0.28), sr = rr(0.2, 0.55), sc = rr(0.75, 1.25);
-    const la = rnd() * TAU, lm = rr(0, 0.11), full = rr(0.55, 1.3) * dens;
-    const stem = (s, h) => { const a = ph + s * TAU / strands + h * tw, r = sr * (1 - 0.6 * h / H), ln = lm * h * h / H; return [x + cos(a) * r + cos(la) * ln, z + sin(a) * r + sin(la) * ln, a]; };
-    for (let s = 0; s < strands; s++) for (let h = 0; h < H - 1; h += 1.7) { const p = stem(s, h); leaf(big, p[0], y + h, p[1], 2.1, p[2] + PI / 2, 0.1, 0.17, h, 1, rnd(), rnd(), 0.3); }
-    const n = floor(H * 30 * full);
-    for (let i = 0; i < n; i++) {
-      const t = pow(rnd(), 0.9), h = t * H, p = stem((rnd() * strands) | 0, h);
-      const L = ((0.55 + 0.75 * rnd() * rnd()) * (1 - 0.5 * t * t) * sc + 0.25) * (kind === 1 ? 1.25 : 1.15);
-      const tilt = mix(rr(0.4, 1.0), rr(0.15, 0.45), t);
-      const type = kind === 1 ? (rnd() < 0.8 ? 3 : 4) : kind === 2 ? (rnd() < 0.5 ? 4 : 0) : 0;
-      leaf(big, p[0], y + h, p[1], L, rnd() * TAU, tilt, L * (kind === 1 ? rr(0.09, 0.13) : rr(0.15, 0.21)) + 0.03, h, type, rnd(), rnd(), rr(0.38, 0.95));
-    }
-    for (let i = floor(H * (kind === 1 ? 16 : 13)); i > 0; i--) { const h = rnd() * H, a = rnd() * TAU, r = rr(0.15, 0.8) * (1 - 0.5 * h / H), ln = lm * h * h / H; glint(x + cos(a) * r + cos(la) * ln, y + h, z + sin(a) * r + sin(la) * ln, h, rnd(), kind === 1 ? rnd() : rnd() * 0.6, rr(0.018, 0.05), 0); }
-    // light absorption footprint for the skylight bake
-    const hx = round((x - OX) / VS / 2), hz = round((z - OZ) / VS / 2);
-    for (let hy = floor((y - OY) / VS / 2); hy <= floor((y + H - OY) / VS / 2); hy++) {
-      if (hy >= 0 && hy < NY / 2 && hx > 0 && hx < NX / 2 - 1 && hz > 0 && hz < NZ / 2 - 1) kelpAbs[hx + NX / 2 * (hy + NY / 2 * hz)] += 0.17;
-    }
+  const nearCamp = (x, z, r) => hypot(x - CAMP[0], z - CAMP[2]) < r;
+  // a flat-ish ground point picked from the terrain mesh, or null
+  const ground = (ny0, rCamp, rFly) => {
+    const k = pickV(); if (T.wn[k + 1] < ny0) return null;
+    const x = T.wp[k] + rr(-0.35, 0.35), z = T.wp[k + 2] + rr(-0.35, 0.35), y = T.wp[k + 1];
+    if (hypot(x, z) > 168 || nearCamp(x, z, rCamp) || nearPose(x, z, 3) || nearFly(x, y, z, rFly)) return null;
+    return [x, y, z];
   };
-  const KELPZ = [[-32, -5, 13, 0.85], [0, -86, 46, 1], [72, -26, 27, 0.9], [-60, -4, 11, 0.8], [0, -36, 12, 0.55], [-17, -8, 6, 0.8], [15, -8, 6, 0.8], [-4, 120, 20, 0.4], [-45, -63, 15, 0.9], [62, -26, 12, 0.9], [-100, 70, 30, 0.8], [100, 60, 30, 0.8], [-95, -90, 32, 0.8], [105, -85, 30, 0.7]];
-  const NOKELP = [[-5, -106.5, 8], [4.6, -109.4, 10], [14.2, -112.3, 12], [-26, -100, 6], [-20.5, -101.7, 4.5], [-14.8, -104.5, 6], [-7.5, -107.8, 7], [4, 112, 11], [2, 4, 15], [42, 22, 12], [6, 78, 19], [-58, -16, 8], [9, -66, 9], [8, -76, 8]];
-  const kelpDens = (x, z) => {
-    for (const p of NOKELP) if (hypot(x - p[0], z - p[1]) < p[2]) return 0;
-    let d = sstep(0.52, 0.64, fbm(x * 0.022, 4, z * 0.022, 3)) * 0.5;
-    for (const p of KELPZ) d = max(d, p[3] * sstep(p[2], p[2] * 0.75, hypot(x - p[0], z - p[1])));
-    return d;
-  };
-  const occ = new Set();
-  rseed(1);
-  const tryColumn = (x, z, kind, force, dens = 1) => {
-    const key = floor(x / 2.3) * 4096 + floor(z / 2.3);
-    if (occ.has(key)) return;
-    const f = floorsAt(x, z); const c = [];
-    for (let i = 0; i < f.length; i += 2) if (f[i + 1] > 9) c.push(i);
-    if (!c.length) return;
-    const i = c[(rnd() * c.length) | 0], y = f[i];
-    if (grad(x, y, z)[1] < 0.55) return;
-    if (!force && flyPts.some((p) => hypot(x - p[0], z - p[2]) < 5)) return;
-    occ.add(key);
-    column(x, y - 0.3, z, min(f[i + 1] - rr(0.8, 5), force ? rr(30, 42) : rr(15, 40)), kind, dens);
-  };
-  // hand-placed columns framing the viewpoints: x, z, kind, density
-  for (const p of [[...rel(0, 11, -8.5), 0], [...rel(0, 16, -10.5), 0], [...rel(0, 21, -9), 0], [...rel(0, 9, 7), 0], [...rel(0, 14, 9.5), 0], [...rel(0, 19, 8), 0], [...rel(0, 26, 6), 0],
-    [...rel(5, 6.5, 5.2), 1], [...rel(5, 12, 7), 1], [...rel(5, 15, -8), 0], [...rel(5, 22, -5), 1], [...rel(3, 12, -5.5), 0], [...rel(3, 16, 5.5), 0], [...rel(3, 20, -4.5), 0], [...rel(3, 25, 6), 0], [...rel(3, 13, 8), 0], [...rel(3, 30, -7), 0], [24, 62, 1], [-6, 96, 1], [20, 96, 2], [-10, 70, 0], [16, 52, 1],
-    [...rel(4, 15, -9), 0, 1.2], [...rel(4, 19, -13), 0, 1.2], [...rel(4, 23, -8.5), 0, 1.2], [...rel(4, 25, -15), 0, 1.2],
-    [...rel(4, 25, 0.5), 2, 1.2], [...rel(4, 27, -3), 2, 1.2], [...rel(4, 28, 3.5), 2, 1.2], [...rel(4, 31, 0), 0, 1.3], [...rel(4, 33, -5), 0, 1.3], [...rel(4, 33, 5), 0, 1.3], [...rel(4, 21, 9), 0, 1.2], [...rel(4, 27, 11), 0, 1.2],
-    [...rel(2, 6.5, -5.5), 0, 1.5], [...rel(2, 9.5, -8), 0, 1.3], [...rel(2, 8, 6), 0, 1.4], [...rel(2, 12, 3.6), 0, 1.3], [...rel(2, 17, -2.5), 0, 1.2], [...rel(2, 21, 4), 0, 1.2], [...rel(2, 12, -4.5), 2, 1.2], [...rel(2, 27, -9), 0, 1.2], [...rel(2, 30, 8.5), 0, 1.2], [...rel(2, 37, -3), 0, 1.1],
-    [...rel(2, 13.5, 6.5), 0, 1.3], [...rel(2, 14.5, -7), 0, 1.3], [...rel(2, 6.5, 6.5), 0, 1.3], [...rel(2, 9, -8), 2, 1.3]]) tryColumn(p[0], p[1], p[2], true, p[3]);
-  // random columns across the world
-  rseed(2);
-  for (let i = 0; i < 15000; i++) {
-    const a = rnd() * TAU, r = sqrt(rnd()) * 170, x = cos(a) * r, z = sin(a) * r;
-    if (rnd() < kelpDens(x, z)) tryColumn(x, z, zoneP(x, z) > 0.5 && rnd() < 0.5 ? 1 : rnd() < 0.03 ? 2 : 0);
-  }
 
-  // --- clusters of ribbon leaves on the ground
-  const cluster = (x, y, z, n, type, lmin, lmax, wmin, wmax, tmax, sway) => {
-    for (let i = 0; i < n; i++) {
-      const a = rnd() * TAU, r = rnd() * 0.5, L = rr(lmin, lmax);
-      leaf(big, x + cos(a) * r, y - 0.15, z + sin(a) * r, L, a, rr(0.05, tmax), rr(wmin, wmax), sway, type, rnd(), rnd(), rr(0.3, 0.8));
+  // --- shrubs: sagebrush and rabbitbrush (leaf bushes), dry bunch grass
+  const bush = (x, y, z, s, type) => {
+    for (let j = (26 + rnd() * 26) * s | 0; j > 0; j--) {
+      const a = rnd() * TAU, r = sqrt(rnd()) * 0.3 * s;
+      leaf(big, x + cos(a) * r, y - 0.05, z + sin(a) * r, rr(0.3, 0.6) * s, a + rr(-0.4, 0.4), rr(0.05, 1.15), rr(0.06, 0.1) * s, 0, type, rnd(), rnd(), rr(0.38, 0.55));
     }
   };
-  const HOT = [[0, 5, 30], [42, 30, 24], [6, 82, 34], [-58, 10, 24], [4, -88, 30], [-36, 44, 18], [-46, -60, 20]];
-  const hot = (x, z) => { let h = 0.4; for (const p of HOT) h = max(h, sstep(p[2], p[2] * 0.4, hypot(x - p[0], z - p[1]))); return h; };
+  const tuft = (x, y, z) => {
+    for (let j = 8 + rnd() * 10 | 0; j > 0; j--) leaf(small, x + rr(-0.05, 0.05), y - 0.03, z + rr(-0.05, 0.05), rr(0.15, 0.42), rnd() * TAU, rr(0.05, 0.75), rr(0.015, 0.03), 0, 5, rnd(), rnd(), rr(0.4, 0.7));
+  };
   rseed(3);
-  for (let i = 0; i < 40000; i++) {
-    const k = pickV(), x = T.wp[k], y = T.wp[k + 1], z = T.wp[k + 2], ny = T.wn[k + 1];
-    if (hypot(x, z) > 172 || y > -6) continue;
-    const h = hot(x, z), zp = zoneP(x, z), u = rnd();
-    if (nearFly(x, y, z, 4) || hypot(x + 1, z - 2) < 9 || nearPose(x, z, 8)) continue;
-    if (ny > 0.75 && u < 0.10 * h) cluster(x, y, z, 8 + rnd() * 14 | 0, 2, 1.0, 3.0, 0.13, 0.26, 0.6, 2.5);
-    else if (ny > 0.6 && u < 0.10 * h + 0.07 * max(zp, h * 0.4)) cluster(x, y, z, 10 + rnd() * 18 | 0, rnd() < 0.8 ? 3 : 4, 0.9, 2.6, 0.14, 0.28, 0.9, 1.5);
-    else if (ny < -0.35 && u < 0.5 * max(zp, 0.2)) { // hanging fronds
-      const n = 12 + rnd() * 20 | 0;
-      for (let j = 0; j < n; j++) leaf(big, x + rr(-0.6, 0.6), y + 0.2, z + rr(-0.6, 0.6), rr(0.8, 3.2), rnd() * TAU, PI - rr(0, 0.4), rr(0.08, 0.18), 0, zp > 0.3 || rnd() < 0.5 ? 6 : 0, rnd(), rnd(), rr(0.3, 0.6));
-    } else if (ny > -0.2 && ny < 0.8 && u < 0.07) { // wall tufts
-      const yaw = atan2(T.wn[k + 2], T.wn[k]), n = 5 + rnd() * 7 | 0;
-      for (let j = 0; j < n; j++) leaf(big, x, y, z, rr(0.5, 1.4), yaw + rr(-0.9, 0.9), rr(0.3, 1.1), rr(0.06, 0.12), 0.5, zp > 0.4 && rnd() < 0.6 ? 3 : 0, rnd(), rnd(), rr(0.2, 0.6));
-    }
+  for (let i = 0; i < 170000; i++) {
+    const p = ground(0.78, 11, 1.5); if (!p) continue;
+    const pat = fbm(p[0] * 0.045, 3, p[2] * 0.045, 3), u = rnd();
+    if (u < 0.012 + 0.03 * sstep(0.4, 0.65, pat)) bush(p[0], p[1], p[2], rr(0.6, 1.25), rnd() < 0.8 ? 2 : 7);
+    else if (u < 0.05 + 0.04 * sstep(0.55, 0.3, pat)) tuft(p[0], p[1], p[2]);
   }
-  // --- ground cover: dense carpets of small tufts in the magenta patches
+
+  // --- trees: juniper and pinyon, a trunk mesh with foliage sprays (leaves) clustered round its branch tips
+  const trunks = [treeTrunk(0), treeTrunk(1)];
+  const tree = (x, y, z, kind, sc = rr(0.75, 1.35)) => {
+    const a = rnd() * TAU, ca = cos(a), sa = sin(a);
+    solid(8 + kind, x, y - 0.1, z, sc, qAxis(0, 1, 0, a), 2, rnd(), 1, 0);
+    for (const t of trunks[kind].tips) {
+      const tx = (t[0] * ca + t[2] * sa) * sc, tz = (-t[0] * sa + t[2] * ca) * sc, ty = t[1] * sc, rc = t[3] * sc;
+      for (let j = rc * rc * 200 + 20 | 0; j > 0; j--) {
+        let dx = rr(-1, 1), dy = rr(-0.6, 1), dz = rr(-1, 1); const l = hypot(dx, dy, dz) || 1; dx /= l; dy /= l; dz /= l;
+        const r = rc * pow(rnd(), 0.4), py = y + ty + dy * r * 0.75;
+        leaf(big, x + tx + dx * r, py, z + tz + dz * r, rr(0.16, 0.32) * (0.8 + 0.3 * rc), atan2(dz, dx) + rr(-0.5, 0.5), rr(0.2, 1.7), rr(0.055, 0.09), py - y, kind ? 4 : 0, rnd(), rnd(), rr(0.4, 0.6));
+      }
+    }
+  };
   rseed(4);
-  for (const p of MAGENTA) for (let i = p[2] * p[2] * PI * 45; i > 0; i--) {
-    const a = rnd() * TAU, r = sqrt(rnd()) * p[2], x = p[0] + cos(a) * r, z = p[1] + sin(a) * r;
-    if (rnd() > magAt(x, z) + 0.12 || nearPose(x, z)) continue;
-    const f = floorsAt(x, z); if (!f.length) continue;
-    const y = f[f.length - 2]; if (grad(x, y, z)[1] < 0.7) continue;
-    const nl = 2 + (rnd() * 3 | 0), yw = rnd() * TAU;
-    for (let j = 0; j < nl; j++) leaf(small, x, y - 0.03, z, rr(0.08, 0.26), yw + j * TAU / nl + rr(-0.4, 0.4), rr(0.15, 0.85), rr(0.035, 0.07), 0, 5, rnd(), rnd(), rr(0.3, 0.7));
-    if (rnd() < 0.3) for (let j = 0; j < 2; j++) leaf(small, x + rr(-0.2, 0.2), y - 0.04, z + rr(-0.2, 0.2), rr(0.2, 0.55), rnd() * TAU, rr(0.05, 0.6), rr(0.03, 0.06), 0, 7, rnd(), rnd(), rr(0.3, 0.8));
-    if (rnd() < 0.3) glint(x, y + rr(0.08, 0.22), z, 0, rnd(), 0.82 + rnd() * 0.18, rr(0.01, 0.02), 0);
+  // a few by camp, so it does not stand in the open
+  for (const t of [[-11, 7, 0, 1.2], [10, 14, 1, 1.1], [-8, -13, 0, 1.3], [-14, -4, 0, 0.9], [14, 11, 0, 0.8]]) { const x = CAMP[0] + t[0], z = CAMP[2] + t[1]; tree(x, gy(x, z), z, t[2], t[3]); }
+  const tocc = new Set();
+  for (let i = 0, made = 0; i < 80000 && made < 340; i++) {
+    const p = ground(0.75, 13, 3.5); if (!p) continue;
+    if (rnd() > 0.12 + 0.6 * sstep(0.45, 0.65, fbm(p[0] * 0.03, 8, p[2] * 0.03, 3))) continue;
+    const key = floor(p[0] / 5) * 4096 + floor(p[2] / 5); if (tocc.has(key)) continue;
+    tocc.add(key); tree(p[0], p[1], p[2], rnd() < 0.65 ? 0 : 1); made++;
   }
+
+  // --- yucca (a rosette of stiff blades, often with last summer's dry flower stalk) and cacti
+  const yucca = (x, y, z) => {
+    const s = rr(0.7, 1.2);
+    for (let j = 26 + rnd() * 20 | 0; j > 0; j--) leaf(big, x + rr(-0.06, 0.06), y - 0.02, z + rr(-0.06, 0.06), rr(0.4, 0.8) * s, rnd() * TAU, pow(rnd(), 0.7) * 1.35, rr(0.035, 0.05) * s, 0, 3, rnd(), rnd(), rr(0.3, 0.36));
+    if (rnd() < 0.55) {
+      const h = rr(1.4, 2.4) * s, ya = rnd() * TAU, ln = rr(0, 0.12);
+      leaf(big, x, y + 0.1, z, h, ya, ln, 0.03, 0, 1, rnd(), rnd(), 0.3);
+      const tx = x + cos(ya) * sin(ln) * h, tz = z + sin(ya) * sin(ln) * h;
+      for (let j = 0; j < 7; j++) { const f = rr(0.7, 0.97); leaf(big, x + (tx - x) * f, y + 0.1 + h * f, z + (tz - z) * f, rr(0.08, 0.2), rnd() * TAU, rr(0.6, 1.4), 0.025, h, 1, rnd(), rnd(), 0.45); }
+    }
+  };
   rseed(5);
-  for (let i = 0; i < 620000; i++) {
-    const k = pickV(), ny = T.wn[k + 1];
-    if (ny < 0.72) continue;
-    const x = T.wp[k] + rr(-0.45, 0.45), z = T.wp[k + 2] + rr(-0.45, 0.45), y = T.wp[k + 1];
-    if (hypot(x, z) > 170 || nearPose(x, z)) continue;
-    const m = magAt(x, z), zp = zoneP(x, z), u = rnd();
-    if (m > 0.3 && u < m * 0.9) for (let j = 0; j < 4; j++) leaf(small, x + rr(-0.1, 0.1), y - 0.05, z + rr(-0.1, 0.1), rr(0.12, 0.34), rnd() * TAU, rr(0.05, 0.75), rr(0.04, 0.08), 0, 5, rnd(), rnd(), rr(0.3, 0.7));
-    else if (u < m * 0.9 + 0.5 * max(zp, hot(x, z)) * sstep(0.42, 0.6, fbm(x * 0.09, 9, z * 0.09, 2))) for (let j = 0; j < 3; j++) leaf(small, x + rr(-0.1, 0.1), y - 0.05, z + rr(-0.1, 0.1), rr(0.25, 0.7), rnd() * TAU, rr(0.1, 0.8), rr(0.05, 0.1), 0, 7, rnd(), rnd(), rr(0.3, 0.8));
+  for (let i = 0; i < 90000; i++) {
+    const p = ground(0.7, 9, 2); if (!p) continue;
+    const u = rnd(), pat = fbm(p[0] * 0.06, 5, p[2] * 0.06, 2), q = qAxis(0, 1, 0, rnd() * TAU);
+    if (u < 0.006) yucca(p[0], p[1], p[2]);
+    else if (u < 0.006 + 0.012 * pat) solid(6 + (rnd() < 0.5), p[0], p[1] - 0.04, p[2], rr(0.7, 1.3), q, 2, rnd(), 1, 0);
+    else if (u < 0.008 + 0.017 * pat) solid(rnd() < 0.5 ? 4 : 5, p[0], p[1] - 0.04, p[2], rr(0.6, 1.4), q, 2, rnd(), 1, 0);
   }
 
-  // --- sponges and coral (clustered on rock)
-  const spots = [];
-  const ZS = [[-58, 8, 30, 1], [0, 0, 30, 0.7], [6, 84, 36, 0.9], [4, -88, 22, 0.6], [44, 20, 24, 0.5]];
-  const zw = (x, z) => { let h = 0.45; for (const p of ZS) h = max(h, p[3] * sstep(p[2], p[2] * 0.4, hypot(x - p[0], z - p[1]))); return h; };
-  rseed(6);
-  for (let i = 0; i < 13000; i++) {
-    const k = pickV(), x = T.wp[k], y = T.wp[k + 1], z = T.wp[k + 2];
-    if (hypot(x, z) > 170 || y > -8 || T.wn[k + 1] < -0.15 || rnd() > zw(x, z) || nearFly(x, y, z, 3)) continue;
-    const n0 = [T.wn[k], T.wn[k + 1], T.wn[k + 2]], [t1, t2] = tangent(n0), coral = T.wn[k + 1] > 0.85 || rnd() < 0.35, cnt = coral ? 2 + rnd() * 5 | 0 : 3 + rnd() * 9 | 0, sd = rnd();
-    for (let j = 0; j < cnt; j++) {
-      const a = rr(-1, 1) * (0.5 + cnt * 0.13), b = rr(-1, 1) * (0.5 + cnt * 0.13);
-      const s = snap(x + t1[0] * a + t2[0] * b, y + t1[1] * a + t2[1] * b, z + t1[2] * a + t2[2] * b, n0);
-      if (!s) continue;
-      let ux = s[3], uy = s[4] + (coral ? 0.9 : 1.1), uz = s[5]; const l = hypot(ux, uy, uz); ux /= l; uy /= l; uz /= l;
-      const q = qMul(qFromY(ux, uy, uz), qAxis(0, 1, 0, rnd() * TAU)), sc = coral ? rr(0.5, 1.5) : rr(0.35, 0.9) * (rnd() < 0.1 ? 1.6 : 1);
-      solid(coral ? 7 + (rnd() * 3 | 0) : 4 + (rnd() * 3 | 0), s[0] - ux * 0.12 * sc, s[1] - uy * 0.12 * sc, s[2] - uz * 0.12 * sc, sc, q, coral ? 5 : 4, fract(sd + rr(-0.03, 0.03)), 1, 0);
-    }
-    if (!coral && rnd() < 0.3) spots.push([x + n0[0], y + n0[1] + 0.5, z + n0[2]]);
-  }
-
-  // dense sponge / coral gardens: x, z, radius, count
-  rseed(7);
-  for (const g of [[-68, -6, 9, 260], [-66, 6, 7, 160], [16, 72, 7, 200], [-6, 74, 6, 120], [-13, -2, 6, 80], [8, -88, 8, 160], [44, 12, 7, 120], [-62, 22, 6, 140], [-47, 40, 6, 140], [-30, 47, 6, 120], [-12, 48, 5, 100], [14, 28, 6, 140], [28, 45, 6, 120], [-36, -76, 6, 130], [-49, -58, 6, 130], [-58, -38, 6, 120]]) {
-    let made = 0;
-    for (let i = 0; i < 400000 && made < g[3]; i++) {
-      const k = pickV(), x = T.wp[k], y = T.wp[k + 1], z = T.wp[k + 2];
-      if (hypot(x - g[0], z - g[1]) > g[2] || y > -14 || T.wn[k + 1] < -0.1 || nearFly(x, y, z, 2.2)) continue;
-      made++;
-      const coral = T.wn[k + 1] > 0.85 || rnd() < 0.3, nx = T.wn[k], ny = T.wn[k + 1] + (coral ? 0.9 : 1.1), nz = T.wn[k + 2], l = hypot(nx, ny, nz);
-      const sc = coral ? rr(0.5, 1.4) : rr(0.35, 0.9) * (rnd() < 0.15 ? 1.7 : 1);
-      solid(coral ? 7 + (rnd() * 3 | 0) : 4 + (rnd() * 3 | 0), x - nx / l * 0.1 * sc, y - ny / l * 0.1 * sc, z - nz / l * 0.1 * sc, sc, qMul(qFromY(nx / l, ny / l, nz / l), qAxis(0, 1, 0, rnd() * TAU)), coral ? 5 : 4, rnd(), 1, 0);
-    }
-  }
-  // --- rocks: floating boulder clusters + scattered ground rocks
-  const BOULD = [[-11, -11, -105, 14, 5], [-56, -19, -18, 18, 6], [10, -13, -88, 22, 7], [24, -15, -24, 22, 7], [-18, -12, 4, 14, 6], [30, -14, 30, 16, 6], [36, -12, -70, 22, 8], [-30, -13, -84, 16, 7], [-58, -14, 0, 14, 6], [19, -13, 98, 18, 6], [62, -9, 34, 14, 6]];
-  rseed(8);
-  for (let i = 0; i < 9; i++) { const a = rnd() * TAU, r = rr(60, 150); BOULD.push([cos(a) * r, rr(-20, -9), sin(a) * r, 10 + rnd() * 12 | 0, rr(5, 9)]); }
-  for (const b of BOULD) for (let i = 0; i < b[3]; i++) {
-    const sc = rnd() < 0.12 ? rr(1.8, 3.2) : rr(0.35, 1.5);
-    const x = b[0] + rr(-1, 1) * b[4], y = b[1] + rr(-1, 1) * b[4] * 0.6, z = b[2] + rr(-1, 1) * b[4];
-    if (Dw(x, y, z) > -sc) continue;
-    const bob = rr(0.12, 0.4), sd = rnd();
-    solid(rnd() * 4 | 0, x, min(y, -2 - sc), z, sc, qRand(), 1, sd, 1, bob);
-    if (sc > 1.1) for (let j = 0; j < 7; j++) solid(rnd() * 4 | 0, x + rr(-1.6, 1.6) * sc, min(y, -2 - sc) + rr(-1.4, 1) * sc, z + rr(-1.6, 1.6) * sc, rr(0.1, 0.35), qRand(), 1, sd, 1, bob);
-  }
+  // --- rocks: scattered ground rocks, talus and boulders on the slopes, pebbles
   rseed(9);
   for (let i = 0; i < 2600; i++) {
-    const k = pickV(); if (T.wn[k + 1] < 0.7 || hypot(T.wp[k], T.wp[k + 2]) > 170 || nearFly(T.wp[k], T.wp[k + 1], T.wp[k + 2], 6)) continue;
+    const k = pickV(); if (T.wn[k + 1] < 0.7 || hypot(T.wp[k], T.wp[k + 2]) > 170 || nearCamp(T.wp[k], T.wp[k + 2], 12) || nearFly(T.wp[k], T.wp[k + 1], T.wp[k + 2], 6)) continue;
     const sc = rr(0.25, 1.3) * (rnd() < 0.1 ? 2 : 1);
     solid(rnd() * 4 | 0, T.wp[k], T.wp[k + 1] + sc * 0.2, T.wp[k + 2], sc, qRand(), 1, rnd(), 1, 0);
   }
-
   rseed(10);
   for (let i = 0; i < 60000; i++) {
     const k = pickV(), x = T.wp[k], y = T.wp[k + 1], z = T.wp[k + 2], ny = T.wn[k + 1];
-    if (hypot(x, z) > 172 || y > -3 || (ny > 0.8 && rnd() < 0.6) || nearFly(x, y, z, 3.5)) continue;
+    if (hypot(x, z) > 172 || y > -3 || (ny > 0.8 && rnd() < 0.6) || nearFly(x, y, z, 3.5) || nearCamp(x, z, 13)) continue;
     const sc = (0.35 + 2.1 * pow(rnd(), 2.6)) * (ny > 0.8 ? 0.5 : 1), q = qRand();
     chunks[(sc > 1.15 ? 3 : 0) + (rnd() * 3 | 0)][cellOf(x, z)].push(x - T.wn[k] * sc * 0.3, y - ny * sc * 0.3, z - T.wn[k + 2] * sc * 0.3, sc, q[0], q[1], q[2], q[3], 1, rnd(), sc > 1.15 ? 0 : 96, 0);
   }
   rseed(11);
-  for (let i = 0; i < 170000; i++) { // pebbles and rubble on the sea floor
+  for (let i = 0; i < 170000; i++) {
     const k = pickV(), x = T.wp[k] + rr(-0.4, 0.4), z = T.wp[k + 2] + rr(-0.4, 0.4), y = T.wp[k + 1];
-    if (T.wn[k + 1] < 0.8 || hypot(x, z) > 170 || nearFly(x, y, z, 1.3)) continue;
+    if (T.wn[k + 1] < 0.8 || hypot(x, z) > 170 || nearFly(x, y, z, 1.3) || nearCamp(x, z, 7)) continue;
     const sc = 0.05 + 0.3 * pow(rnd(), 2), q = qRand();
     nth++ % THIN || chunks[6][cellOf(x, z)].push(x, y - sc * 0.25, z, sc, q[0], q[1], q[2], q[3], 1, rnd(), 44, 0);
   }
-  // --- set pieces
-  const gy = (x, z) => { const f = floorsAt(x, z); return f.length ? f[f.length - 2] : -45; };
-  solid(10, -5, gy(-5, -4) - 0.6, -4, 1, qMul(qAxis(0, 1, 0, 1.2), qMul(qAxis(0, 0, 1, 0.16), qAxis(1, 0, 0, -0.3))), 2, 0.3, 1, 0);          // whale fluke
-  solid(11, 59.5, -23, 6, 1, qMul(qAxis(0, 1, 0, -PI / 2), qMul(qAxis(0, 0, 1, -0.1), qAxis(1, 0, 0, 0.32))), 3, 0.5, 1, 0); // ship hull
-  // barrel sponges in front of viewpoint 4, small sponges around the fluke base
-  rseed(12);
-  for (const b of [[7, 3.2, 1.3, 4], [8.4, 4.6, 1.0, 6], [9.6, 2.6, 1.5, 4], [11, 5, 1.1, 5], [8, -3.6, 1.2, 4], [12.5, 2, 1.2, 6], [9, 3.9, 0.8, 4]]) { const p = rel(3, b[0], b[1]), c = POSES[3]; let ux = (c[0] - p[0]) * 0.07, uz = (c[2] - p[1]) * 0.07; const l = hypot(ux, 1, uz); solid(b[3], p[0], gy(p[0], p[1]) - 0.1, p[1], b[2], qFromY(ux / l, 1 / l, uz / l), 4, rnd(), 1, 0); }
-  for (let i = 0; i < 9; i++) { const a = rnd() * TAU; const x = -5 + cos(a) * rr(1.2, 2.6), z = -4 + sin(a) * rr(1.5, 4); solid(6, x, gy(x, z) + 0.05, z, rr(0.4, 0.9), qAxis(0, 1, 0, rnd() * 6), 4, rnd(), 1, 0); }
 
-  // --- bubbles
-  const VENTS = [[4, -44, -3], [4.5, -44, -3.5], [-1, -44, 2], [2, -44, -1], [5.5, -44, -7], [3, -44, -9], [6, -44, -90], [8, -44, -84], [4, -44, -93], [-9, -44, 3], [5, -35, -86], [9, -37, -92], [40, -44, 20], [-56, -44, 12], [10, -44, 80], [-2, -44, 30], [0, -44, -30], [12, -44, 2], [6, -44, -2], [46, -44, 30], [-20, -44, -103], [-52, -44, -12], [4, -44, 70], [9, -44, -74], [4, -44, -78], [14, -44, 26], [26, -44, 40], [-45, -44, -64], [-55, -44, -40], [-58, -44, 22], [-40, -44, 40], [-14, -44, 45], [-1, -44, -9], [-7, -44, -6]];
-  rseed(13);
-  for (const s of spots) if (rnd() < 0.28) VENTS.push(s);
-  for (const v of VENTS) {
-    const n = 90 + rnd() * 70 | 0, y0 = v[1] === -44 ? gy(v[0], v[2]) : v[1];
-    for (let i = 0; i < n; i++) {
-      const sz = rnd() < 0.24 ? rr(0.1, 0.3) : rr(0.025, 0.08);
-      bubbles.push(v[0] + rr(-0.3, 0.3), y0, v[2] + rr(-0.3, 0.3), sz, rnd(), rr(1.1, 2.4) * (0.6 + sz * 3), -y0 - 0.2, rr(0.05, 0.16));
-    }
-  }
+  // --- the camp (one mesh) and the folding chair (its own instance, so it can be moved later)
+  solid(10, CAMP[0], CAMP[1], CAMP[2], 1, [0, 0, 0, 1], 2, 0, 1, 0);
+  solid(12, CAMP[0] + CHAIR[0], CAMP[1], CAMP[2] + CHAIR[1], 1, qAxis(0, 1, 0, CHAIR[2]), 2, 0, 1, 0);
+  // campfire: flame cards (x, y, z, half width | seed, 0, height) and embers (seed, 1)
+  const fire = [];
+  rseed(12);
+  for (let i = 0; i < 7; i++) { const a = rnd() * TAU, r = rr(0, 0.22); fire.push(CAMP[0] + cos(a) * r, CAMP[1] + 0.04, CAMP[2] + sin(a) * r, rr(0.16, 0.26), rnd(), 0, rr(0.4, 0.75), 0); }
+  for (let i = 0; i < 36; i++) fire.push(CAMP[0] + rr(-0.2, 0.2), CAMP[1] + 0.15, CAMP[2] + rr(-0.2, 0.2), 0, rnd(), 1, 0, 0);
 
   // --- pack leaves (36 bytes: 8 floats + 4 unorm8), sorted by culling cell
   const pack = (L, step = 1, wm = 1) => {
@@ -339,7 +224,7 @@ function makeWorld(D, T, flyPts, POSES) {
     return { buf, n, start, lo, hi };
   };
 
-  // --- half-res volume: r = openness, g = skylight
+  // --- half-res volume: r = openness, g = how much of the sky a point sees (blurred top-down light)
   const hx = NX / 2, hy = NY / 2, hz = NZ / 2, volD = new Uint8Array(hx * hy * hz * 2);
   let Lp = new Float32Array(hx * hz).fill(1), Ln = new Float32Array(hx * hz), tmp = new Float32Array(hx * hz);
   for (let y = hy - 1; y >= 0; y--) {
@@ -349,45 +234,31 @@ function makeWorld(D, T, flyPts, POSES) {
       const g0 = gi(x * 2, y * 2, z * 2);
       const d = (D[g0] + D[g0 + 1] + D[g0 + NX] + D[g0 + NX + 1] + D[g0 + NX * NY] + D[g0 + NX * NY + 1] + D[g0 + NX * NY + NX] + D[g0 + NX * NY + NX + 1]) * 0.125;
       const o = x + hx * (y + hy * z);
-      const l = b * clamp(0.5 - d / 1.5, 0, 1) * (1 - min(kelpAbs[o], 0.5));
-      Ln[i] = l;
+      Ln[i] = b * clamp(0.5 - d / 1.5, 0, 1);
       volD[o * 2] = clamp(0.5 - d / 12, 0, 1) * 255; volD[o * 2 + 1] = min(1, b) * 255;
     }
     const t = Lp; Lp = Ln; Ln = t;
   }
 
-  // --- ground map: r magenta cover, b purple zone, a sand
+  // --- ground map: a = sand (vs. bare rock) on the flats
   const gm = new Uint8Array(512 * 512 * 4);
   for (let j = 0; j < 512; j++) for (let i = 0; i < 512; i++) {
-    const x = (i + 0.5) / 512 * 384 - 192, z = (j + 0.5) / 512 * 384 - 192, o = (i + 512 * j) * 4;
-    gm[o] = magAt(x, z) * 255; gm[o + 2] = zoneP(x, z) * 255; gm[o + 3] = sstep(0.42, 0.6, fbm(x * 0.04, 3, z * 0.04, 3)) * 255;
+    const x = (i + 0.5) / 512 * 384 - 192, z = (j + 0.5) / 512 * 384 - 192;
+    gm[(i + 512 * j) * 4 + 3] = sstep(0.38, 0.6, fbm(x * 0.04, 3, z * 0.04, 3)) * 255;
   }
 
-  // --- fish schools + mantas
-  const fish = [];
-  rseed(14);
-  const SCH = [[-2, -36, -10, 15, 520, 0.3, 1, 0.945], [8, -30, -70, 22, 420, 0.32, -1], [48, -30, 14, 18, 360, 0.3, 1], [-58, -30, -8, 11, 420, 0.28, -1, 0.3], [8, -36, 84, 16, 320, 0.28, 1],
-    [-90, -28, -70, 25, 300, 0.3, 1], [95, -30, 70, 25, 300, 0.3, -1], [0, -22, 20, 30, 380, 0.34, -1], [-30, -30, -100, 18, 300, 0.3, 1], [16, -36, 30, 12, 300, 0.3, 1], [-48, -34, -58, 12, 300, 0.3, -1], [-45, -35, 38, 14, 320, 0.3, 1]];
-  for (const s of SCH) { const ss = s[7] === undefined ? rnd() : s[7]; for (let i = 0; i < s[4]; i++) fish.push(s[0], s[1], s[2], s[3], rnd(), s[6] * 1.9 / s[3], s[5], ss); }
-  const mantas = [];
-  for (const m of [[1, -28, 3.5, 14, 3.012, 0.085, 3.6, 0.1], [49, -31, 24.5, 5, 0.029, -0.08, 3.7, 0.4], [0, -14, -80, 34, 0.3, 0.06, 5.2, 0.7], [-50, -18, 20, 26, 5, -0.075, 3.8, 0.55], [10, -16, 86, 26, 2.2, 0.07, 4.4, 0.85], [20, -11, -20, 46, 4.2, -0.045, 5.6, 0.25]]) mantas.push(...m);
-
-  // --- drifting particles
-  const snow = new Float32Array(9000 * 4);
-  for (let i = 0; i < snow.length; i++) snow[i] = rnd();
-
   const sol = { data: [], ranges: [] }; let si = 0;
-  for (let m = 0; m < 12; m++) { const a = solids[m] || []; sol.ranges.push([si, a.length / 12]); si += a.length / 12; for (let i = 0; i < a.length; i++) sol.data.push(a[i]); }
+  for (let m = 0; m < 14; m++) { const a = solids[m] || []; sol.ranges.push([si, a.length / 12]); si += a.length / 12; for (let i = 0; i < a.length; i++) sol.data.push(a[i]); }
   const packC = (L) => {
     let n = 0; const start = new Uint32Array(nCells + 1);
     for (let c = 0; c < nCells; c++) { start[c] = n; n += L[c].length / 12; }
     start[nCells] = n;
     const data = new Float32Array(n * 12), lo = new Float32Array(nCells).fill(1e9), hi = new Float32Array(nCells).fill(-1e9);
     let k = 0;
-    for (let c = 0; c < nCells; c++) { const a = L[c]; for (let i = 0; i < a.length; i += 12) { for (let j = 0; j < 12; j++) data[k++] = a[i + j]; lo[c] = min(lo[c], a[i + 1] - 3); hi[c] = max(hi[c], a[i + 1] + 3); } }
+    for (let c = 0; c < nCells; c++) { const a = L[c]; for (let i = 0; i < a.length; i += 12) { for (let j = 0; j < 12; j++) data[k++] = a[i + j]; lo[c] = min(lo[c], a[i + 1] - 3); hi[c] = max(hi[c], a[i + 1] + 5); } }
     return { data, n, start, lo, hi };
   };
-  return { gy, glints: new Float32Array(glints), chunks: chunks.map(packC), props: props.map(packC), big: pack(big), bigF: pack(big, 2, 1.5), small: pack(small), solids: { data: new Float32Array(sol.data), ranges: sol.ranges }, bubbles: new Float32Array(bubbles), volD, gm, fish: new Float32Array(fish), mantas: new Float32Array(mantas), snow };
+  return { gy, trunks, chunks: chunks.map(packC), props: props.map(packC), big: pack(big), bigF: pack(big, 2, 1.5), small: pack(small), solids: { data: new Float32Array(sol.data), ranges: sol.ranges }, volD, gm, fire: new Float32Array(fire) };
 }
 const fract = (x) => x - floor(x);
 
@@ -403,155 +274,281 @@ function meshChunk(sd, sub = 2, det = sub > 2) {
     return [px, py, pz];
   });
 }
-function meshLathe(prof, seg, lump, ribs = 0) {
-  const m = new Mesh(), rings = [];
-  for (const [r, h, ao] of prof) { const ring = []; for (let s = 0; s < seg; s++) { const a = s / seg * TAU, rl = r * (1 + lump * (fbm(cos(a) * 1.5 + h * 2, h * 3, sin(a) * 1.5, 2) - 0.5) + 0.07 * cos(ribs * a + h * 1.5)); ring.push(m.v(cos(a) * rl, h, sin(a) * rl, ao)); } rings.push(ring); }
+
+// ---------------------------------------------------------------- shape helpers for the hand-built objects
+// Every helper adds to mesh m with the current part id (m.part, which picks the material: see prop() in shaders.js).
+const P = (m, id) => { m.part = id; return m; };
+// give every vertex already in m the part id (for meshes made by icosphere())
+const tag = (m, id) => { m.aux.fill(id / 127); return m; };
+const box = (m, x0, y0, z0, x1, y1, z1) => {
+  const f = (...c) => { const i = c.map((p) => m.v(...p)); m.quad(i[0], i[1], i[2], i[3]); };
+  f([x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]); f([x0, y0, z1], [x0, y1, z1], [x1, y1, z1], [x1, y0, z1]);
+  f([x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [x0, y0, z1]); f([x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0]);
+  f([x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]); f([x0, y0, z0], [x0, y0, z1], [x1, y0, z1], [x1, y0, z0]);
+};
+// flat disc facing along n
+const disc = (m, c, n, r, sides = 12) => {
+  const l = hypot(...n), nx = n[0] / l, ny = n[1] / l, nz = n[2] / l, h = abs(ny) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+  let ux = h[1] * nz - h[2] * ny, uy = h[2] * nx - h[0] * nz, uz = h[0] * ny - h[1] * nx; const ul = hypot(ux, uy, uz); ux /= ul; uy /= ul; uz /= ul;
+  const wx = ny * uz - nz * uy, wy = nz * ux - nx * uz, wz = nx * uy - ny * ux;
+  const o = m.v(...c), ring = [];
+  for (let s = 0; s < sides; s++) { const a = s / sides * TAU; ring.push(m.v(c[0] + (ux * cos(a) + wx * sin(a)) * r, c[1] + (uy * cos(a) + wy * sin(a)) * r, c[2] + (uz * cos(a) + wz * sin(a)) * r)); }
+  for (let s = 0; s < sides; s++) m.tri(o, ring[s], ring[(s + 1) % sides]);
+};
+// cylinder from a to b, with flat caps
+const cyl = (m, a, b, r, sides = 12, caps = true) => {
+  m.tube([a, b], r, sides, false);
+  if (caps) { const n = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]; disc(m, a, n, r, sides); disc(m, b, n, r, sides); }
+};
+// loft along z through rounded-rectangle sections [z, cx, cy, half width, half height, roundness (2 ellipse .. 8 boxy)]
+const loft = (m, secs, n = 20) => {
+  const rings = secs.map(([z, cx, cy, w, h, e]) => {
+    const r = [];
+    for (let k = 0; k < n; k++) { const a = k / n * TAU, c = cos(a), s = sin(a); r.push(m.v(cx + w * Math.sign(c) * pow(abs(c), 2 / e), cy + h * Math.sign(s) * pow(abs(s), 2 / e), z)); }
+    return r;
+  });
+  for (let j = 0; j < rings.length - 1; j++) for (let k = 0; k < n; k++) { const k2 = (k + 1) % n; m.quad(rings[j][k], rings[j + 1][k], rings[j + 1][k2], rings[j][k2]); }
+  for (const j of [0, rings.length - 1]) { const [z, cx, cy] = secs[j], o = m.v(cx, cy, z); for (let k = 0; k < n; k++) m.tri(o, rings[j][k], rings[j][(k + 1) % n]); }
+};
+// lathe round the y axis through [radius, height] points, optionally ribbed
+const lathe = (m, prof, seg, ox = 0, oy = 0, oz = 0, ribs = 0, ra = 0) => {
+  const rings = prof.map(([r, h]) => { const ring = []; for (let s = 0; s < seg; s++) { const a = s / seg * TAU, rl = r * (1 + ra * cos(ribs * a)); ring.push(m.v(ox + cos(a) * rl, oy + h, oz + sin(a) * rl)); } return ring; });
   for (let k = 0; k < rings.length - 1; k++) for (let s = 0; s < seg; s++) { const s2 = (s + 1) % seg; m.quad(rings[k][s], rings[k + 1][s], rings[k + 1][s2], rings[k][s2]); }
-  return m;
-}
-function meshCoral(fan, lo = LV > 1) {
-  rseed(200 + fan);
-  const m = new Mesh();
-  const nrm = (v) => { const l = hypot(...v) || 1; return v.map((c) => c / l); };
-  const br = (p, d, r, len, depth) => {
+};
+// copy mesh b into a: scaled by s (number or [x, y, z]), turned by yaw round y, then moved to x, y, z; b's part ids stay
+const put = (a, b, x, y, z, yaw = 0, s = 1) => {
+  const n0 = a.p.length / 3, c = cos(yaw), sn = sin(yaw), [sx, sy, sz] = typeof s === 'number' ? [s, s, s] : s;
+  for (let k = 0; k < b.p.length; k += 3) { const px = b.p[k] * sx, pz = b.p[k + 2] * sz; a.p.push(x + px * c + pz * sn, y + b.p[k + 1] * sy, z - px * sn + pz * c); }
+  for (const v of b.aux) a.aux.push(v);
+  for (const i of b.i) a.i.push(i + n0);
+};
+// a lumpy stone of radius ~1
+const stone = (seed) => { rseed(300 + seed); const k = rr(0.6, 0.85); return tag(icosphere(1, (x, y, z) => { const r = 0.8 + 0.35 * fbm(x * 2 + seed, y * 2, z * 2, 2); return [x * r, y * r * k, z * r]; }), 13); };
+
+// ---------------------------------------------------------------- plants
+// juniper (0: low, twisted, several stems, a dead silver branch) or pinyon (1: one straighter trunk, rounded crown)
+// returns the trunk mesh and the foliage clumps [x, y, z, radius] it carries
+function treeTrunk(kind) {
+  rseed(400 + kind);
+  const m = P(new Mesh(), kind ? 66 : 61), tips = [];
+  const branch = (p, d, r, len, depth) => {
     const pts = [p]; let q = p;
-    for (let i = 0; i < 3; i++) { d = nrm([d[0] + rr(-0.3, 0.3), d[1] + rr(-0.1, 0.3), d[2] + (fan ? rr(-0.05, 0.05) : rr(-0.3, 0.3))]); q = [q[0] + d[0] * len / 3, q[1] + d[1] * len / 3, q[2] + d[2] * len / 3]; pts.push(q); }
-    if (!depth) pts.push([q[0] + d[0] * r * 1.6, q[1] + d[1] * r * 1.6, q[2] + d[2] * r * 1.6]);
-    if (lo) m.tube(depth ? [pts[0], pts[3]] : [pts[0], pts[3], pts[4]], (k) => (k > 1 ? r * 0.36 : r * (1 - 0.22 * k)) * 1.25, 3, true, (k) => clamp(1 - (depth + 1 - k) / 5, 0, 1));
-    else m.tube(pts, (k) => k > 3 ? r * 0.36 : r * (1 - 0.22 * k / 3), fan ? 5 : 6, true, (k) => clamp(1 - (depth + 1 - k / 3) / 5, 0, 1));
-    if (depth > 0) { const n = 2 + (rnd() < 0.5); for (let i = 0; i < n; i++) br(q, nrm([d[0] + rr(-0.8, 0.8), d[1] + rr(-0.1, 0.5), d[2] + (fan ? rr(-0.08, 0.08) : rr(-0.8, 0.8))]), r * 0.78, len * 0.8, depth - 1); }
-  };
-  const n0 = fan ? 1 : 2 + (rnd() * 2 | 0);
-  for (let i = 0; i < n0; i++) br([rr(-0.08, 0.08), 0, rr(-0.08, 0.08)], nrm([rr(-0.5, 0.5), 1, fan ? 0 : rr(-0.5, 0.5)]), fan ? 0.06 : 0.08, fan ? 0.5 : 0.45, 3);
-  return m;
-}
-function meshTubes() {
-  rseed(210);
-  const m = new Mesh();
-  for (let i = 0; i < 9; i++) {
-    const a = rnd() * TAU, r0 = rr(0, 0.28), h = rr(0.45, 1.1), rad = rr(0.07, 0.12), lean = rr(0.05, 0.3), pts = [];
-    for (let k = 0; k <= 4; k++) pts.push([cos(a) * (r0 + lean * k / 4 * h), h * k / 4, sin(a) * (r0 + lean * k / 4 * h)]);
-    m.tube(pts, (k) => rad * (0.8 + 0.25 * k / 4), 12, false, (k) => 0.35 + 0.65 * k / 4);
-    // rim + dark throat
-    const e = pts[4], n = m.p.length / 3, c = m.v(e[0], e[1] - rad * 1.2, e[2], 0.05);
-    for (let s2 = 0; s2 < 12; s2++) m.tri(n - 12 + s2, n - 12 + (s2 + 1) % 12, c);
-  }
-  return m;
-}
-// stone whale fluke: SDF of tapered capsules -> surface nets
-function meshFluke() {
-  const C = [];
-  const chain = (pts, zs) => { for (let i = 0; i < pts.length - 1; i++) C.push([...pts[i], ...pts[i + 1], zs]); };
-  chain([[0, -1.6, 3.7, 1.2], [0, 1.8, 2.35, 0.98], [0, 4.6, 1.0, 0.76], [0, 6.9, 0.1, 0.6]], 0.8);
-  chain([[0, 6.6, 0.1, 0.72], [1.9, 7.9, 0, 0.98], [3.9, 8.8, -0.1, 0.9], [5.7, 9.8, -0.25, 0.64], [7.0, 11.2, -0.4, 0.38], [7.7, 12.8, -0.55, 0.2], [7.9, 14.1, -0.65, 0.1]], 0.18);
-  chain([[0, 6.6, 0.1, 0.72], [-1.7, 8.3, 0.05, 0.96], [-3.3, 9.7, -0.05, 0.88], [-4.7, 11.2, -0.2, 0.64], [-5.6, 12.9, -0.4, 0.38], [-6.0, 14.6, -0.5, 0.2], [-5.9, 15.9, -0.6, 0.1]], 0.18);
-  const sdf = (x, y, z) => {
-    let d = 1e9;
-    for (const c of C) {
-      const zs = c[8], pz = z / zs, az = c[2] / zs, bz = c[6] / zs;
-      const bax = c[4] - c[0], bay = c[5] - c[1], baz = bz - az, pax = x - c[0], pay = y - c[1], paz = pz - az;
-      const h = clamp((pax * bax + pay * bay + paz * baz) / (bax * bax + bay * bay + baz * baz), 0, 1);
-      const e = (hypot(pax - bax * h, pay - bay * h, paz - baz * h) - mix(c[3], c[7], h)) * zs;
-      const k = 0.45, hh = max(k - abs(d - e), 0) / k;
-      d = min(d, e) - hh * hh * k * 0.25;
+    for (let i = 0; i < 4; i++) {
+      d = [d[0] + rr(-0.35, 0.35), d[1] + rr(-0.1, 0.25), d[2] + rr(-0.35, 0.35)]; const l = hypot(...d); d = d.map((v) => v / l);
+      q = [q[0] + d[0] * len / 4, q[1] + d[1] * len / 4, q[2] + d[2] * len / 4]; pts.push(q);
     }
-    return d;
+    m.tube(pts, (k) => r * (1 - 0.17 * k), 7, true);
+    if (depth) for (let i = depth > 1 ? 3 : 2; i > 0; i--) branch(pts[2 + (rnd() * 2 | 0)], [d[0] + rr(-0.9, 0.9), d[1] + rr(-0.2, 0.4), d[2] + rr(-0.9, 0.9)], r * 0.55, len * rr(0.45, 0.7), depth - 1);
+    else tips.push([q[0], q[1], q[2], rr(0.6, 0.95) * (kind ? 1.15 : 1)], [pts[2][0], pts[2][1], pts[2][2], rr(0.45, 0.7)]);
+    return pts;
   };
-  const vs = 0.09, ox = -7.6, oy = -2.6, oz = -2.2, nx = 186, ny = 216, nz = 76, D = new Float32Array(nx * ny * nz);
-  for (let z = 0; z < nz; z++) for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) D[x + nx * (y + ny * z)] = -sdf(ox + x * vs, oy + y * vs, oz + z * vs);
-  const sn = surfaceNets(D, nx, ny, nz), smp = sampler3(D, nx, ny, nz);
-  const vb = new ArrayBuffer(sn.nv * 16), f = new Float32Array(vb), s = new Int8Array(vb);
-  for (let k = 0; k < sn.nv; k++) {
-    const x = sn.pos[k * 3], y = sn.pos[k * 3 + 1], z = sn.pos[k * 3 + 2], e = 0.7;
-    let ax = smp(x - e, y, z) - smp(x + e, y, z), ay = smp(x, y - e, z) - smp(x, y + e, z), az = smp(x, y, z - e) - smp(x, y, z + e);
-    const l = hypot(ax, ay, az) || 1;
-    f[k * 4] = ox + x * vs; f[k * 4 + 1] = oy + y * vs; f[k * 4 + 2] = oz + z * vs;
-    s[k * 16 + 12] = round(ax / l * 127); s[k * 16 + 13] = round(ay / l * 127); s[k * 16 + 14] = round(az / l * 127); s[k * 16 + 15] = 127;
+  if (kind) {
+    const t = branch([0, 0, 0], [rr(-0.1, 0.1), 1, rr(-0.1, 0.1)], 0.13, 2.0, 2);
+    tips.push([t[4][0], t[4][1] + 0.3, t[4][2], 0.9], [t[3][0], t[3][1], t[3][2], 0.85]);
+  } else {
+    for (let s = 0; s < 3; s++) { const a = s * 2.1 + rr(-0.4, 0.4); branch([cos(a) * 0.08, 0, sin(a) * 0.08], [cos(a) * 0.45, 1, sin(a) * 0.45], 0.1, rr(1.2, 1.8), 1); }
+    P(m, 62); branch([0.05, 0.3, 0], [0.9, 0.5, 0.2], 0.04, 1.1, 0); tips.pop(); tips.pop(); // the dead branch carries no foliage
   }
-  return { vb, ib: new Uint32Array(sn.idx), nv: sn.nv };
+  return { m, tips };
 }
-// sunken ship (bow at +x): keel with stem and stern posts, curved ribs, hull planking with a breach,
-// raised stern castle with transom, deck remnants, two masts with yards, bowsprit
-function meshShip() {
-  rseed(220);
-  const m = new Mesh(), Lh = 17, B = 5.6, Dp = 7.6;
-  const hb = (x) => B * pow(max(1 - pow(abs(x / Lh), x < 0 ? 3.6 : 2.6), 0), 0.5);
-  const dp = (x) => Dp * (1 - 0.36 * pow(abs(x / Lh), 2.5));
-  const sheer = (x) => 0.5 + (x > 0 ? 3.0 : 3.8) * pow(abs(x / Lh), 2.2);
-  const pt = (x, ph, off = 0) => { const b = hb(x) + off, d = dp(x) + off, s = sheer(x); return [x, s - (d + s) * pow(max(cos(ph), 0), 0.66), b * Math.sign(ph) * pow(abs(sin(ph)), 0.8)]; };
-  const out = (p) => { const l = hypot(p[1] + 0.5, p[2] * 1.3) || 1; return [0, (p[1] + 0.5) / l, p[2] * 1.3 / l]; };
-  const up = () => [0, 1, 0];
-  const keel = [];
-  for (let i = 0; i <= 44; i++) { const x = mix(-Lh - 1.0, Lh + 2.4, i / 44), e = max(abs(x) / Lh - 0.78, 0) * 4.2; keel.push([x, -dp(clamp(x, -Lh, Lh)) - 0.3 + e * e * e * 4.2, 0]); }
-  m.sweep(keel, 0.55, 0.95, up);
-  for (let x = -Lh + 0.7; x < Lh - 0.3; x += 0.8) {
-    const a0 = rnd() < 0.1 ? rr(-0.9, -0.2) : -PI / 2, a1 = rnd() < 0.1 ? rr(0.2, 0.9) : PI / 2, pts = [];
-    for (let i = 0; i <= 16; i++) pts.push(pt(x, mix(a0, a1, i / 16)));
-    m.sweep(pts, 0.24, 0.3, out);
+// barrel cactus
+function meshBarrel() { const m = P(new Mesh(), 60); lathe(m, [[0, 0], [0.16, 0], [0.2, 0.1], [0.21, 0.3], [0.19, 0.45], [0.13, 0.55], [0.05, 0.6], [0, 0.61]], 36, 0, 0, 0, 18, 0.09); return m; }
+// hedgehog cactus: a clump of small ribbed stems
+function meshHedgehog() {
+  rseed(410); const m = P(new Mesh(), 60);
+  for (let i = 0; i < 7; i++) { const a = rnd() * TAU, r = rr(0, 0.12), h = rr(0.12, 0.3), w = rr(0.045, 0.07); lathe(m, [[0, -0.02], [w, 0], [w * 1.05, h * 0.6], [w * 0.7, h * 0.95], [0, h]], 16, cos(a) * r, 0, sin(a) * r, 8, 0.12); }
+  return m;
+}
+// prickly pear: flat pads growing from the edges of older pads, a few red-purple fruits on top
+function meshPear(seed) {
+  rseed(420 + seed); const m = new Mesh(), pad = tag(icosphere(2), 63), fruit = tag(icosphere(1), 65);
+  const grow = (x, y, z, yaw, lean, depth) => {
+    const s = rr(0.8, 1.1), h = 0.17 * s;
+    const n0 = m.p.length / 3; put(m, pad, 0, 0, 0, 0, [0.13 * s, h, 0.035]);
+    // tip the pad (round its own x axis), then turn and move it so its base sits at x, y, z
+    for (let k = n0 * 3; k < m.p.length; k += 3) {
+      const px = m.p[k], py = m.p[k + 1] + h, pz = m.p[k + 2], c = cos(lean), sn = sin(lean);
+      const qy = py * c - pz * sn, qz = py * sn + pz * c, cy = cos(yaw), sy = sin(yaw);
+      m.p[k] = x + px * cy + qz * sy; m.p[k + 1] = y + qy; m.p[k + 2] = z - px * sy + qz * cy;
+    }
+    const tx = x + sin(lean) * 2 * h * sin(yaw), ty = y + cos(lean) * 2 * h, tz = z + sin(lean) * 2 * h * cos(yaw);
+    if (depth) for (let i = 1 + (rnd() < 0.6); i > 0; i--) grow(tx + rr(-0.06, 0.06), ty - 0.04, tz + rr(-0.06, 0.06), yaw + rr(-1, 1), lean + rr(-0.5, 0.5), depth - 1);
+    else if (rnd() < 0.7) for (let i = 1 + rnd() * 3 | 0; i > 0; i--) put(m, fruit, tx + rr(-0.06, 0.06), ty - 0.01, tz + rr(-0.03, 0.03), 0, 0.025);
+  };
+  for (let i = 0; i < 3; i++) grow(rr(-0.15, 0.15), -0.03, rr(-0.15, 0.15), rnd() * TAU, rr(-0.5, 0.5), 2);
+  return m;
+}
+
+// ---------------------------------------------------------------- the camp
+// 1950s pickup, nose to -z, ground at y = 0: rounded fenders, two-tone cream over turquoise, whitewall tyres
+function meshTruck() {
+  const m = new Mesh();
+  P(m, 21); box(m, -0.55, 0.3, -2.2, 0.55, 0.52, 2.2);
+  P(m, 2);
+  for (const s of [-1, 1]) {
+    loft(m, [[-2.42, s * 0.7, 0.66, 0.06, 0.06, 2.4], [-2.36, s * 0.7, 0.7, 0.17, 0.2, 2.4], [-2.15, s * 0.71, 0.73, 0.21, 0.3, 2.4], [-1.75, s * 0.72, 0.74, 0.22, 0.34, 2.4],
+      [-1.35, s * 0.72, 0.72, 0.22, 0.33, 2.4], [-1.0, s * 0.73, 0.66, 0.21, 0.26, 2.4], [-0.75, s * 0.74, 0.58, 0.18, 0.16, 2.4], [-0.62, s * 0.74, 0.53, 0.1, 0.07, 2.4]], 18);
+    loft(m, [[0.72, s * 0.8, 0.62, 0.06, 0.06, 2.4], [0.82, s * 0.8, 0.64, 0.16, 0.22, 2.4], [1.1, s * 0.8, 0.66, 0.17, 0.32, 2.4], [1.6, s * 0.8, 0.66, 0.17, 0.32, 2.4],
+      [1.9, s * 0.8, 0.64, 0.16, 0.24, 2.4], [2.05, s * 0.8, 0.6, 0.08, 0.08, 2.4]], 16);
+    P(m, 21); box(m, s * 0.66, 0.48, -0.66, s * 0.95, 0.52, 0.74); P(m, 2); // running board
+    P(m, 12); box(m, s * 0.74, 0.78, 2.05, s * 0.86, 0.92, 2.09); P(m, 2); // tail light
   }
-  const holeX = rr(-6, 2), holeS = rnd() < 0.5 ? 1 : -1;
-  const BR = [[holeX, holeS * 0.8, 3.2, 0.42], [7, -holeS * 0.95, 2.4, 0.34], [12, holeS * 0.5, 1.7, 0.28], [-11, -holeS * 0.55, 2.1, 0.3]];
-  const holed = (x, ph) => { for (const h of BR) { const a = (x - h[0]) / h[2], b = (ph - h[1]) / h[3]; if (a * a + b * b < 1 + 0.45 * sin(x * 3.1 + ph * 9)) return true; } return false; };
-  const NS = 14, xs = []; for (let x = -Lh + 0.35; x <= Lh - 0.3; x += 0.85) xs.push(x);
-  for (let j = 0; j < NS; j++) {
-    const p0 = mix(-1.5, 1.5, j / NS), p1 = mix(-1.5, 1.5, (j + 1) / NS), sg = p0 + p1 < 0 ? -1 : 1, lo = sg < 0 ? p1 : p0, hi = sg < 0 ? p0 : p1;
-    let pv = null;
-    for (const x of xs) {
-      const cu = [m.v(...pt(x, lo, 0.27)), m.v(...pt(x, hi, 0.14)), m.v(...pt(x, lo, 0.1)), m.v(...pt(x, hi, 0.1))];
-      if (pv && !holed(x - 0.42, (p0 + p1) / 2)) {
-        if (sg > 0) { m.quad(pv[0], pv[1], cu[1], cu[0]); m.quad(pv[2], cu[2], cu[3], pv[3]); }
-        else { m.quad(pv[0], cu[0], cu[1], pv[1]); m.quad(pv[2], pv[3], cu[3], cu[2]); }
-      }
-      pv = cu;
+  loft(m, [[-2.38, 0, 0.92, 0.48, 0.1, 3], [-2.2, 0, 0.98, 0.52, 0.15, 3], [-1.6, 0, 1.02, 0.55, 0.18, 3], [-0.86, 0, 1.06, 0.56, 0.2, 3]], 20); // hood
+  box(m, -0.5, 0.42, -2.38, 0.5, 0.88, -0.85);
+  loft(m, [[-0.9, 0, 1.06, 0.87, 0.45, 6], [-0.6, 0, 1.06, 0.88, 0.46, 6], [0.3, 0, 1.06, 0.88, 0.46, 6], [0.56, 0, 1.06, 0.86, 0.45, 6]], 24); // cab, lower
+  P(m, 1);
+  loft(m, [[-0.78, 0, 1.6, 0.78, 0.12, 4], [-0.68, 0, 1.66, 0.8, 0.22, 4.5], [0.3, 0, 1.66, 0.8, 0.22, 4.5], [0.5, 0, 1.62, 0.78, 0.17, 4.5], [0.55, 0, 1.6, 0.7, 0.08, 4]], 24); // cab, upper
+  P(m, 6);
+  const glass = (pts) => { const i = pts.map((p) => m.v(...p)); m.quad(i[0], i[1], i[2], i[3]); };
+  glass([[-0.7, 1.5, -0.73], [0.7, 1.5, -0.73], [0.66, 1.79, -0.69], [-0.66, 1.79, -0.69]]);
+  for (const s of [-1, 1]) glass([[s * 0.805, 1.48, -0.62], [s * 0.805, 1.48, 0.32], [s * 0.805, 1.78, 0.28], [s * 0.805, 1.78, -0.56]]);
+  glass([[-0.45, 1.5, 0.565], [0.45, 1.5, 0.565], [0.45, 1.74, 0.565], [-0.45, 1.74, 0.565]]);
+  P(m, 9); box(m, -0.62, 0.78, 0.62, 0.62, 0.84, 2.36); // bed floor
+  P(m, 2);
+  box(m, -0.68, 0.84, 0.62, -0.62, 1.3, 2.36); box(m, 0.62, 0.84, 0.62, 0.68, 1.3, 2.36); box(m, -0.68, 0.84, 0.6, 0.68, 1.3, 0.66); box(m, -0.68, 0.82, 2.32, 0.68, 1.3, 2.38);
+  P(m, 3);
+  for (let y = 0.5; y < 0.86; y += 0.09) box(m, -0.46, y, -2.45, 0.46, y + 0.045, -2.38); // grille bars
+  box(m, -0.98, 0.36, -2.62, 0.98, 0.5, -2.5); box(m, -0.98, 0.38, 2.38, 0.98, 0.5, 2.48); // bumpers
+  cyl(m, [0, 0.48, 2.5], [0, 0.48, 2.64], 0.035, 8); // hitch
+  for (const s of [-1, 1]) {
+    P(m, 3); cyl(m, [s * 0.71, 0.84, -2.36], [s * 0.71, 0.84, -2.45], 0.115, 16); P(m, 22); disc(m, [s * 0.71, 0.84, -2.452], [0, 0, -1], 0.095, 16);
+    P(m, 3); cyl(m, [s * 0.88, 1.5, -0.7], [s * 1.05, 1.62, -0.72], 0.012, 4); box(m, s * 1.02, 1.56, -0.74, s * 1.1, 1.68, -0.72); // mirror
+    for (const z of [-1.62, 1.38]) {
+      P(m, 4); cyl(m, [s * 0.64, 0.38, z], [s * 0.88, 0.38, z], 0.38, 22);
+      P(m, 5); disc(m, [s * 0.885, 0.38, z], [s, 0, 0], 0.29, 22);
+      P(m, 3); cyl(m, [s * 0.885, 0.38, z], [s * 0.91, 0.38, z], 0.17, 16);
     }
   }
-  for (const sgn of [-1, 1]) {
-    let pts = []; for (let x = -Lh + 0.6; x <= Lh - 0.6; x += 1) pts.push(pt(x, sgn * PI / 2, 0.2)); m.sweep(pts, 0.3, 0.28, up);
-    // stern castle bulwarks
-    for (let j = 0; j < 3; j++) { pts = []; for (let x = -Lh + 0.4; x <= -Lh + 8.5 - j; x += 0.9) pts.push([x, sheer(x) + 0.55 + j * 0.86, sgn * (max(hb(x), 2.6) + 0.15)]); m.sweep(pts, 0.82, 0.09, () => [0, 0, sgn]); }
-  }
-  // transom
-  for (let y = -3; y < sheer(-Lh) + 3; y += 0.86) { const w = max(1.2, 2.9 * sstep(-4.5, 1.5, y)); if (rnd() < 0.9) m.sweep([[-Lh + 0.35, y, -w], [-Lh + 0.35, y, w]], 0.82, 0.1, () => [1, 0, 0]); }
-  for (let x = -Lh + 2; x < Lh - 2; x += rr(1.8, 3.2)) m.sweep([[x, sheer(x) - 0.25, -hb(x)], [x, sheer(x) - 0.2, 0], [x, sheer(x) - 0.25, hb(x)]], 0.26, 0.26, up);
-  for (let z = -3.9; z <= 3.9; z += 0.62) { let x = -Lh + rr(1, 5); while (x < Lh - 4) { const x1 = min(x + rr(3, 9), Lh - 3.5); if (rnd() < 0.6) { const pts = []; for (let xx = x; xx <= x1; xx += 1) if (hb(xx) > abs(z) + 0.3) pts.push([xx, sheer(xx) - 0.05, z]); if (pts.length > 1) m.sweep(pts, 0.56, 0.07, up); } x = x1 + rr(0.5, 3); } }
-  // foremast with yard, broken main mast, bowsprit
-  m.sweep([[7, -Dp + 0.6, 0], [7.1, 1, 0], [7.4, 8, 0.3], [7.8, 15, 0.8]], (k) => 0.62 - k * 0.1, (k) => 0.62 - k * 0.1, () => [1, 0, 0]);
-  m.sweep([[7.5, 9.5, -5.2], [7.5, 9.6, 0.3], [7.5, 9.2, 5.6]], 0.26, 0.26, up);
-  m.sweep([[7.7, 13.2, -3.2], [7.7, 13.3, 3.6]], 0.2, 0.2, up);
-  m.sweep([[-3, -Dp + 0.6, 0], [-3.2, 1, 0.2], [-3.9, 6, 1.0], [-5.2, 9.5, 2.6]], (k) => 0.74 - k * 0.1, (k) => 0.74 - k * 0.1, () => [1, 0, 0]);
-  m.sweep([[Lh + 1.4, 2.6, 0], [Lh + 8, 5.2, 0.2]], 0.34, 0.34, up);
+  // canvas water bag hanging from the front bumper
+  P(m, 17); loft(m, [[-2.67, 0.42, 0.3, 0.02, 0.03, 2], [-2.66, 0.42, 0.22, 0.13, 0.17, 3], [-2.6, 0.42, 0.22, 0.14, 0.18, 3], [-2.585, 0.42, 0.3, 0.02, 0.03, 2]], 14);
+  P(m, 18); cyl(m, [0.36, 0.5, -2.63], [0.42, 0.42, -2.63], 0.008, 4, false); cyl(m, [0.48, 0.5, -2.63], [0.42, 0.42, -2.63], 0.008, 4, false);
   return m;
 }
-// manta ray: span along x (half span = 1), nose +z; aux = span coordinate for the flap animation
-function meshManta() {
-  const m = new Mesh(), NU = 72, M = 22, rings = [];
-  for (let j = 0; j <= NU; j++) {
-    const u = j / NU * 2 - 1, au = abs(u);
-    let zl = 0.52 - 0.74 * pow(au, 1.35) + 0.07 * exp(-pow((au - 0.13) / 0.05, 2)) - 0.05 * exp(-pow(au / 0.05, 2)) - 0.08 * pow(au, 5);
-    const zt = -0.5 + 0.3 * pow(au, 0.8) + 0.02 - 0.08 * pow(au, 5);
-    if (zl < zt + 0.004) zl = zt + 0.004;
-    const th = 0.08 * pow(1 - au, 1.15) + 0.004 + 0.12 * exp(-pow(u / 0.2, 2)), ring = [];
-    for (let k = 0; k < M; k++) { const a = k / M * TAU; ring.push(m.v(u, th * sin(a) * (0.62 + 0.38 * cos(a)), mix(zt, zl, 0.5 + 0.5 * cos(a)), u)); }
-    rings.push(ring);
-  }
-  for (let j = 0; j < NU; j++) for (let k = 0; k < M; k++) { const k2 = (k + 1) % M; m.quad(rings[j][k], rings[j + 1][k], rings[j + 1][k2], rings[j][k2]); }
-  const tail = []; for (let i = 0; i <= 8; i++) tail.push([0, 0, -0.42 - i * 0.19]);
-  const n0 = m.p.length / 3;
-  m.tube(tail, (k) => 0.016 * (1 - k / 9), 4, true);
-  for (let k = n0; k < m.aux.length; k++) m.aux[k] = 0;
-  for (const sx of [-1, 1]) { // cephalic fins
-    const n1 = m.p.length / 3;
-    m.tube([[sx * 0.12, -0.02, 0.48], [sx * 0.135, -0.05, 0.6], [sx * 0.115, -0.09, 0.69], [sx * 0.085, -0.125, 0.74]], (k) => 0.045 * (1 - k / 4.4), 6, true);
-    for (let k = n1; k < m.aux.length; k++) m.aux[k] = sx * 0.1;
-  }
+// 1950s travel trailer: rounded polished aluminium body, wraparound front window, nose (and hitch) to -z
+function meshTrailer() {
+  const m = new Mesh(), L = 6.4, N = 30;
+  const sec = (t) => { const f = pow(max(1 - pow(abs(t), 5), 0), 0.22), h = pow(max(1 - pow(abs(t), 4), 0), 0.3); return [(t * 0.5 + 0.5) * L, 1.15 * f, 1.05 * h]; };
+  const secs = []; for (let k = 0; k <= N; k++) { const [z, w, h] = sec(k / N * 2 - 1); secs.push([z, 0, 1.52, max(w, 0.01), max(h, 0.01), 2.7]); }
+  P(m, 7); loft(m, secs, 32);
+  // a point on the skin at (t along the body, angle round it), pushed out by off
+  const sp = (t, a, off) => { const [z, w, h] = sec(t), c = cos(a), s = sin(a); const x = (w + off) * Math.sign(c) * pow(abs(c), 2 / 2.7), y = 1.52 + (h + off) * Math.sign(s) * pow(abs(s), 2 / 2.7); return [x, y, z]; };
+  const patch = (t0, t1, a0, a1, off, nt = 4, na = 4) => {
+    const g = []; for (let i = 0; i <= nt; i++) { const r = []; for (let j = 0; j <= na; j++) r.push(m.v(...sp(mix(t0, t1, i / nt), mix(a0, a1, j / na), off))); g.push(r); }
+    for (let i = 0; i < nt; i++) for (let j = 0; j < na; j++) m.quad(g[i][j], g[i + 1][j], g[i + 1][j + 1], g[i][j + 1]);
+  };
+  P(m, 6);
+  for (const [t0, t1] of [[-0.6, -0.25], [0.2, 0.55]]) { patch(t0, t1, 0.12, 0.45, 0.012); patch(t0, t1, PI - 0.45, PI - 0.12, 0.012); }
+  patch(-0.88, -0.76, 0.15, PI - 0.15, 0.012, 2, 12); // wraparound front window
+  patch(0.86, 0.92, 1.2, PI - 1.2, 0.012, 2, 3);
+  P(m, 3); patch(-0.97, 0.97, -0.03, 0.03, 0.016, 24, 1); patch(-0.97, 0.97, PI - 0.03, PI + 0.03, 0.016, 24, 1); // chrome belt line
+  P(m, 7); patch(-0.12, 0.08, PI - 0.55, PI + 0.95, 0.02, 3, 6); // door (on the camp side)
+  P(m, 21); box(m, -0.95, 0.3, 0.5, 0.95, 0.5, L - 0.6);
+  for (const s of [-1, 1]) { P(m, 4); cyl(m, [s * 0.8, 0.34, L * 0.55], [s * 1.02, 0.34, L * 0.55], 0.34, 20); P(m, 3); cyl(m, [s * 1.02, 0.34, L * 0.55], [s * 1.04, 0.34, L * 0.55], 0.15, 14); }
+  P(m, 21); for (const s of [-1, 1]) m.sweep([[s * 0.7, 0.42, 0.6], [0, 0.48, -1.25]], 0.08, 0.1); // tongue
+  cyl(m, [0, 0.48, -1.2], [0, 0.48, -1.32], 0.05, 8); cyl(m, [0, 0.0, -0.8], [0, 0.55, -0.8], 0.035, 8); // coupler and jack
+  P(m, 12); for (const s of [-1, 1]) box(m, s * 0.55, 0.75, L - 0.08, s * 0.7, 0.85, L);
   return m;
 }
-function meshFish() {
+// white canvas wall tent, door to -z, flaps open (one rolled up, one hanging out), ground cloth, poles, guy ropes
+function meshTent() {
+  rseed(430);
+  const m = new Mesh(), W = 1.5, D = 1.8, HW = 1.3, HR = 2.35;
+  const roofY = (x) => HW + (HR - HW) * (1 - abs(x) / W);
+  const grid = (f, nu, nv, skip) => {
+    const g = []; for (let i = 0; i <= nu; i++) { const r = []; for (let j = 0; j <= nv; j++) r.push(m.v(...f(i / nu, j / nv))); g.push(r); }
+    for (let i = 0; i < nu; i++) for (let j = 0; j < nv; j++) if (!skip || !skip((i + 0.5) / nu, (j + 0.5) / nv)) m.quad(g[i][j], g[i + 1][j], g[i + 1][j + 1], g[i][j + 1]);
+  };
+  const sag = (u, v) => 0.04 * sin(PI * u) * sin(PI * v);
+  P(m, 8);
+  for (const s of [-1, 1]) {
+    const x = (u) => -W + 2 * W * u;
+    if (s > 0) grid((u, v) => [x(u), v * roofY(x(u)), D - sag(u, v) * 0.5], 12, 10); // back wall
+    else { // front wall: two panels beside the door and the gable above it
+      for (const k of [-1, 1]) grid((u, v) => { const xx = k * mix(0.52, W, u); return [xx, v * roofY(xx), -D + sag(u, v) * 0.3]; }, 4, 10);
+      grid((u, v) => { const xx = mix(-0.52, 0.52, u); return [xx, mix(1.86, roofY(xx), v), -D]; }, 4, 2);
+    }
+    grid((u, v) => [s * (W - sag(u, v)), v * HW, -D + 2 * D * u], 12, 6); // side walls
+    grid((u, v) => { const z = -D - 0.12 + (2 * D + 0.24) * u, x = s * mix(W + 0.1, 0, v); return [x, mix(HW - 0.06, HR, v) - 0.06 * sin(PI * v) * (0.5 + 0.5 * sin(PI * 2 * u) ** 2), z]; }, 14, 6); // roof
+  }
+  // door flaps: the left one rolled up beside the door, the right one hanging open
+  m.tube([[-0.62, 0.15, -D - 0.06], [-0.6, 1.0, -D - 0.07], [-0.6, 1.86, -D - 0.06]], 0.065, 8, true);
+  grid((u, v) => { const a = 0.55, r = 0.56 * u; return [0.52 + r * cos(a), 0.05 + v * 1.82 + 0.03 * sin(u * 5 + v * 3), -D - r * sin(a) - 0.02 * sin(v * 7)]; }, 4, 8);
+  P(m, 24); box(m, -W + 0.05, 0, -D + 0.05, W - 0.05, 0.012, D - 0.05);
+  P(m, 10);
+  cyl(m, [0, 0, D - 0.06], [0, HR + 0.12, D - 0.06], 0.025, 8); // back pole (the front of the ridge is held by the front rope)
+  cyl(m, [0, HR - 0.02, -D + 0.06], [0, HR - 0.02, D - 0.06], 0.025, 8);
+  // guy ropes to stakes: three a side from the eaves, one at each end from the ridge
+  const rope = (a, b) => { P(m, 18); cyl(m, a, b, 0.007, 4, false); P(m, 9); box(m, b[0] - 0.02, -0.05, b[2] - 0.02, b[0] + 0.02, 0.18, b[2] + 0.02); };
+  for (const s of [-1, 1]) { for (const z of [-D, 0, D]) rope([s * (W + 0.1), HW - 0.06, z], [s * (W + 1.0), 0.04, z * 1.1]); if (s > 0) rope([0, HR + 0.1, D + 0.1], [0, 0.04, D + 1.3]); }
+  return m;
+}
+// the campfire: a ring of stones, a bed of embers and ash, low logs burning through, a coffee pot on a stone
+function meshFire() {
+  rseed(440);
   const m = new Mesh();
-  const X = [0.5, 0.3, 0.05, -0.22, -0.34], H = [0.01, 0.13, 0.17, 0.09, 0.035], Wd = [0.01, 0.05, 0.065, 0.03, 0.012], rings = [];
-  for (let i = 0; i < 5; i++) { const r = []; for (let k = 0; k < 6; k++) { const a = k / 6 * TAU; r.push(m.v(X[i], sin(a) * H[i], cos(a) * Wd[i])); } rings.push(r); }
-  for (let i = 0; i < 4; i++) for (let k = 0; k < 6; k++) { const k2 = (k + 1) % 6; m.quad(rings[i][k], rings[i + 1][k], rings[i + 1][k2], rings[i][k2]); }
-  const a = m.v(-0.33, 0, 0), b = m.v(-0.56, 0.2, 0), c = m.v(-0.47, 0, 0), d = m.v(-0.56, -0.2, 0);
-  m.tri(a, b, c); m.tri(a, c, d);
+  for (let i = 0; i < 12; i++) { const a = i / 12 * TAU + rr(-0.1, 0.1), r = rr(0.58, 0.68); put(m, stone(i), cos(a) * r, 0.04, sin(a) * r, rnd() * TAU, rr(0.13, 0.2)); }
+  P(m, 16); lathe(m, [[0, 0.012], [0.55, 0.008], [0.6, 0]], 20);
+  P(m, 15); lathe(m, [[0, 0.07], [0.2, 0.06], [0.34, 0.03], [0.4, 0.01]], 20);
+  for (let i = 0; i < 4; i++) {
+    const a = i / 4 * TAU + rr(-0.3, 0.3), c = cos(a), s = sin(a), r = rr(0.055, 0.075), l = rr(0.55, 0.75), y = 0.06 + i % 2 * 0.07;
+    P(m, 15); cyl(m, [c * 0.06, y + 0.03, s * 0.06], [c * 0.3, y, s * 0.3], r, 8);
+    P(m, 14); cyl(m, [c * 0.3, y, s * 0.3], [c * (0.3 + l), y - 0.04, s * (0.3 + l)], r, 8);
+  }
+  P(m, 20);
+  const px = 0.62, pz = 0.18, py = 0.16;
+  lathe(m, [[0, 0], [0.07, 0], [0.078, 0.05], [0.062, 0.16], [0.035, 0.2], [0.03, 0.21], [0.012, 0.225], [0, 0.23]], 18, px, py, pz);
+  cyl(m, [px - 0.06, py + 0.06, pz], [px - 0.13, py + 0.15, pz], 0.012, 6);
+  m.sweep([[px + 0.055, py + 0.18, pz], [px + 0.1, py + 0.13, pz], [px + 0.09, py + 0.04, pz], [px + 0.065, py + 0.03, pz]], 0.015, 0.008, null, false);
+  return m;
+}
+// folding camp chair: wooden X legs, arms, khaki canvas seat and back; faces -z
+function meshChair() {
+  const m = new Mesh();
+  P(m, 9);
+  for (const s of [-1, 1]) {
+    const x = s * 0.27;
+    m.sweep([[x, 0, -0.24], [x, 0.45, 0.2]], 0.035, 0.035); m.sweep([[x, 0, 0.2], [x, 0.45, -0.24]], 0.035, 0.035);
+    m.sweep([[x, 0.45, -0.26], [x, 0.45, 0.22]], 0.035, 0.035); m.sweep([[x, 0.66, -0.28], [x, 0.66, 0.22]], 0.06, 0.025);
+    m.sweep([[x, 0.45, 0.21], [x, 0.9, 0.27]], 0.035, 0.035); m.sweep([[x, 0.45, -0.24], [x, 0.66, -0.24]], 0.03, 0.03);
+  }
+  P(m, 17); box(m, -0.26, 0.42, -0.23, 0.26, 0.445, 0.2); box(m, -0.26, 0.64, 0.24, 0.26, 0.86, 0.26);
+  return m;
+}
+// green steel cooler with handles
+function meshCooler() {
+  const m = new Mesh();
+  P(m, 11); box(m, -0.32, 0, -0.18, 0.32, 0.33, 0.18); box(m, -0.33, 0.33, -0.19, 0.33, 0.4, 0.19);
+  P(m, 23); box(m, -0.325, 0.14, -0.185, 0.325, 0.17, 0.185);
+  P(m, 3); for (const s of [-1, 1]) m.sweep([[s * 0.33, 0.28, -0.08], [s * 0.37, 0.27, -0.07], [s * 0.37, 0.27, 0.07], [s * 0.33, 0.28, 0.08]], 0.015, 0.015, null, false);
+  box(m, -0.04, 0.3, -0.2, 0.04, 0.37, -0.19);
+  return m;
+}
+function meshCamp() {
+  const m = new Mesh();
+  put(m, meshFire(), 0, 0, 0);
+  put(m, meshTent(), 1, 0, 7.5);
+  put(m, meshTruck(), 8, 0, -4.2);
+  put(m, meshTrailer(), 8, 0, -4.2 + 2.64 + 1.32);
+  put(m, meshCooler(), 2.3, 0, 2.4, 0.4);
+  // firewood stacked by the fire
+  rseed(450); P(m, 10);
+  for (let i = 0; i < 9; i++) { const l = rr(0.6, 0.85), r = rr(0.05, 0.075), y = r + (i / 3 | 0) * 0.12, x0 = -2.4 + i % 3 * 0.17 + (i / 3 | 0) * 0.08; cyl(m, [x0, y, -1.6], [x0 + rr(-0.1, 0.1), y, -1.6 + l], r, 7); }
+  // duffel bag and a jerry can
+  P(m, 17); m.tube([[2.5, 0.16, 5.0], [2.6, 0.17, 5.2], [2.95, 0.17, 5.5], [3.05, 0.16, 5.62]], (k) => [0.1, 0.17, 0.17, 0.1][k], 12, true);
+  P(m, 19); box(m, 5.75, 0, 1.0, 5.92, 0.47, 1.45); P(m, 21); box(m, 5.82, 0.47, 1.12, 5.85, 0.52, 1.33);
+  return m;
+}
+// kerosene hurricane lantern, red paint and tin, origin at the flame
+function meshLantern() {
+  const m = new Mesh();
+  P(m, 40); lathe(m, [[0, -0.165], [0.07, -0.165], [0.085, -0.15], [0.088, -0.11], [0.075, -0.085], [0.04, -0.075], [0.04, -0.07]], 20);
+  P(m, 41); lathe(m, [[0.03, -0.07], [0.048, -0.05], [0.062, -0.01], [0.062, 0.02], [0.05, 0.05], [0.035, 0.07]], 20);
+  P(m, 40); lathe(m, [[0.036, 0.07], [0.07, 0.085], [0.07, 0.1], [0.04, 0.13], [0.02, 0.14], [0, 0.145]], 20);
+  P(m, 42);
+  for (let i = 0; i < 4; i++) { const a = i / 4 * TAU + 0.4, c = cos(a), s = sin(a); cyl(m, [c * 0.072, -0.075, s * 0.072], [c * 0.072, 0.06, s * 0.072], 0.0035, 4, false); }
+  cyl(m, [0, -0.01, 0], [0, -0.004, 0], 0.075, 16, false);
+  P(m, 40);
+  for (const s of [-1, 1]) m.tube([[s * 0.08, -0.12, 0], [s * 0.095, -0.03, 0], [s * 0.088, 0.08, 0], [s * 0.05, 0.12, 0]], 0.009, 6, true);
+  P(m, 42); const bail = []; for (let i = 0; i <= 10; i++) { const a = i / 10 * PI; bail.push([cos(a) * 0.1, 0.0 + sin(a) * 0.16, 0]); } m.tube(bail, 0.0035, 4, false);
   return m;
 }

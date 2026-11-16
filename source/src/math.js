@@ -126,7 +126,8 @@ const sampler3 = (D, nx, ny, nz) => (x, y, z) => {
 // ---------------------------------------------------------------- mesh builder (solid vertex format: f32x3 pos, snorm8x4 normal+aux)
 class Mesh {
   constructor() { this.p = []; this.i = []; this.aux = []; }
-  v(x, y, z, aux = 1) { this.p.push(x, y, z); this.aux.push(aux); return this.p.length / 3 - 1; }
+  // with this.part set (props, plants, the lantern), every new vertex carries that part id instead of aux
+  v(x, y, z, aux = 1) { this.p.push(x, y, z); this.aux.push(this.part ? this.part / 127 : aux); return this.p.length / 3 - 1; }
   tri(a, b, c) { this.i.push(a, b, c); }
   quad(a, b, c, d) { this.i.push(a, b, c, a, c, d); }
   // box-section sweep along a polyline; faces get their own vertices (hard edges)

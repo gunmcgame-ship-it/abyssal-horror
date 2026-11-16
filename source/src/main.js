@@ -43,25 +43,24 @@ const sClamp = device.createSampler({ magFilter: 'linear', minFilter: 'linear' }
 const sCmp = device.createSampler({ compare: 'less-equal', magFilter: 'linear', minFilter: 'linear' });
 const tShadow = tex(SHADOW, SHADOW, DEPTH, TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING);
 const tDummy = tex(1, 1, DEPTH, TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING);
-const tWater = tex(WATER, WATER, HDR, TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING, { mips: 5 });
 const tDetail = tex(1024, 1024, 'rgba8unorm', TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING, { mips: 11 });
 const tVol = tex(NX / 2, NY / 2, 'rg8unorm', TU.TEXTURE_BINDING | TU.COPY_DST, { d: NZ / 2 });
 const tMap = tex(512, 512, 'rgba8unorm', TU.TEXTURE_BINDING | TU.COPY_DST);
 
-const UB = new Float32Array(60), UBS = new Float32Array(60);
-const ubo = device.createBuffer({ size: 240, usage: BU.UNIFORM | BU.COPY_DST }), uboS = device.createBuffer({ size: 240, usage: BU.UNIFORM | BU.COPY_DST });
-const WT = new Float32Array(4), uboW = device.createBuffer({ size: 16, usage: BU.UNIFORM | BU.COPY_DST });
+// uniforms (struct G in shaders.js): view-projection, shadow matrix, camera, basis, moon, resolution, misc, fire, lantern
+const UB = new Float32Array(68), UBS = new Float32Array(68);
+const ubo = device.createBuffer({ size: 272, usage: BU.UNIFORM | BU.COPY_DST }), uboS = device.createBuffer({ size: 272, usage: BU.UNIFORM | BU.COPY_DST });
 
 const VF = SS.VERTEX | SS.FRAGMENT;
 const bgl0 = device.createBindGroupLayout({ entries: [
   { binding: 0, visibility: VF, buffer: {} },
   { binding: 1, visibility: VF, sampler: {} }, { binding: 2, visibility: VF, sampler: {} }, { binding: 3, visibility: VF, sampler: { type: 'comparison' } },
   { binding: 4, visibility: VF, texture: { sampleType: 'depth' } },
-  { binding: 5, visibility: VF, texture: {} }, { binding: 6, visibility: VF, texture: {} },
+  { binding: 6, visibility: VF, texture: {} },
   { binding: 7, visibility: VF, texture: { viewDimension: '3d' } }, { binding: 8, visibility: VF, texture: {} }] });
 const mkBG0 = (u, sh) => device.createBindGroup({ layout: bgl0, entries: [
   { binding: 0, resource: { buffer: u } }, { binding: 1, resource: sRep }, { binding: 2, resource: sClamp }, { binding: 3, resource: sCmp },
-  { binding: 4, resource: sh.createView() }, { binding: 5, resource: tWater.createView() }, { binding: 6, resource: tDetail.createView() },
+  { binding: 4, resource: sh.createView() }, { binding: 6, resource: tDetail.createView() },
   { binding: 7, resource: tVol.createView() }, { binding: 8, resource: tMap.createView() }] });
 const bg0 = mkBG0(ubo, tShadow), bg0s = mkBG0(uboS, tDummy);
 const pl0 = device.createPipelineLayout({ bindGroupLayouts: [bgl0] });
@@ -71,7 +70,7 @@ const plBlit = device.createPipelineLayout({ bindGroupLayouts: [bglBlit] });
 const mBlit = mod(W_BLIT);
 const blitPipe = (entry, format, add) => device.createRenderPipeline({ layout: plBlit, vertex: { module: mBlit, entryPoint: 'vs' },
   fragment: { module: mBlit, entryPoint: entry, targets: [{ format, blend: add ? { color: { srcFactor: 'one', dstFactor: 'one' }, alpha: { srcFactor: 'one', dstFactor: 'one' } } : undefined }] } });
-const pMip8 = blitPipe('fsMip', 'rgba8unorm'), pMip16 = blitPipe('fsMip', HDR), pDown0 = blitPipe('fsDown0', HDR), pDown = blitPipe('fsDown', HDR), pUp = blitPipe('fsUp', HDR, true);
+const pMip8 = blitPipe('fsMip', 'rgba8unorm'), pDown0 = blitPipe('fsDown0', HDR), pDown = blitPipe('fsDown', HDR), pUp = blitPipe('fsUp', HDR, true);
 const blitBG = (view) => device.createBindGroup({ layout: bglBlit, entries: [{ binding: 0, resource: view }, { binding: 1, resource: sClamp }] });
 const colorAtt = (view, clear) => ({ view, loadOp: clear ? 'clear' : 'load', storeOp: 'store', clearValue: [0, 0, 0, 0] });
 
@@ -80,9 +79,7 @@ const A = (shaderLocation, offset, format) => ({ shaderLocation, offset, format 
 const vbSolid = { arrayStride: 16, attributes: [A(0, 0, 'float32x3'), A(1, 12, 'snorm8x4')] };
 const ibSolid = { arrayStride: 48, stepMode: 'instance', attributes: [A(2, 0, 'float32x4'), A(3, 16, 'float32x4'), A(4, 32, 'float32x4')] };
 const ibLeaf = { arrayStride: 36, stepMode: 'instance', attributes: [A(0, 0, 'float32x4'), A(1, 16, 'float32x4'), A(2, 32, 'unorm8x4')] };
-const ibAnim = { arrayStride: 32, stepMode: 'instance', attributes: [A(2, 0, 'float32x4'), A(3, 16, 'float32x4')] };
-const ibBub = { arrayStride: 32, stepMode: 'instance', attributes: [A(0, 0, 'float32x4'), A(1, 16, 'float32x4')] };
-const ibSnow = { arrayStride: 16, stepMode: 'instance', attributes: [A(0, 0, 'float32x4')] };
+const ibFire = { arrayStride: 32, stepMode: 'instance', attributes: [A(0, 0, 'float32x4'), A(1, 16, 'float32x4')] };
 
 const scenePipe = (m, vsE, fsE, buffers, o = {}) => device.createRenderPipeline({ layout: pl0,
   vertex: { module: m, entryPoint: vsE, buffers, constants: o.constants },
@@ -95,53 +92,40 @@ const shadowPipe = (m, vsE, buffers, o = {}) => device.createRenderPipeline({ la
   depthStencil: { format: DEPTH, depthWriteEnabled: true, depthCompare: 'less', depthBias: 2, depthBiasSlopeScale: 1.5 } });
 
 await say('Compiling shaders…', 0.05, 300);
-const mSolid = mod(W_SOLID), mLeaf = mod(W_LEAF), mAnim = mod(W_ANIM), mSurf = mod(W_SURF), mSpr = mod(W_SPR);
+const mSolid = mod(W_SOLID), mLeaf = mod(W_LEAF), mSky = mod(W_SKY), mFire = mod(W_FIRE);
 const pTerrain = scenePipe(mSolid, 'vs', 'fs', [vbSolid, ibSolid], { cull: 'back' });
 const pSolid = scenePipe(mSolid, 'vs', 'fs', [vbSolid, ibSolid]);
 const pLeaf = scenePipe(mLeaf, 'vs', 'fs', [ibLeaf], { strip: true, constants: { ROWS: 9 } });
 const pLeaf5 = scenePipe(mLeaf, 'vs', 'fs', [ibLeaf], { strip: true, constants: { ROWS: 5 } });
 const pLeafS = scenePipe(mLeaf, 'vs', 'fs', [ibLeaf], { strip: true, constants: { ROWS: 3, FAR: 70 } });
 const pLeafF = scenePipe(mLeaf, 'vs', 'fs', [ibLeaf], { strip: true, constants: { ROWS: 3 } });
-const pFish = scenePipe(mAnim, 'vsFish', 'fsFish', [vbSolid, ibAnim]);
-const pManta = scenePipe(mAnim, 'vsManta', 'fsManta', [vbSolid, ibAnim]);
-const pSurf = scenePipe(mSurf, 'vs', 'fs', [], { strip: true }), pBack = scenePipe(mSurf, 'vsB', 'fsB', [], { strip: true });
-const pBub = scenePipe(mSpr, 'vsBub', 'fsBub', [ibBub], { strip: true, blend: { color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' }, alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' } } });
+const pSky = scenePipe(mSky, 'vs', 'fs', [], { strip: true });
 const ADD = { color: { srcFactor: 'one', dstFactor: 'one' }, alpha: { srcFactor: 'one', dstFactor: 'one' } };
-const pSnow = scenePipe(mSpr, 'vsSnow', 'fsSnow', [ibSnow], { strip: true, blend: ADD });
-const pGl = scenePipe(mLeaf, 'vsGl', 'fsGl', [ibBub], { strip: true, blend: ADD, constants: { ROWS: 7 } });
+const pFire = scenePipe(mFire, 'vs', 'fs', [ibFire], { strip: true, blend: ADD });
 const pSolidSh = shadowPipe(mSolid, 'vs', [vbSolid, ibSolid]), pTerrSh = shadowPipe(mSolid, 'vs', [vbSolid, ibSolid], { cull: 'front' });
 const pLeafSh = shadowPipe(mLeaf, 'vs', [ibLeaf], { strip: true, constants: { ROWS: 3 } });
-
-const mWater = mod(W_WATER);
-const pWater = device.createRenderPipeline({ layout: 'auto', vertex: { module: mWater, entryPoint: 'vs' }, fragment: { module: mWater, entryPoint: 'fs', targets: [{ format: HDR }] } });
-const bgWater = device.createBindGroup({ layout: pWater.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: uboW } }] });
-const waterViews = [0, 1, 2, 3, 4].map((m) => tWater.createView({ baseMipLevel: m, mipLevelCount: 1 }));
-const waterBG = waterViews.map((v) => blitBG(v));
-const waterPass = waterViews.map((v) => ({ colorAttachments: [colorAtt(v, true)] }));
-
-const mRays = mod(W_RAYS), mPost = mod(W_POST), mRB = mod(W_RBLUR);
-const pRB = device.createRenderPipeline({ layout: 'auto', vertex: { module: mRB, entryPoint: 'vs' }, fragment: { module: mRB, entryPoint: 'fs', targets: [{ format: HDR }] } });
-const pRays = device.createRenderPipeline({ layout: 'auto', vertex: { module: mRays, entryPoint: 'vs' }, fragment: { module: mRays, entryPoint: 'fs', targets: [{ format: HDR }] } });
+const mPost = mod(W_POST);
 const pPost = device.createRenderPipeline({ layout: 'auto', vertex: { module: mPost, entryPoint: 'vs' }, fragment: { module: mPost, entryPoint: 'fs', targets: [{ format: FMT }] } });
 
-// ---------------------------------------------------------------- sun + shadow matrix
-const SUN = (() => { const v = [0.27, 1, -0.24], l = hypot(...v); return v.map((c) => c / l); })();
+// ---------------------------------------------------------------- moon + shadow matrix
+// An orthographic view from the moon (MOON in shaders.js). The moon is low, so the world seen from it is wide and
+// short: the map covers 2 x 215 m across and 2 x 110 m up, and 520 m in depth.
 {
-  const L = SUN, lr = [L[1], -L[0], 0], ll = hypot(...lr); lr[0] /= ll; lr[1] /= ll;
+  const L = MOON, ll = hypot(L[0], L[2]), lr = [-L[2] / ll, 0, L[0] / ll];
   const lu = [L[1] * lr[2] - L[2] * lr[1], L[2] * lr[0] - L[0] * lr[2], L[0] * lr[1] - L[1] * lr[0]];
-  const R = 225, d0 = -175, d1 = 125, m = UBS;
-  m[0] = lr[0] / R; m[4] = lr[1] / R; m[8] = lr[2] / R; m[12] = 0;
-  m[1] = lu[0] / R; m[5] = lu[1] / R; m[9] = lu[2] / R; m[13] = 0;
+  const RX = 215, RY = 110, d0 = -260, d1 = 260, m = UBS;
+  m[0] = lr[0] / RX; m[4] = lr[1] / RX; m[8] = lr[2] / RX; m[12] = 0;
+  m[1] = lu[0] / RY; m[5] = lu[1] / RY; m[9] = lu[2] / RY; m[13] = 0;
   m[2] = -L[0] / (d1 - d0); m[6] = -L[1] / (d1 - d0); m[10] = -L[2] / (d1 - d0); m[14] = d1 / (d1 - d0);
   m[3] = 0; m[7] = 0; m[11] = 0; m[15] = 1;
   for (let i = 0; i < 16; i++) { UBS[16 + i] = m[i]; UB[16 + i] = m[i]; }
-  for (let i = 0; i < 3; i++) { UB[48 + i] = UBS[48 + i] = SUN[i]; }
+  for (let i = 0; i < 3; i++) { UB[48 + i] = UBS[48 + i] = MOON[i]; }
   UBS[32] = 0; UBS[33] = -20; UBS[34] = 0; UBS[35] = 0; UBS[58] = 1;
   Q.writeBuffer(uboS, 0, UBS);
 }
 
 // ---------------------------------------------------------------- world generation
-await say('Sculpting the seabed…', 0.25, 1200);
+await say('Shaping the canyon…', 0.25, 1200);
 // marks a load in progress (quality.js); leaving the page before it ends is not a crash
 keep('abyssalLoad', 1);
 addEventListener('pagehide', () => keep('abyssalLoad', ''));
@@ -165,14 +149,14 @@ let D;
   br.unmap(); br.destroy(); bd.destroy();
   // rock connected to the seabed: each column's unbroken run up from the bottom is, and the rock above a gap
   // (overhangs, specks) is when it touches rock that is. What never connects is a speck of noise floating in
-  // the water (surface nets would make it a small box), so it becomes water
+  // the air (surface nets would make it a small box), so it becomes air
   const S = NX * NY, R = new Uint8Array(D.length), O = [1, -1, NX, -NX, S, -S], b = new Uint8Array(NX), L = [];
   for (let i = 0; i < D.length;) { b.fill(1); for (let y = 0; y < NY; y++) for (let x = 0; x < NX; x++, i++) if (D[i] <= 0) b[x] = 0; else if (b[x]) R[i] = 1; else L.push(i); }
   for (let k = 1; k; L.reverse()) { k = 0; for (const i of L) if (!R[i] && O.some((o) => R[i + o])) R[i] = k = 1; }
   for (const i of L) if (!R[i]) D[i] = -D[i];
 }
 // Distance to the rock for collide(), in 1/127 m (> 0 in rock, clamped to ±1 m), kept only in the 4x4x4-voxel
-// bricks near the surface within the camera's reach (~2 MB). CI per brick: 0 all water, 1 all rock, n brick n-2 in CG.
+// bricks near the surface within the camera's reach (~2 MB). CI per brick: 0 all air, 1 all rock, n brick n-2 in CG.
 const CO = 52, CN = 102, CI = new Uint16Array(CN * CN * NY / 4);
 let CG = new Int8Array(64 * 65534);
 {
@@ -190,13 +174,14 @@ let CG = new Int8Array(64 * 65534);
   }
   CG = CG.slice(0, n * 64);
 }
-await say('Carving canyons…', 0.32, 400);
+await say('Weathering the sandstone…', 0.32, 400);
 const T = buildTerrain(D);
 
 // preset viewpoints (position, look-at), keys 1-6; the world generator dresses the scene around them
+// 1: at the tent door, looking past the fire down the canyon to the setting moon; 2: the camp from outside
 const POSES = [
-  [10, 1.3, 7, -9, -31, -10],
-  [50, 1.3, 34, 58, -23, 8],
+  [CAMP[0] + 1, 1.62, CAMP[2] + 6.4, CAMP[0] - 1, -44.0, CAMP[2] - 8],
+  [CAMP[0] - 9, 2.2, CAMP[2] - 9, CAMP[0] + 3, -44.5, CAMP[2] + 3],
   [-26, 2.2, -100, 0, -9, -108],
   [-55, 1.5, -18, -60, -30, 8],
   [10, 1.2, -62, 6, -22, -90],
@@ -266,21 +251,19 @@ function flyAt() {
 for (let t = 0; t <= FLYT; t += 0.1) { F[FLT] = t; flyAt(); flyPts.push([F[CX], F[CY], F[CZ]]); }
 for (const p of POSES) flyPts.push([p[0], -40, p[2]]);
 
-await say('Growing kelp…', 0.73, 2500);
+await say('Planting sagebrush and juniper…', 0.73, 2500);
 const Wd = makeWorld(D, T, flyPts, POSES);
 for (const p of POSES) p[1] += Wd.gy(p[0], p[2]);
 D = Wd.gy = T.smp = null; // with gy goes the generator's working memory (about 200 MB)
 
-await say('Building set pieces…', 0.94, 1200);
-// mesh ids: 0-3 boulders, 4-6 sponges, 7-8 coral, 9 tube sponge, 10 whale fluke, 11 ship, 12 manta, 13 fish,
-// 14-20 rock chunks + pebbles, 21-22 coral LOD, 23-25 far LOD of the large rock chunks
-const meshes = [meshChunk(1, 3), meshChunk(7, 3), meshChunk(13, 3), meshChunk(22, 3),
-  meshLathe([[0, 0, 0.5], [0.34, 0, 0.6], [0.5, 0.2, 0.85], [0.6, 0.6, 1], [0.55, 0.95, 1], [0.47, 1.08, 1], [0.38, 1.1, 0.9], [0.3, 1.0, 0.45], [0.26, 0.6, 0.15], [0, 0.35, 0.05]], 18, 0.3, 9),
-  meshLathe([[0, 0, 0.5], [0.2, 0, 0.6], [0.26, 0.5, 0.85], [0.4, 1.25, 1], [0.4, 1.42, 1], [0.33, 1.48, 0.9], [0.26, 1.38, 0.4], [0.18, 0.8, 0.12], [0, 0.5, 0.05]], 16, 0.35, 8),
-  meshLathe([[0, 0, 0.5], [0.5, 0, 0.7], [0.72, 0.18, 1], [0.74, 0.38, 1], [0.62, 0.5, 0.9], [0.48, 0.42, 0.45], [0.4, 0.2, 0.15], [0, 0.14, 0.06]], 18, 0.25, 10),
-  meshCoral(0), meshCoral(1), meshTubes()].map((m) => m.build());
-meshes.push(meshFluke(), meshShip().build(), meshManta().build(), meshFish().build(),
-  meshChunk(3).build(), meshChunk(11).build(), meshChunk(29).build(), meshChunk(5, 3).build(), meshChunk(17, 3).build(), meshChunk(41, 3).build(), meshChunk(9, 1).build(), meshCoral(0, 1).build(), meshCoral(1, 1).build(), meshChunk(5, 2, 1).build(), meshChunk(17, 2, 1).build(), meshChunk(41, 2, 1).build());
+await say('Pitching camp…', 0.94, 1200);
+// mesh ids: 0-3 rocks, 4 barrel cactus, 5 hedgehog cactus, 6-7 prickly pear, 8 juniper trunk, 9 pinyon trunk,
+// 10 the camp, 11 the lantern, 12 the folding chair, 13 unused, 14-20 rock chunks + pebbles, 21-22 unused,
+// 23-25 far LOD of the large rock chunks
+const unused = () => { const m = new Mesh(); m.tri(m.v(0, 0, 0), m.v(0.01, 0, 0), m.v(0, 0.01, 0)); return m; };
+const meshes = [meshChunk(1, 3), meshChunk(7, 3), meshChunk(13, 3), meshChunk(22, 3), meshBarrel(), meshHedgehog(), meshPear(0), meshPear(1), Wd.trunks[0].m, Wd.trunks[1].m,
+  meshCamp(), meshLantern(), meshChair(), unused(),
+  meshChunk(3), meshChunk(11), meshChunk(29), meshChunk(5, 3), meshChunk(17, 3), meshChunk(41, 3), meshChunk(9, 1), unused(), unused(), meshChunk(5, 2, 1), meshChunk(17, 2, 1), meshChunk(41, 2, 1)].map((m) => m.build());
 let nV = 0, nI = 0;
 for (const m of meshes) { m.v0 = nV; m.i0 = nI; nV += m.nv; nI += m.ib.length; }
 const allV = new Uint8Array(nV * 16), allI = new Uint32Array(nI);
@@ -292,10 +275,9 @@ const solidData = new Float32Array((nSolid + 1) * 12); solidData.set(Wd.solids.d
 const ibSolids = buf(solidData, BU.VERTEX);
 const ibChunk = Wd.chunks.map((c) => buf(c.data, BU.VERTEX)), ibProp = Wd.props.map((c) => buf(c.data, BU.VERTEX));
 const ibBig = buf(new Uint8Array(Wd.big.buf), BU.VERTEX), ibBigF = buf(new Uint8Array(Wd.bigF.buf), BU.VERTEX), ibSmall = buf(new Uint8Array(Wd.small.buf), BU.VERTEX);
-const ibFish = buf(Wd.fish, BU.VERTEX), ibManta = buf(Wd.mantas, BU.VERTEX), ibBubbles = buf(Wd.bubbles, BU.VERTEX), ibSnowB = buf(Wd.snow, BU.VERTEX);
-const ibGl = buf(Wd.glints, BU.VERTEX), nGl = Wd.glints.length / 8;
-const nFish = Wd.fish.length / 8, nManta = Wd.mantas.length / 8, nBub = Wd.bubbles.length / 8, nSnow = Wd.snow.length / 4;
-const MANTA = meshes[12], FISH = meshes[13];
+const ibFireB = buf(Wd.fire, BU.VERTEX), nFire = Wd.fire.length / 8;
+// the lantern is one instance, rewritten every frame (position, scale, rotation, material 2)
+const LANT = new Float32Array([0, 0, 0, 0.85, 0, 0, 0, 1, 2, 0, 1, 0]), ibLant = buf(LANT, BU.VERTEX), LANTM = meshes[11];
 Q.writeTexture({ texture: tVol }, Wd.volD, { bytesPerRow: NX, rowsPerImage: NY / 2 }, [NX / 2, NY / 2, NZ / 2]);
 Q.writeTexture({ texture: tMap }, Wd.gm, { bytesPerRow: 2048 }, [512, 512]);
 
@@ -315,8 +297,8 @@ Q.writeTexture({ texture: tMap }, Wd.gm, { bytesPerRow: 2048 }, [512, 512]);
   r.setVertexBuffer(0, vbTerrain); r.setVertexBuffer(1, ibSolids); r.setIndexBuffer(ibTerrain, 'uint32');
   r.drawIndexed(T.ib.length, 1, 0, 0, nSolid);
   r.setPipeline(pSolidSh); r.setVertexBuffer(0, vbMesh); r.setIndexBuffer(ibMesh, 'uint32');
-  for (let i = 0; i < 12; i++) { const g = Wd.solids.ranges[i]; if (g[1]) r.drawIndexed(meshes[i].ib.length, g[1], meshes[i].i0, meshes[i].v0, g[0]); }
-  // small rocks, sponges and corals (~35M triangles) only on High: too much for a phone's driver
+  for (let i = 0; i < 14; i++) { const g = Wd.solids.ranges[i]; if (g[1]) r.drawIndexed(meshes[i].ib.length, g[1], meshes[i].i0, meshes[i].v0, g[0]); }
+  // small rocks, cacti and tree trunks only on High: too much for a phone's driver
   if (!LV) for (let i = 0; i < NCHUNK; i++) { r.setVertexBuffer(1, ibChunk[i]); r.drawIndexed(meshes[14 + i].ib.length, Wd.chunks[i].n, meshes[14 + i].i0, meshes[14 + i].v0, 0); }
   if (!LV) for (let i = 0; i < 6; i++) if (Wd.props[i].n) { r.setVertexBuffer(1, ibProp[i]); r.drawIndexed(meshes[4 + i].ib.length, Wd.props[i].n, meshes[4 + i].i0, meshes[4 + i].v0, 0); }
   r.setPipeline(pLeafSh); r.setVertexBuffer(0, ibBig); r.draw(6, Wd.big.n);
@@ -325,14 +307,14 @@ Q.writeTexture({ texture: tMap }, Wd.gm, { bytesPerRow: 2048 }, [512, 512]);
 }
 // the GPU has its own copies now: let go of the generator's (about 300 MB)
 for (const o of [Wd.big, Wd.bigF, Wd.small, ...Wd.chunks, ...Wd.props]) o.buf = o.data = 0;
-Wd.glints = Wd.volD = Wd.gm = T.vb = T.ib = T.wp = T.wn = 0;
+Wd.volD = Wd.gm = T.vb = T.ib = T.wp = T.wn = 0;
 
 // ---------------------------------------------------------------- render targets (rebuilt on resize)
 // The scene is drawn at `pix` pixels and scaled up to the window. frame() tunes it and the draw distance scale `det`
 // for 60 fps; both start where the last visit left them.
 const PIXMAX = 2560 * 1440, PIXMIN = mob ? 25e4 : 5e5, DETMIN = 0.4;
 let W = 0, H = 0, DW = 0, DH = 0, pix = +SV[1] || (LV > 1 ? 41e4 : mob ? 1280 * 720 : PIXMAX), det = +SV[2] || 1, dynN = 0, dynT = 0, dynG = 0, dynGN = 0, dynBad = 0, dynOk = 0, dynWait = 3;
-let passScene, passRays, passBlur, bgBlur, passPost, bgRays, bgPost, bloomPass = [], bloomBG = [], targets = [];
+let passScene, passPost, bgPost, bloomPass = [], bloomBG = [], targets = [];
 const NB = 6;
 function resize() {
   DW = max(2, round(canvas.clientWidth * devicePixelRatio)); DH = max(2, round(canvas.clientHeight * devicePixelRatio));
@@ -344,22 +326,16 @@ function resize() {
   ctx.configure({ device, format: FMT, alphaMode: 'opaque' });
   for (const t of targets) t.destroy();
   const tMS = tex(AA > 1 ? W : 1, H, HDR, TU.RENDER_ATTACHMENT, { samples: AA }), tDp = tex(W, H, DEPTH, TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING, { samples: AA });
-  const tRes = tex(W, H, HDR, TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING), tRay = tex(W / 2, H / 2, HDR, TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING), tRay2 = tex(W / 2, H / 2, HDR, TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING);
-  targets = [tMS, tDp, tRes, tRay, tRay2];
+  const tRes = tex(W, H, HDR, TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING);
+  targets = [tMS, tDp, tRes];
   const bl = [];
   for (let i = 0; i < NB; i++) { const t = tex(max(1, W >> (i + 1)), max(1, H >> (i + 1)), HDR, TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING); bl.push(t); targets.push(t); }
-  const vDp = tDp.createView(), vRes = tRes.createView(), vRay = tRay.createView(), vRay2 = tRay2.createView(), vBl = bl.map((t) => t.createView());
+  const vDp = tDp.createView(), vRes = tRes.createView(), vBl = bl.map((t) => t.createView());
   // without anti-aliasing (Low) the scene goes straight into the resolve target, and tMS is one unused column
   passScene = { colorAttachments: [{ view: AA > 1 ? tMS.createView() : vRes, resolveTarget: AA > 1 ? vRes : undefined, loadOp: 'clear', storeOp: AA > 1 ? 'discard' : 'store', clearValue: [0, 0, 0, 1] }],
     depthStencilAttachment: { view: vDp, depthClearValue: 0, depthLoadOp: 'clear', depthStoreOp: 'store' } };
-  passRays = { colorAttachments: [colorAtt(vRay, true)] };
-  passBlur = { colorAttachments: [colorAtt(vRay2, true)] };
-  bgBlur = device.createBindGroup({ layout: pRB.getBindGroupLayout(0), entries: [{ binding: 0, resource: vRay }] });
   passPost = { colorAttachments: [{ view: null, loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 1] }] };
-  bgRays = device.createBindGroup({ layout: pRays.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: ubo } }, { binding: 1, resource: sRep }, { binding: 2, resource: sCmp },
-    { binding: 3, resource: tShadow.createView() }, { binding: 4, resource: tWater.createView() }, { binding: 5, resource: vDp }, { binding: 6, resource: tVol.createView() }, { binding: 7, resource: sClamp }] });
-  bgPost = device.createBindGroup({ layout: pPost.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: ubo } }, { binding: 1, resource: sClamp }, { binding: 2, resource: vRes },
-    { binding: 3, resource: vRay2 }, { binding: 4, resource: vBl[0] }, { binding: 5, resource: vDp }] });
+  bgPost = device.createBindGroup({ layout: pPost.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: ubo } }, { binding: 1, resource: sClamp }, { binding: 2, resource: vRes }, { binding: 3, resource: vBl[0] }] });
   bloomPass = []; bloomBG = [];
   // down: res -> b0 -> ... -> b5 ; up: b5 -> b4 (additive) ... -> b0
   for (let i = 0; i < NB; i++) { bloomPass.push({ colorAttachments: [colorAtt(vBl[i], true)] }); bloomBG.push(blitBG(i ? vBl[i - 1] : vRes)); }
@@ -390,7 +366,7 @@ if (hasTS) {
 // ---------------------------------------------------------------- frame
 let hud = false;
 let kf = 0, kb = 0, kl = 0, kr = 0, ku = 0, kd = 0, ks = 0, mdx = 0, mdy = 0, lkx = 0, lky = 0, l2x = 0, l2y = 0, hN = 0, hMax = 0, hMin = 1e9, hPer = 1e9, hLate = 0, hTot = 0, tId = -1, tN = 0, tx0 = 0, ty0 = 0, tx = 0, ty = 0;
-const TANH = 0.6, NEAR = 0.1, EXPO = 0.62, RAYS = 0.54;
+const TANH = 0.6, NEAR = 0.1, EXPO = 0.9;
 const submitList = [null];
 const rowOrd = new Uint8Array(CELLS);
 // Draws the cells of a cell-sorted buffer that are in view and within [minD, maxD) (scaled by `det`, but not for the
@@ -437,55 +413,53 @@ function render() {
   m[36] = rx; m[37] = 0; m[38] = rz; m[39] = TANH * asp;
   m[40] = ux; m[41] = uy; m[42] = uz; m[43] = TANH;
   m[44] = fx; m[45] = fy; m[46] = fz; m[47] = NEAR;
-  const zx = cx - PURPLE[0], zz = cz - PURPLE[1]; let zt = (44 - sqrt(zx * zx + zz * zz)) / 18; zt = zt < 0 ? 0 : zt > 1 ? 1 : zt;
-  m[51] = zt * zt * (3 - 2 * zt);
-  let ek = (-cy - 8) / 26; ek = ek < 0 ? 0 : ek > 1 ? 1 : ek;
-  m[56] = EXPO * (0.6 + 0.4 * ek); m[57] = RAYS; m[58] = det;
+  m[56] = EXPO; m[58] = det;
+  const t = F[TIME];
+  // the breeze (same as gust() in shaders.js): in a strong gust the lantern gutters, dimming for a second or two
+  const gs = t - (cx * 0.05 + cz * 0.02), gb = 0.5 + 0.5 * sin(gs * 0.37) * sin(gs * 0.23 + 1.3), gu = 0.35 + 0.65 * gb * gb;
+  let gt = (gu - 0.82) / 0.18; gt = gt < 0 ? 0 : gt > 1 ? 1 : gt;
+  // campfire light: low, warm, flickering
+  m[60] = CAMP[0]; m[61] = CAMP[1] + 0.45; m[62] = CAMP[2];
+  m[63] = 8 * (1 + 0.12 * sin(t * 9.3) + 0.08 * sin(t * 15.1 + 2) + 0.06 * sin(t * 3.7));
+  // the lantern: held low on the right, swinging a little round its handle; its flame is the light
+  const sw = sin(t * 1.1) * 0.035 + sin(t * 0.47 + 1) * 0.02, hx = rz, hz = -rx; // hx, hz: forward, level
+  const lx = cx + fx * 0.8 + rx * 0.4 - ux * 0.4 + hx * sw * 0.16, ly = cy + fy * 0.8 - uy * 0.4, lz = cz + fz * 0.8 + rz * 0.4 - uz * 0.4 + hz * sw * 0.16;
+  m[64] = lx; m[65] = ly + 0.01; m[66] = lz;
+  m[67] = 1.8 * (1 + 0.05 * sin(t * 17) + 0.04 * sin(t * 23 + 1) + 0.03 * sin(t * 7.3)) * (1 - 0.55 * gt * gt * (3 - 2 * gt));
+  const ss2 = sin(sw / 2), cs2 = cos(sw / 2), by = sin(-yaw / 2), bw = cos(-yaw / 2), qx = rx * ss2, qz = rz * ss2;
+  LANT[0] = lx; LANT[1] = ly; LANT[2] = lz; LANT[4] = qx * bw - qz * by; LANT[5] = cs2 * by; LANT[6] = qx * by + qz * bw; LANT[7] = cs2 * bw;
+  Q.writeBuffer(ibLant, 0, LANT);
   Q.writeBuffer(ubo, 0, UB);
-  WT[0] = F[TIME]; Q.writeBuffer(uboW, 0, WT);
 
   { let cr = floor((cz - OZ) / CELLW) | 0; cr = cr < 0 ? 0 : cr > CELLS - 1 ? CELLS - 1 : cr; let n = 0; rowOrd[n++] = cr; for (let d = 1; d < CELLS; d++) { if (cr - d >= 0) rowOrd[n++] = cr - d; if (cr + d < CELLS) rowOrd[n++] = cr + d; } }
   const e = device.createCommandEncoder();
   let slot = null;
   if (hasTS) { for (let i = 0; i < qRead.length; i++) if (!qRead[i].busy) { slot = qRead[i]; break; } }
-  waterPass[0].timestampWrites = slot ? tsBegin : undefined;
+  passScene.timestampWrites = slot ? tsBegin : undefined;
   passPost.timestampWrites = slot ? tsEnd : undefined;
-  // animated water texture + mips
-  let r = e.beginRenderPass(waterPass[0]); r.setPipeline(pWater); r.setBindGroup(0, bgWater); r.draw(3); r.end();
-  for (let i = 1; i < 5; i++) { r = e.beginRenderPass(waterPass[i]); r.setPipeline(pMip16); r.setBindGroup(0, waterBG[i - 1]); r.draw(3); r.end(); }
   // scene
-  r = e.beginRenderPass(passScene);
+  let r = e.beginRenderPass(passScene);
   r.setBindGroup(0, bg0);
   r.setPipeline(pTerrain); r.setVertexBuffer(0, vbTerrain); r.setVertexBuffer(1, ibSolids); r.setIndexBuffer(ibTerrain, 'uint32');
   drawCells(r, T.start, T.lo, T.hi, 1.5, 1, 0, 0, 240);
   r.setPipeline(pSolid); r.setVertexBuffer(0, vbMesh); r.setIndexBuffer(ibMesh, 'uint32');
-  for (let i = 0; i < 12; i++) { const g = Wd.solids.ranges[i]; if (g[1]) r.drawIndexed(meshes[i].ib.length, g[1], meshes[i].i0, meshes[i].v0, g[0]); }
+  for (let i = 0; i < 14; i++) { const g = Wd.solids.ranges[i]; if (g[1]) r.drawIndexed(meshes[i].ib.length, g[1], meshes[i].i0, meshes[i].v0, g[0]); }
+  r.setVertexBuffer(1, ibLant); r.drawIndexed(LANTM.ib.length, 1, LANTM.i0, LANTM.v0, 0);
   for (let i = 0; i < NCHUNK; i++) {
     const c = Wd.chunks[i], big = i > 2 && i < 6; r.setVertexBuffer(1, ibChunk[i]);
     drawCells(r, c.start, c.lo, c.hi, 3, meshes[14 + i], 0, 0, i > 5 ? 30 : big ? 40 : 96);
     if (big) drawCells(r, c.start, c.lo, c.hi, 3, meshes[20 + i], 0, 40, 150);
   }
-  for (let i = 0; i < 6; i++) {
-    const lod = i === 3 || i === 4; r.setVertexBuffer(1, ibProp[i]);
-    drawCells(r, Wd.props[i].start, Wd.props[i].lo, Wd.props[i].hi, 3, meshes[4 + i], 0, 0, lod ? 6 : 110);
-    if (lod) drawCells(r, Wd.props[i].start, Wd.props[i].lo, Wd.props[i].hi, 3, meshes[18 + i], 0, 6, 110);
-  }
-  r.setPipeline(pManta); r.setVertexBuffer(1, ibManta); r.drawIndexed(MANTA.ib.length, nManta, MANTA.i0, MANTA.v0, 0);
-  r.setPipeline(pFish); r.setVertexBuffer(1, ibFish); r.drawIndexed(FISH.ib.length, nFish, FISH.i0, FISH.v0, 0);
-  // kelp and plants: 9-row blades up close, 5 rows mid-range, a decimated set far away
+  // cacti, then the tree trunks (seen from further away)
+  for (let i = 0; i < 6; i++) { r.setVertexBuffer(1, ibProp[i]); drawCells(r, Wd.props[i].start, Wd.props[i].lo, Wd.props[i].hi, 3, meshes[4 + i], 0, 0, i > 3 ? 160 : 110); }
+  // plants: 9-row blades up close, 5 rows mid-range, a decimated set far away
   r.setPipeline(pLeaf); r.setVertexBuffer(0, ibBig); drawCells(r, Wd.big.start, Wd.big.lo, Wd.big.hi, 5, false, 18, 0, 24);
   r.setPipeline(pLeaf5); drawCells(r, Wd.big.start, Wd.big.lo, Wd.big.hi, 5, false, 10, 24, 58);
   r.setPipeline(pLeafF); r.setVertexBuffer(0, ibBigF); drawCells(r, Wd.bigF.start, Wd.bigF.lo, Wd.bigF.hi, 5, false, 6, 58, 150);
   r.setPipeline(pLeafS); r.setVertexBuffer(0, ibSmall); drawCells(r, Wd.small.start, Wd.small.lo, Wd.small.hi, 1.5, false, 6, 0, 70);
-  r.setPipeline(pSurf); r.draw(4);
-  r.setPipeline(pBack); r.draw(4);
-  r.setPipeline(pBub); r.setVertexBuffer(0, ibBubbles); r.draw(4, nBub);
-  r.setPipeline(pGl); r.setVertexBuffer(0, ibGl); r.draw(4, nGl);
-  r.setPipeline(pSnow); r.setVertexBuffer(0, ibSnowB); r.draw(4, nSnow);
+  r.setPipeline(pSky); r.draw(4);
+  r.setPipeline(pFire); r.setVertexBuffer(0, ibFireB); r.draw(4, nFire);
   r.end();
-  // light shafts
-  r = e.beginRenderPass(passRays); r.setPipeline(pRays); r.setBindGroup(0, bgRays); r.draw(3); r.end();
-  r = e.beginRenderPass(passBlur); r.setPipeline(pRB); r.setBindGroup(0, bgBlur); r.draw(3); r.end();
   // bloom
   for (let i = 0; i < bloomPass.length; i++) {
     r = e.beginRenderPass(bloomPass[i]); r.setPipeline(i === 0 ? pDown0 : i < NB ? pDown : pUp); r.setBindGroup(0, bloomBG[i]); r.draw(3); r.end();
@@ -563,7 +537,7 @@ function frame(now) {
     const ax = lkx * kq, ay = lky * kq; lkx -= ax; lky -= ay; l2x += ax; l2y += ay;
     const dyw = l2x * kq, dpt = l2y * kq; l2x -= dyw; l2y -= dpt;
     const yaw = F[YAW] + dyw; let pitch = F[PIT] - dpt; pitch = pitch < -1.55 ? -1.55 : pitch > 1.55 ? 1.55 : pitch;
-    const sp = ks || tN > 1 ? 26 : 7, k = 1 - exp(-dt * 4.5), mf = tId >= 0 ? 0.7 : kf - kb, mr = kr - kl, mu = ku - kd, cp = cos(pitch), sy = sin(yaw), cw = cos(yaw);
+    const sp = ks || tN > 1 ? 12 : 3.5, k = 1 - exp(-dt * 4.5), mf = tId >= 0 ? 0.7 : kf - kb, mr = kr - kl, mu = ku - kd, cp = cos(pitch), sy = sin(yaw), cw = cos(yaw);
     const vx = F[VX] + ((sy * cp * mf + cw * mr) * sp - F[VX]) * k, vy = F[VY] + ((sin(pitch) * mf + mu) * sp - F[VY]) * k, vz = F[VZ] + ((-cw * cp * mf + sy * mr) * sp - F[VZ]) * k;
     let x = F[CX] + vx * dt, y = F[CY] + vy * dt, z = F[CZ] + vz * dt;
     const rad = sqrt(x * x + z * z); if (rad > 150) { x *= 150 / rad; z *= 150 / rad; }
