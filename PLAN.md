@@ -25,7 +25,7 @@ period-appropriate look (for example a 1950s typewriter or park-signage style), 
 | Topic | Decision |
 |---|---|
 | Old underwater scene | Replace completely. Upstream repo keeps the original. |
-| Movement | Walk on the ground. Slow walk, no sprint, no jump. Crouch to peek over rocks. |
+| Movement | Walk on the ground. Slow walk, no sprint, no jump, no crouch. |
 | Footsteps | Different sounds for sand and rock. Lantern bobs as you walk. |
 | Time and light | Deep night, half moon, dense stars and Milky Way. Realistic look, no film filter. |
 | Player light | One 1950s lantern: flickers and sways when walking, SHORT range (about 10-15 m, falls off fast). Wind makes it gutter: it dims and recovers within a second or two (never fully out). No flashlight. Fuel does not run out. |
@@ -53,7 +53,7 @@ period-appropriate look (for example a 1950s typewriter or park-signage style), 
 | Canyon shape | Winding canyon with side pockets: bends hide what's ahead, small alcoves to explore. |
 | Park details | Wooden park sign at the landing reading the park name, an old fire ring and a picnic table. Everything must be 1950s-appropriate: no modern objects, signs, materials or fonts. |
 | Other people | Nobody else is there, but there are period-appropriate traces that others have been before (for example old tire tracks, an older cold fire ring, a rusted can or bottle, a faded trail marker). |
-| Year | 1957. |
+| Date | The first days of October 1957, right after Sputnik launched (October 4, 1957). |
 | Title | Working title: "Ground Observer, 1957". Use it in the menu, page title and README. May change later; keep it in one easy-to-edit place. |
 | Menu text | The title plus a quiet date-and-place line: "<Park name>, 1957". |
 | Park name | Coldsupper Canyon National Monument. Shown on the wooden park sign at the landing and on the menu line ("Coldsupper Canyon National Monument, 1957"). |
@@ -108,7 +108,7 @@ Goal: you can stand at the tent and look around a believable desert night. Free 
 Acceptance: a screenshot from the tent door shows camp lit by fire, a starry sky with moon, dark red cliffs in the distance, no water look anywhere.
 
 ### M2: Walking, canyon, boundaries
-1. Replace free-fly with walking: gravity, ground following with `Wd.gy`, eye height about 1.65 m (about 0.9 m crouched), slow walk speed, no sprint, no jump. Crouch while holding C (not Ctrl: Ctrl+W closes the browser tab).
+1. Replace free-fly with walking: gravity, ground following with `Wd.gy`, eye height about 1.65 m, slow walk speed, no sprint, no jump, no crouch.
 2. Keep rock collision (`collide()`), tuned for a standing capsule.
 3. Lantern bob and sway tied to footsteps. Footstep sounds: sand versus rock, based on slope or surface type.
 4. Shape the map edge with canyon walls and cliffs so you cannot walk out. Remove the 150 m radius clamp and the depth clamp.
@@ -170,5 +170,5 @@ Update README, title and menu text. Credit upstream.
 
 ## 8. Hooks to leave for the later chase version (build nothing now)
 - Keep the event director (M5) separate from rendering so a chase can reuse its position and timing.
-- Keep walking and crouch state in a clean player object with position, speed and crouch.
+- Keep walking state in a clean player object with position and speed.
 - Keep one place that defines where "the thing" appears, so it can become a real mover later.
