@@ -10,12 +10,17 @@ Desktop Chrome first. Phone support must not be broken on purpose, but is not te
 
 ## 1. The concept
 
-You are a 1950s UFO hobbyist camping alone in a Southwest canyon-country national park, at deep night.
+You are a 1950s UFO hobbyist camping alone in Coldsupper Canyon National Monument, Southwest canyon country, 1957, at deep night.
 You start inside the canvas tent, step out, and explore with a real kerosene lantern as your only light.
 Something else is out there. In this version it is **never seen clearly, only hinted at**.
 A full chase and jump scare is planned for a LATER version (see section 8): leave hooks, build none of it now.
 
 ## 2. Decisions already made (do not re-ask)
+
+**PERIOD RULE (hard rule, applies to everything):** nothing may exist in the game world that was not available in 1957.
+Every object, material, vehicle, sign, label, typeface, device and sound source must be period-accurate (or older,
+like the 1870s ruins). If unsure whether something existed in 1957, leave it out. The menu should also use a
+period-appropriate look (for example a 1950s typewriter or park-signage style), not a modern UI style.
 
 | Topic | Decision |
 |---|---|
@@ -28,16 +33,15 @@ A full chase and jump scare is planned for a LATER version (see section 8): leav
 | Plants | Juniper, pinyon pine, sagebrush, yucca, prickly pear, small cacti (replaces kelp, sponges, coral). |
 | Wildlife | Bats and moths around the lantern (replaces fish and mantas). Sound-only: coyote, crickets, owl. |
 | Camp props | Low campfire, canvas tent (enterable, you start inside), a 1950s pickup truck towing a 1950s metallic camper trailer (rounded polished aluminum, Airstream-style), folding chair, cooler and gear. |
-| UFO-hobbyist props | Notebook with sketches and sighting times, reel-to-reel tape recorder or shortwave radio, star charts and park map pinned to a table, camera on a tripod aimed at the sky, Roswell newspapers and film photos. |
+| UFO-hobbyist props | Notebook with sketches and sighting times, a shortwave radio on the camp table, a portable reel-to-reel tape recorder inside the tent, star charts and park map pinned to the table, a film camera on a tripod aimed at the patch of sky where the stars go out (M5), Roswell newspapers (1947) and black-and-white film photos. |
 | Interaction | Look only. No reading, no pickups. Story is environmental. |
-| Radio and tape audio | Static with fading 1950s-style music, plus rhythmic tones or number-station beeps. All synthesized. Real recordings are not allowed. |
-| Hints of the threat | A figure on a distant ridge (there, then gone; its LOOK IS NOT DECIDED, see open questions), sounds (crickets and wind stop, then a distant call), signs it has been near camp (footprints, knocked-over chair, torn tent, moved props), and a patch of stars that goes out for a moment. |
+| Radio and tape audio | Shortwave radio (camp table): static with fading 1950s-style crooner music. Tape recorder (tent): rhythmic tones and number-station-style beeps. All synthesized. |
+| Hints of the threat | A figure on a distant ridge (there, then gone; placeholder look), sounds (crickets and wind stop, then a distant call), signs it has been near camp (disturbed sand with no clear footprint shape, a shifted chair, a moved prop), and a patch of stars that goes out for a moment. |
 | Map edges | Canyon walls and cliffs block you (shaped terrain, not an invisible wall). |
-| Opening | You start inside the tent and step out because you hear something. Inside: rumpled sleeping bag with a pillow, a small lantern or candle already lit by the flap (you pick up your lantern as you leave), photos and clippings taped to the canvas. |
+| Opening | You start inside the tent. Wake sequence: the radio outside clicks on by itself (static, then music fading in), something at camp knocks over with a clatter, and the crickets go quiet. It could have been an animal; not obviously scary yet. Inside the tent: rumpled sleeping bag with a pillow, your kerosene lantern already lit by the flap (it is your lantern for the whole game), the tape recorder, and photos and clippings taped to the canvas. |
 | Map size | Small and dense, about 300 m across (same as the original world). |
-| Hint timing | Random timer with long gaps. No fixed trigger spots for v1. |
+| Hint timing | Random timer (see Hint pace). No fixed trigger spots for v1. |
 | Goal | None. Pure exploration and mood. No ending in v1. |
-| Name | Working name 'abyssal-horror'. Owner wants name suggestions (see open questions). |
 | Darkness | Dark but readable: moonlight shows big shapes (mesas, rocks). Menu has a brightness slider. |
 | Weather and sky motion | Steady breeze with occasional gusts (moves plants and tent canvas, drives lantern flicker), occasional shooting stars, thin high clouds crossing the moon. No dust devils. |
 | Campfire | Burns low and steady the whole time. No dying fire in v1. |
@@ -47,7 +51,7 @@ A full chase and jump scare is planned for a LATER version (see section 8): leav
 | Performance | Balanced, via the Low/Medium/High menu: High looks best, Low stays smooth. |
 | Backstory (props only) | The hobbyist came because of a recent sighting at this canyon: a newspaper clipping about lights over it, plus their notes and map trying to pin down the spot. |
 | Canyon shape | Winding canyon with side pockets: bends hide what's ahead, small alcoves to explore. |
-| Park details | Wooden park sign at the landing (made-up park name), an old fire ring and a picnic table. Everything must be 1950s-appropriate: no modern objects, signs, materials or fonts. |
+| Park details | Wooden park sign at the landing reading the park name, an old fire ring and a picnic table. Everything must be 1950s-appropriate: no modern objects, signs, materials or fonts. |
 | Other people | Nobody else is there, but there are period-appropriate traces that others have been before (for example old tire tracks, an older cold fire ring, a rusted can or bottle, a faded trail marker). |
 | Year | 1957. |
 | Title | Working title: "Ground Observer, 1957". Use it in the menu, page title and README. May change later; keep it in one easy-to-edit place. |
@@ -58,6 +62,11 @@ A full chase and jump scare is planned for a LATER version (see section 8): leav
 | Ridge figure | Placeholder for now: a plain tall dark silhouette, built so its shape is easy to swap later. Owner is researching the final look. |
 | Run style | Milestone by milestone. Each milestone is one complete run with no questions asked mid-way; stop at the end for the owner to review. |
 | Self-check | Screenshot critic subagent (sees only renders, as in prompt.txt) on milestones 1 and 6 only. GPU timing check on every milestone. |
+| The distant call | A long low tone, unidentifiable, partway between an animal and a horn. Synthesize it first. Leave a simple hook so the owner can later swap in their own recording (embedded in the single file as base64) if the synthesized one is not good enough. |
+| Hint pace | First hint after about 3 minutes, then one every 3 to 6 minutes (random). Never the same hint twice in a row. |
+| Ruins location | One or two bends of the canyon away from camp, out of sight of camp. |
+| Menu | Brightness slider, detail Low/Medium/High, volume slider (replaces mute-only). Period-styled. |
+| Colors | Pickup: two-tone cream and turquoise. Camper trailer: polished aluminum. Tent: white canvas (glows warm when the lantern is inside). |
 | First milestone | Look-around only: camp and sky. Walking comes in milestone 2. |
 
 ## 3. How the current code is laid out (what to change)
@@ -91,7 +100,7 @@ Goal: you can stand at the tent and look around a believable desert night. Free 
 2. Replace fog with thin dry night air: slight cool blue haze, short fog distance at ground level, no scattering color shift. Keep the distance fade so the edge of the world never shows.
 3. Sky: black-blue gradient, dense stars, a Milky Way band, a half moon, all procedural. One lighting source from the moon (reuse the sun shadow map, with the moon direction).
 4. Re-color terrain to red-orange sandstone and pale sand, lit only by moonlight. Dark overall. Rocks must still be readable.
-5. Camp set at the start pose: low campfire (warm flickering light and glow), canvas tent (enterable shape, open flap), a 1950s pickup towing a rounded metallic camper trailer, folding chair, cooler and gear. Clear the terrain there using the existing `CLEARS` mechanism so props sit on flat ground.
+5. Camp set at the start pose (colors as in the decisions table): low campfire (warm flickering light and glow), canvas tent (enterable shape, open flap), a 1950s pickup towing a rounded metallic camper trailer, folding chair, cooler and gear. Clear the terrain there using the existing `CLEARS` mechanism so props sit on flat ground.
 6. Lantern: a single warm point light that follows the camera (hand position, slightly lower right), with short range and fast falloff, flicker, and sway. No shadows from it in M1.
 7. Plants: scatter juniper, pinyon, sagebrush, yucca, prickly pear and cacti by simple procedural meshes, replacing the kelp.
 8. Keep `dev.js` benchmark working. Check frame time before moving on.
@@ -99,16 +108,19 @@ Goal: you can stand at the tent and look around a believable desert night. Free 
 Acceptance: a screenshot from the tent door shows camp lit by fire, a starry sky with moon, dark red cliffs in the distance, no water look anywhere.
 
 ### M2: Walking, canyon, boundaries
-1. Replace free-fly with walking: gravity, ground following with `Wd.gy`, eye height about 1.65 m (about 0.9 m crouched), slow walk speed, no sprint, no jump. Crouch on C or Ctrl.
+1. Replace free-fly with walking: gravity, ground following with `Wd.gy`, eye height about 1.65 m (about 0.9 m crouched), slow walk speed, no sprint, no jump. Crouch while holding C (not Ctrl: Ctrl+W closes the browser tab).
 2. Keep rock collision (`collide()`), tuned for a standing capsule.
 3. Lantern bob and sway tied to footsteps. Footstep sounds: sand versus rock, based on slope or surface type.
 4. Shape the map edge with canyon walls and cliffs so you cannot walk out. Remove the 150 m radius clamp and the depth clamp.
-5. Start inside the tent: short interior, the player steps out through the flap after hearing something (a sound cue at the start). Interior: rumpled sleeping bag and pillow, a small lit lantern or candle by the flap, photos and clippings taped to the canvas.
-6. Update `POSES` (keys 1-6) to useful viewpoints: tent, camp, ridge, arch, canyon, far overlook. Update `FLY` for benchmarks.
+5. Start inside the tent: short interior, then the wake sequence from the decisions table (radio clicks on, clatter, crickets stop) and the player steps out through the flap. Interior as in the decisions table.
+6. Keys 1-6 (`POSES`) become dev-only (available in `build:dev`, not in the normal build), set to: tent, camp, ruins, a canyon bend, the ridge where the figure appears, a far overlook. Update `FLY` so the benchmark walks the canyon floor through camp and past the ruins.
 
 ### M3: Storytelling props
-Place the hobbyist props near camp and at a few spots in the park: notebook, tape recorder or shortwave radio,
-table with pinned star charts and park map, camera tripod aimed at one spot in the sky, newspapers and photos.
+Place the hobbyist props at camp and in the tent only: at camp, the picnic table with the shortwave radio, notebook,
+pinned star charts and park map, newspapers, and the camera tripod at the edge of camp; in the tent, the tape
+recorder and the photos and clippings. Around the canyon, place only the period traces of other people (old tire
+tracks, older cold fire ring, rusted can or bottle, faded trail marker). The ruins hold only 1870s items
+(collapsed timber, broken crockery, an iron stove, a table).
 All procedural geometry. Paper and photos use generated textures (hand-drawn style lines and blocks, no readable
 real text needed, but a few big headline-like shapes are fine). No interaction.
 
@@ -122,8 +134,8 @@ Build a small "event director" that triggers hints with long random gaps, never 
 1. Silence: crickets and wind cut out for a few seconds, then one distant call.
 2. Distant ridge figure: a silhouette on a far ridge that is visible only when you look toward it, and is gone when you look away and back. Never lit up, never approached. Its shape is NOT decided: see open questions.
 3. Sky: a patch of stars blocked for a moment.
-4. Camp changes: when you return to camp, something moved (chair knocked over, tent torn, footprints in sand, props shifted).
-5. Radio reacts: number-station tones start or stop near events.
+4. Camp changes: when you return to camp after being out of sight of it, something is subtly different (chair shifted, a prop moved, disturbed sand with no clear prints).
+5. Radio reacts: the radio at camp drops to static or the tape recorder starts its tones around hint moments.
 Tune for slow dread, not constant action.
 
 ### M6: Polish and performance
@@ -132,9 +144,7 @@ Target: smooth frame rate on the owner's PC at Medium and High, usable on Low. U
 Update README, title and menu text. Credit upstream.
 
 ## 4b. Open questions (owner has not decided)
-- What the ridge figure looks like. The owner wants this researched first. Before M5, propose 3-4 options based on how classic UFO and 1950s-era sightings, folklore and horror films handle a distant unexplained figure, and let the owner pick. Do not build it until chosen.
-
-- The game's title. Suggested options: Skywatch, Dead Air, Static Between Stars, Number Station, Kerosene, Night Watch. Owner will pick.
+- What the ridge figure looks like. Owner is researching. Build the placeholder (plain tall dark silhouette) in M5, in one easy-to-swap place. Do not invent a final design.
 
 ## 5. Visual references to match
 - Night in canyon country with a half moon: blue-black sky, rock faces that catch just a little light.
@@ -147,14 +157,15 @@ Update README, title and menu text. Credit upstream.
 - Day or dusk modes.
 - Getting out of the playable area.
 - Phone and touch testing (do not remove touch code, just do not tune for it yet).
-- Real audio recordings or real voices.
+- Real voices, and real recordings from anyone other than the owner (the owner's own recording for the distant call is the one allowed exception, see decisions table).
 - A giant landmark pillar or spire (decided against). Normal canyon rock formations are fine.
 
 ## 7. Working rules for the agent
 - Work milestone by milestone and report what runs. Do not start the next until the owner approves.
 - Explain choices in plain language. The owner is not an engineer.
 - Test in desktop Chrome with WebGPU. If a step cannot be verified visually, say so.
-- Keep the single-file output. Do not add libraries or asset files.
+- Keep the single-file output. Do not add libraries or asset files (only exception: the owner's optional call recording, embedded as base64).
+- Do not make creative decisions that are not in this file. If something is genuinely missing, choose the plainest period-accurate option and list it in the milestone report so the owner can change it.
 - Commit small and often with clear messages.
 
 ## 8. Hooks to leave for the later chase version (build nothing now)
