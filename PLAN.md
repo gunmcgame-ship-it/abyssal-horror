@@ -38,6 +38,9 @@ A full chase and jump scare is planned for a LATER version (see section 8): leav
 | Hint timing | Random timer with long gaps. No fixed trigger spots for v1. |
 | Goal | None. Pure exploration and mood. No ending in v1. |
 | Name | Working name 'abyssal-horror'. Owner wants name suggestions (see open questions). |
+| Darkness | Dark but readable: moonlight shows big shapes (mesas, rocks). Menu has a brightness slider. |
+| Weather and sky motion | Steady breeze with occasional gusts (moves plants and tent canvas, drives lantern flicker), occasional shooting stars, thin high clouds crossing the moon. No dust devils. |
+| Campfire | Burns low and steady the whole time. No dying fire in v1. |
 | First milestone | Look-around only: camp and sky. Walking comes in milestone 2. |
 
 ## 3. How the current code is laid out (what to change)
