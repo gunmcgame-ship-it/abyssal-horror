@@ -185,8 +185,8 @@ const TAU = 6.2831853;
 const LOW = ${LV > 1};
 const MOON = vec3f(${MOON});
 const MWN = vec3f(${MWN});
-const MOONC = vec3f(1., .95, .88) * .52;
-const SKYA = vec3f(.032, .044, .085);
+const MOONC = vec3f(1., .94, .86) * .4;
+const SKYA = vec3f(.024, .034, .068);
 const HAZE = vec3f(.011, .014, .025);
 const FIREC = vec3f(1., .40, .12);
 const LANTC = vec3f(1., .64, .34);
@@ -238,7 +238,7 @@ fn plS(p: vec3f, n: vec3f, V: vec3f, pw: f32) -> vec3f {
        + LANTC * att(p, g.lant, LANTR) * pow(sat(dot(n, normalize(V + ll))), pw) * sat(dot(n, ll) * 4.);
 }
 // sky light from above (sky: how open to the sky, from the baked volume) and a little warm bounce from the ground
-fn amb(n: vec3f, sky: f32) -> vec3f { let up = n.y * .5 + .5; return SKYA * (.2 + .8 * sky) * (.3 + .7 * up) + MOONC * .06 * (.4 + .6 * sat(dot(n, -vec3f(MOON.x, 0., MOON.z)))) * (.5 + .5 * sky); }
+fn amb(n: vec3f, sky: f32) -> vec3f { let up = n.y * .5 + .5; return SKYA * (.2 + .8 * sky) * (.3 + .7 * up) + MOONC * .045 * (.4 + .6 * sat(dot(n, -vec3f(MOON.x, 0., MOON.z)))) * (.5 + .5 * sky); }
 // thin, dry night air: a faint cool haze, and at the far end of the draw distance everything fades into the sky
 fn fog(c: vec3f, wp: vec3f) -> vec3f {
   let v = wp - g.cam.xyz; let d = length(v); let rd = v / d;
@@ -410,7 +410,7 @@ fn shape2(v: f32) -> f32 { return sin(3.14159 * sat(v)); }
   var col = vec3f(0.); var pr = vec4f(0.); var shp = vec2f(.75, .7); var wav = .2; var fls = .5;
   switch ty {
     case 0 { col = mix(vec3f(.08, .11, .08), vec3f(.10, .12, .07), s1); pr = vec4f(0., .35, 0., 0.); shp = vec2f(.3, .35); wav = .15; }   // juniper sprays
-    case 1 { col = vec3f(.30, .25, .17) * (.8 + .4 * s1); pr = vec4f(0., .1, 0., 0.); shp = vec2f(.05, .1); wav = .02; fls = .1; }       // dry yucca stalk
+    case 1 { col = vec3f(.19, .15, .10) * (.8 + .4 * s1); pr = vec4f(0., .1, 0., 0.); shp = vec2f(.05, .1); wav = .02; fls = .1; }       // dry yucca stalk
     case 2 { col = mix(vec3f(.24, .27, .22), vec3f(.31, .32, .26), s1); pr = vec4f(0., .4, 0., 0.); shp = vec2f(.4, .5); }               // sagebrush
     case 3 { col = mix(vec3f(.13, .17, .08), vec3f(.19, .21, .10), s1); col = mix(col, vec3f(.30, .26, .16), step(.82, s2)); pr = vec4f(0., .5, 0., 0.); shp = vec2f(.25, .6); wav = .03; fls = .2; }   // yucca
     case 4 { col = mix(vec3f(.06, .10, .05), vec3f(.08, .11, .06), s1); pr = vec4f(0., .35, 0., 0.); shp = vec2f(.3, .35); wav = .15; }   // pinyon needles
@@ -506,9 +506,9 @@ fn stars(rd: vec3f, sc: f32, dens: f32, bright: f32, px: f32) -> vec3f {
   let band = exp(-bw * bw / .022) * .8 + exp(-bw * bw / .08) * .2;
   let n1 = fbm3(rd * 7., 5); let n2 = fbm3(rd * 22. + 3., 3);
   let dust = ss(.42, .62, fbm3(rd * 9. + 7., 5)) * exp(-bw * bw / .008);
-  let mw = band * (.12 + 1.7 * ss(.35, .78, n1)) * (.45 + .9 * n2) * (1. - .85 * dust);
+  let mw = band * (.3 + 1.0 * ss(.3, .8, n1)) * (.6 + .6 * n2) * (1. - .7 * dust);
   c += vec3f(.055, .056, .064) * mw * wash * ext;
-  var st = stars(rd, 130., .012, 1., px) + stars(rd, 290., .04 + .6 * band * (1. - dust), .1, px) * wash + stars(rd, 520., .5 * band * (1. - dust), .05, px) * wash;
+  var st = stars(rd, 130., .012, 1., px) + stars(rd, 290., .04 + .6 * band * (1. - dust), .1, px) * wash + stars(rd, 520., .3 * band * (1. - dust), .03, px) * wash;
   // near the horizon the air makes them twinkle
   st *= ext * (1. + .6 * (1. - up) * sin(t * 9. + dot(rd, vec3f(3000., 2100., 2700.))));
   // thin high cloud drifting across the moon: it hides the stars behind it and glows where the moon is near
@@ -528,7 +528,7 @@ fn stars(rd: vec3f, sc: f32, dens: f32, bright: f32, px: f32) -> vec3f {
     let mar = fbm3(vec3f(q * 1.8, 3.), 5);
     let alb = mix(.6, 1., ss(.44, .58, mar)) * (.75 + .25 * nz);
     let disc = 1. - ss(1. - px / MR, 1. + px / MR, r);
-    let mc = vec3f(1., .86, .66) * 3.2 * alb * (lit + .006) * (1. - .5 * cd);
+    let mc = vec3f(1., .80, .58) * 3.2 * alb * (lit + .006) * (1. - .5 * cd);
     c = mix(c, mc, disc);
   }
   // a shooting star now and then: a short streak that flares and fades
@@ -605,7 +605,7 @@ fn tmap(x: vec3f) -> vec3f { return sat3((x * (2.51 * x + .03)) / (x * (2.43 * x
   c = tmap(c);
   // in the dark the eye loses colour and sees a little bluer: only the dimmest parts of the image
   let l = dot(c, vec3f(.2126, .7152, .0722));
-  c = mix(vec3f(l) * vec3f(.84, .94, 1.16), c, .3 + .7 * ss(.04, .45, l));
+  c = mix(vec3f(l) * vec3f(.84, .94, 1.16), c, .45 + .55 * ss(.03, .35, l));
   c = pow(max(c, vec3f(0.)), vec3f(1. / 2.2));
   let n = ign(fc.xy) + ign(fc.xy + 37.) - 1.;
   return vec4f(c + n / 255., 1.);
