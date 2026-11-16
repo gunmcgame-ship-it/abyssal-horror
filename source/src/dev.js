@@ -55,7 +55,7 @@
     flyTo: (t) => { flying = false; F[FLT] = t; flyAt(); },
     // dev.clock(m): the eclipse clock, in game minutes after 3:35 a.m. (9 first bite, 90 totality, 111 deepest)
     clock: (m) => (F[ECT] = m),
-    // dev.playTime(s): seconds of play (the satellite passes run on it: the first is overhead at about 590)
+    // dev.playTime(s): seconds of play (the satellite passes run on it: one pass, overhead at about 1670)
     playTime: (s) => (F[PLAY] = s),
     state: () => ({ flying, t: F[FLT], frames: nFrame, gpu: F[GPU], size: W + 'x' + H, report: info.textContent }) };
 }

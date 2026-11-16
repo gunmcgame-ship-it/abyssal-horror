@@ -105,7 +105,8 @@ function makeWorld(D, T, flyPts, POSES) {
   const pickV = () => ((rnd() * T.nv) | 0) * 3;
   const nearFly = (x, y, z, r) => { for (const p of flyPts) if (hypot(x - p[0], z - p[2]) < r && y < p[1] + 3 && y > p[1] - 13) return true; return false; };
   const nearPose = (x, z, r = 3) => { for (const p of POSES) if (hypot(x - p[0], z - p[2]) < r) return true; return false; };
-  const nearCamp = (x, z, r) => hypot(x - CAMP[0], z - CAMP[2]) < r;
+  // within r of the fire, or under the tent (nothing may poke through its floor)
+  const nearCamp = (x, z, r) => hypot(x - CAMP[0], z - CAMP[2]) < r || (abs(x - CAMP[0] - 1) < 2.2 && abs(z - CAMP[2] - 7.5) < 2.5);
   // a flat-ish ground point picked from the terrain mesh, or null
   const ground = (ny0, rCamp, rFly) => {
     const k = pickV(); if (T.wn[k + 1] < ny0) return null;
@@ -139,17 +140,17 @@ function makeWorld(D, T, flyPts, POSES) {
     solid(8 + kind, x, y - 0.1, z, sc, qAxis(0, 1, 0, a), 2, rnd(), 1, 0);
     for (const t of trunks[kind].tips) {
       const tx = (t[0] * ca + t[2] * sa) * sc, tz = (-t[0] * sa + t[2] * ca) * sc, ty = t[1] * sc, rc = t[3] * sc;
-      for (let j = rc * rc * 200 + 20 | 0; j > 0; j--) {
+      for (let j = (rc * rc * 200 + 20) * 1.3 | 0; j > 0; j--) {
         let dx = rr(-1, 1), dy = rr(-0.6, 1), dz = rr(-1, 1); const l = hypot(dx, dy, dz) || 1; dx /= l; dy /= l; dz /= l;
-        const r = rc * pow(rnd(), 0.4), py = y + ty + dy * r * 0.75;
-        leaf(big, x + tx + dx * r, py, z + tz + dz * r, rr(0.16, 0.32) * (0.8 + 0.3 * rc), atan2(dz, dx) + rr(-0.5, 0.5), rr(0.2, 1.7), rr(0.055, 0.09), py - y, kind ? 4 : 0, rnd(), rnd(), rr(0.4, 0.6));
+        const r = rc * (0.55 + 0.35 * rnd()), py = y + ty + dy * r * 0.7;
+        leaf(big, x + tx + dx * r, py, z + tz + dz * r, (kind ? rr(0.08, 0.14) : rr(0.1, 0.18)) * (0.8 + 0.3 * rc), atan2(dz, dx) + rr(-0.8, 0.8), rr(0.3, 1.9), kind ? rr(0.03, 0.04) : rr(0.022, 0.032), py - y, kind ? 4 : 0, rnd(), rnd(), rr(0.5, 0.75));
       }
     }
   };
   rseed(4);
   // a few by camp, so it does not stand in the open
   for (const t of [[-11, 7, 0, 1.2], [10, 14, 1, 1.1], [-8, -13, 0, 1.3], [-14, -4, 0, 0.9], [14, 11, 0, 0.8]]) { const x = CAMP[0] + t[0], z = CAMP[2] + t[1]; tree(x, gy(x, z), z, t[2], t[3]); }
-  for (const [x0, z0, k] of [[-6.5, 5.5, 6], [5.5, -9.5, 7], [-9.5, -6, 6], [11.5, 4.5, 7], [-4.5, 11.5, 6], [6.5, 12, 5]]) { const x = CAMP[0] + x0, z = CAMP[2] + z0; solid(k, x, gy(x, z) - 0.04, z, k === 5 ? 1.3 : 1.5, qAxis(0, 1, 0, rnd() * TAU), 2, rnd(), 1, 0); }
+  for (const [x0, z0, k] of [[-6.5, 5.5, 6], [5.5, -9.5, 7], [-9.5, -6, 6], [11.5, 4.5, 7], [-4.5, 11.5, 6], [6.5, 12, 5]]) { const x = CAMP[0] + x0, z = CAMP[2] + z0; solid(k, x, gy(x, z) - 0.04, z, k === 5 ? 1.2 : 1.1, qAxis(0, 1, 0, rnd() * TAU), 2, rnd(), 1, 0); }
   const tocc = new Set();
   for (let i = 0, made = 0; i < 80000 && made < 340; i++) {
     const p = ground(0.75, 13, 3.5); if (!p) continue;
@@ -174,7 +175,7 @@ function makeWorld(D, T, flyPts, POSES) {
     const p = ground(0.7, 9, 2); if (!p) continue;
     const u = rnd(), pat = fbm(p[0] * 0.06, 5, p[2] * 0.06, 2), q = qAxis(0, 1, 0, rnd() * TAU);
     if (u < 0.006) yucca(p[0], p[1], p[2]);
-    else if (u < 0.006 + 0.02 * pat) solid(6 + (rnd() < 0.5), p[0], p[1] - 0.04, p[2], rr(0.9, 1.7), q, 2, rnd(), 1, 0);
+    else if (u < 0.006 + 0.02 * pat) solid(6 + (rnd() < 0.5), p[0], p[1] - 0.04, p[2], rr(0.75, 1.25), q, 2, rnd(), 1, 0);
     else if (u < 0.008 + 0.017 * pat) solid(rnd() < 0.5 ? 4 : 5, p[0], p[1] - 0.04, p[2], rr(0.6, 1.4), q, 2, rnd(), 1, 0);
   }
 
@@ -183,7 +184,7 @@ function makeWorld(D, T, flyPts, POSES) {
   for (let i = 0; i < 2600; i++) {
     const k = pickV(); if (T.wn[k + 1] < 0.7 || hypot(T.wp[k], T.wp[k + 2]) > 170 || nearCamp(T.wp[k], T.wp[k + 2], 12) || nearFly(T.wp[k], T.wp[k + 1], T.wp[k + 2], 6)) continue;
     const sc = rr(0.25, 1.3) * (rnd() < 0.1 ? 2 : 1);
-    solid(rnd() * 4 | 0, T.wp[k], T.wp[k + 1] + sc * 0.2, T.wp[k + 2], sc, qRand(), 1, rnd(), 1, 0);
+    solid(rnd() * 4 | 0, T.wp[k], T.wp[k + 1] + sc * 0.08, T.wp[k + 2], sc, qMul(qAxis(0, 1, 0, rnd() * TAU), qAxis(1, 0, 0, rr(-0.25, 0.25))), 1, rnd(), 1, 0);
   }
   rseed(10);
   const gy0 = (x, z) => { const f = floorsAt(x, z); return f.length ? f[0 + f.length - 2] : -45; }; // lowest floor here
@@ -191,7 +192,8 @@ function makeWorld(D, T, flyPts, POSES) {
     const k = pickV(), x = T.wp[k], y = T.wp[k + 1], z = T.wp[k + 2], ny = T.wn[k + 1];
     // talus: fallen blocks only at the foot of the cliffs and on gentle slopes, never stuck to the cliff faces
     if (hypot(x, z) > 172 || y > gy0(x, z) + 6 || ny < 0.25 || (ny > 0.8 && rnd() < 0.6) || nearFly(x, y, z, 3.5) || nearCamp(x, z, 13)) continue;
-    const sc = (0.35 + 2.1 * pow(rnd(), 2.6)) * (ny > 0.8 ? 0.5 : 1), q = qRand();
+    if (rnd() < 0.55) continue;
+    const sc = (0.35 + 1.7 * pow(rnd(), 3.2)) * (ny > 0.8 ? 0.5 : 1), q = qAxis(0, 1, 0, rnd() * TAU);
     chunks[(sc > 1.15 ? 3 : 0) + (rnd() * 3 | 0)][cellOf(x, z)].push(x - T.wn[k] * sc * 0.3, y - ny * sc * 0.3, z - T.wn[k + 2] * sc * 0.3, sc, q[0], q[1], q[2], q[3], 1, rnd(), sc > 1.15 ? 0 : 96, 0);
   }
   rseed(11);
@@ -269,10 +271,12 @@ const fract = (x) => x - floor(x);
 function meshChunk(sd, sub = 2, det = sub > 2) {
   if (LV > 1 && sub > 1) sub--; // Low: a quarter of the triangles
   rseed(100 + sd);
-  const pl = []; for (let i = 0; i < 4; i++) { const q = qRand(); pl.push([q[0], q[1], q[2], rr(0.8, 0.98)]); const l = hypot(q[0], q[1], q[2]) || 1; pl[i][0] /= l; pl[i][1] /= l; pl[i][2] /= l; }
+  // cut by a level top and bottom (the bedding) and six to eight steep joint faces
+  const pl = [[0, 1, 0, rr(0.35, 0.55)], [0, -1, 0, rr(0.3, 0.5)]];
+  for (let i = 0, n = 5 + (rnd() * 4 | 0); i < n; i++) { const a = i / n * TAU + rr(-0.5, 0.5), t = rr(-0.45, 0.45); const l = hypot(1, t); pl.push([cos(a) / l, t / l, sin(a) / l, rr(0.55, 0.9)]); }
   return icosphere(sub, (x, y, z) => {
-    let r = 1 + (fbm(x * 1.6 + sd, y * 1.6, z * 1.6, 2) - 0.5) * 0.9 + (det ? (fbm(x * 4 + sd, y * 4, z * 4, 2) - 0.5) * 0.25 : 0);
-    let px = x * r, py = y * r * 0.8, pz = z * r;
+    let r = 1 + (fbm(x * 1.6 + sd, y * 1.6, z * 1.6, 2) - 0.5) * 0.45 + (det ? (fbm(x * 4 + sd, y * 4, z * 4, 2) - 0.5) * 0.12 : 0);
+    let px = x * r * 1.1, py = y * r * 0.8, pz = z * r * 0.95;
     for (const p of pl) { const d = px * p[0] + py * p[1] + pz * p[2] - p[3]; if (d > 0) { px -= p[0] * d; py -= p[1] * d; pz -= p[2] * d; } }
     return [px, py, pz];
   });
@@ -337,7 +341,7 @@ function treeTrunk(kind) {
   const branch = (p, d, r, len, depth) => {
     const pts = [p]; let q = p;
     for (let i = 0; i < 4; i++) {
-      d = [d[0] + rr(-0.35, 0.35), d[1] + rr(-0.1, 0.25), d[2] + rr(-0.35, 0.35)]; const l = hypot(...d); d = d.map((v) => v / l);
+      const tw = kind ? 0.35 : 0.6; d = [d[0] + rr(-tw, tw), d[1] + rr(-0.1, 0.25), d[2] + rr(-tw, tw)]; const l = hypot(...d); d = d.map((v) => v / l);
       q = [q[0] + d[0] * len / 4, q[1] + d[1] * len / 4, q[2] + d[2] * len / 4]; pts.push(q);
     }
     m.tube(pts, (k) => r * (1 - 0.17 * k), 7, true);
@@ -352,6 +356,8 @@ function treeTrunk(kind) {
     for (let s = 0; s < 3; s++) { const a = s * 2.1 + rr(-0.4, 0.4); branch([cos(a) * 0.08, 0, sin(a) * 0.08], [cos(a) * 0.45, 1, sin(a) * 0.45], 0.1, rr(1.2, 1.8), 1); }
     P(m, 62); branch([0.05, 0.3, 0], [0.9, 0.5, 0.2], 0.04, 1.1, 0); tips.pop(); tips.pop(); // the dead branch carries no foliage
   }
+  P(m, kind ? 68 : 67);
+  for (const t of tips) { rseed(500 + kind * 50 + (t[0] * 97 | 0)); const sd = rnd() * 9; put(m, tag(icosphere(2, (x, y, z) => { const r = 0.75 + 0.45 * fbm(x * 2.3 + sd, y * 2.3, z * 2.3, 3); return [x * r, y * r * 0.8, z * r]; }), kind ? 68 : 67), t[0], t[1], t[2], rnd() * TAU, t[3] * 0.62); }
   return { m, tips };
 }
 // barrel cactus
@@ -389,10 +395,10 @@ function meshTruck() {
   P(m, 21); box(m, -0.55, 0.3, -2.2, 0.55, 0.52, 2.2);
   P(m, 2);
   for (const s of [-1, 1]) {
-    loft(m, [[-2.42, s * 0.7, 0.66, 0.06, 0.06, 2.4], [-2.36, s * 0.7, 0.7, 0.17, 0.2, 2.4], [-2.15, s * 0.71, 0.73, 0.21, 0.3, 2.4], [-1.75, s * 0.72, 0.74, 0.22, 0.34, 2.4],
-      [-1.35, s * 0.72, 0.72, 0.22, 0.33, 2.4], [-1.0, s * 0.73, 0.66, 0.21, 0.26, 2.4], [-0.75, s * 0.74, 0.58, 0.18, 0.16, 2.4], [-0.62, s * 0.74, 0.53, 0.1, 0.07, 2.4]], 18);
-    loft(m, [[0.72, s * 0.8, 0.62, 0.06, 0.06, 2.4], [0.82, s * 0.8, 0.64, 0.16, 0.22, 2.4], [1.1, s * 0.8, 0.66, 0.17, 0.32, 2.4], [1.6, s * 0.8, 0.66, 0.17, 0.32, 2.4],
-      [1.9, s * 0.8, 0.64, 0.16, 0.24, 2.4], [2.05, s * 0.8, 0.6, 0.08, 0.08, 2.4]], 16);
+    loft(m, [[-2.42, s * 0.71, 0.66, 0.05, 0.06, 2.6], [-2.36, s * 0.71, 0.7, 0.14, 0.2, 2.6], [-2.15, s * 0.72, 0.73, 0.175, 0.29, 2.6], [-1.75, s * 0.73, 0.74, 0.185, 0.32, 2.6],
+      [-1.35, s * 0.73, 0.72, 0.185, 0.31, 2.6], [-1.0, s * 0.74, 0.66, 0.175, 0.25, 2.6], [-0.75, s * 0.75, 0.58, 0.15, 0.15, 2.6], [-0.62, s * 0.75, 0.53, 0.08, 0.07, 2.6]], 18);
+    loft(m, [[0.72, s * 0.79, 0.62, 0.05, 0.06, 2.6], [0.82, s * 0.79, 0.64, 0.135, 0.22, 2.6], [1.1, s * 0.79, 0.66, 0.145, 0.31, 2.6], [1.6, s * 0.79, 0.66, 0.145, 0.31, 2.6],
+      [1.9, s * 0.79, 0.64, 0.135, 0.23, 2.6], [2.05, s * 0.79, 0.6, 0.07, 0.08, 2.6]], 16);
     P(m, 21); box(m, s * 0.66, 0.48, -0.66, s * 0.95, 0.52, 0.74); P(m, 2); // running board
     P(m, 12); box(m, s * 0.74, 0.78, 2.05, s * 0.86, 0.92, 2.09); P(m, 2); // tail light
   }
@@ -458,7 +464,7 @@ function meshTrailer() {
   P(m, 3); patch(-0.97, 0.97, -0.03, 0.03, 0.016, 24, 1); patch(-0.97, 0.97, PI - 0.03, PI + 0.03, 0.016, 24, 1); // chrome belt line
   P(m, 7); patch(-0.12, 0.08, PI - 0.55, PI + 0.95, 0.02, 3, 6); // door (on the camp side)
   P(m, 21); box(m, -0.8, 0.3, 1.2, 0.8, 0.46, L - 1.2);
-  P(m, 23); for (const s of [-1, 1]) lathe(m, [[0, 0.5], [0.15, 0.52], [0.16, 0.6], [0.16, 0.86], [0.12, 0.94], [0.03, 0.97], [0.03, 1.02], [0, 1.02]], 16, s * 0.19, 0, -0.75);
+  for (const s of [-1, 1]) { P(m, 42); lathe(m, [[0, 0.5], [0.15, 0.52], [0.16, 0.6], [0.16, 0.86], [0.12, 0.94], [0.03, 0.97], [0, 0.97]], 16, s * 0.19, 0, -0.75); P(m, 31); cyl(m, [s * 0.19, 0.96, -0.75], [s * 0.19, 1.03, -0.75], 0.018, 8); }
   for (const s of [-1, 1]) { P(m, 4); cyl(m, [s * 0.8, 0.34, L * 0.55], [s * 1.02, 0.34, L * 0.55], 0.34, 20); P(m, 3); cyl(m, [s * 1.02, 0.34, L * 0.55], [s * 1.04, 0.34, L * 0.55], 0.15, 14); }
   P(m, 21); for (const s of [-1, 1]) m.sweep([[s * 0.7, 0.42, 0.6], [0, 0.48, -1.25]], 0.08, 0.1); // tongue
   cyl(m, [0, 0.48, -1.2], [0, 0.48, -1.32], 0.05, 8); cyl(m, [0, 0.0, -0.8], [0, 0.55, -0.8], 0.035, 8); // coupler and jack
@@ -478,17 +484,17 @@ function meshTent() {
   P(m, 8);
   for (const s of [-1, 1]) {
     const x = (u) => -W + 2 * W * u;
-    if (s > 0) grid((u, v) => [x(u), v * roofY(x(u)), D - sag(u, v) * 0.5], 12, 10); // back wall
+    if (s > 0) grid((u, v) => [x(u), v * (roofY(x(u)) + 0.06), D - sag(u, v) * 0.5], 12, 10); // back wall
     else { // front wall: two panels beside the door and the gable above it
-      for (const k of [-1, 1]) grid((u, v) => { const xx = k * mix(0.52, W, u); return [xx, v * roofY(xx), -D + sag(u, v) * 0.3]; }, 4, 10);
-      grid((u, v) => { const xx = mix(-0.52, 0.52, u); return [xx, mix(1.86, roofY(xx), v), -D]; }, 4, 2);
+      for (const k of [-1, 1]) grid((u, v) => { const xx = k * mix(0.52, W, u); return [xx, v * (roofY(xx) + 0.06), -D + sag(u, v) * 0.3]; }, 8, 10);
+      grid((u, v) => { const xx = mix(-0.52, 0.52, u); return [xx, mix(1.86, roofY(xx) + 0.06, v), -D]; }, 8, 2);
     }
     grid((u, v) => [s * (W - sag(u, v)), v * HW, -D + 2 * D * u], 12, 6); // side walls
-    grid((u, v) => { const z = -D - 0.12 + (2 * D + 0.24) * u, x = s * mix(W + 0.1, 0, v); return [x, mix(HW - 0.06, HR, v) - 0.06 * sin(PI * v) * (0.5 + 0.5 * sin(PI * 2 * u) ** 2), z]; }, 14, 6); // roof
+    grid((u, v) => { const z = -D - 0.12 + (2 * D + 0.24) * u, x = s * mix(W + 0.1, 0, v); return [x, mix(HW - 0.06, HR, v) - 0.06 * sin(PI * v) * (0.5 + 0.5 * sin(PI * 2 * u) ** 2) * min(1, sin(PI * u) * 3), z]; }, 14, 6); // roof
   }
   // door flaps: the left one rolled up beside the door, the right one hanging open
   m.tube([[-0.6, 0.15, -D - 0.11], [-0.58, 1.0, -D - 0.12], [-0.58, 1.86, -D - 0.11]], 0.065, 8, true); // clear of the wall, so it never pokes through
-  grid((u, v) => { const a = 0.55, r = 0.56 * u; return [0.52 + r * cos(a), 0.05 + v * 1.82 + 0.03 * sin(u * 5 + v * 3), -D - r * sin(a) - 0.02 * sin(v * 7)]; }, 4, 8);
+  grid((u, v) => { const a = 0.55 + 0.25 * (1 - v) * u, r = 0.56 * u, fo = 0.045 * sin(u * PI * 3.2) * (0.4 + 0.6 * (1 - v)); return [0.52 + r * cos(a) + fo * sin(a), 0.05 + v * 1.82 - 0.07 * u * u * v, -D - r * sin(a) + fo * cos(a) - 0.02 * sin(v * 7)]; }, 10, 14);
   P(m, 24); box(m, -W + 0.05, 0, -D + 0.05, W - 0.05, 0.012, D - 0.05);
   P(m, 10);
   cyl(m, [0, 0, D - 0.06], [0, HR + 0.12, D - 0.06], 0.025, 8); // back pole (the front of the ridge is held by the front rope)
@@ -545,19 +551,22 @@ function meshCooler() {
 // folding wooden camp table with a portable shortwave radio and a two-burner camp stove (front toward -x)
 function meshTable() {
   const m = new Mesh();
-  P(m, 9); box(m, -0.3, 0.69, -0.47, 0.3, 0.73, 0.47);
-  for (const s of [-1, 1]) { m.sweep([[-0.26, 0, s * 0.4], [0.26, 0.69, s * 0.4]], 0.03, 0.03); m.sweep([[0.26, 0, s * 0.4], [-0.26, 0.69, s * 0.4]], 0.03, 0.03); }
+  P(m, 9); box(m, -0.3, 0.69, -0.62, 0.3, 0.73, 0.62);
+  for (const s of [-1, 1]) { m.sweep([[-0.26, 0, s * 0.55], [0.26, 0.69, s * 0.55]], 0.03, 0.03); m.sweep([[0.26, 0, s * 0.55], [-0.26, 0.69, s * 0.55]], 0.03, 0.03); }
+  // the newspaper, folded in half and a little skewed, with a flat stone on it
+  P(m, 33); { const n0 = m.p.length / 3; box(m, -0.21, 0.73, -0.15, 0.17, 0.738, 0.15); for (let k = n0 * 3; k < m.p.length; k += 3) { const x = m.p[k], z = m.p[k + 2]; m.p[k] = x * 0.97 - z * 0.24; m.p[k + 2] = x * 0.24 + z * 0.97; } }
+  put(m, stone(7), 0.05, 0.75, 0.04, 0.5, [0.07, 0.035, 0.06]);
   // radio: black leatherette case, brass trim, a dial and a speaker grille on the front (toward the fire), aerial up
-  P(m, 30); box(m, -0.1, 0.73, 0.02, 0.1, 0.99, 0.44);
-  P(m, 31); box(m, -0.106, 0.75, 0.04, -0.1, 0.97, 0.42); box(m, -0.02, 0.99, 0.18, 0.02, 1.01, 0.28);
-  P(m, 32); box(m, -0.111, 0.89, 0.07, -0.106, 0.95, 0.39);
-  P(m, 34); for (let y = 0.77; y < 0.87; y += 0.018) box(m, -0.112, y, 0.08, -0.106, y + 0.008, 0.38);
-  P(m, 3); cyl(m, [0.06, 0.99, 0.38], [0.02, 1.7, 0.42], 0.004, 4, false); for (const z of [0.12, 0.32]) cyl(m, [-0.111, 0.92, z], [-0.135, 0.92, z], 0.016, 10);
+  P(m, 30); box(m, -0.1, 0.73, 0.18, 0.1, 0.99, 0.6);
+  P(m, 31); box(m, -0.106, 0.75, 0.2, -0.1, 0.97, 0.58); box(m, -0.02, 0.99, 0.34, 0.02, 1.01, 0.44);
+  P(m, 32); box(m, -0.111, 0.89, 0.23, -0.106, 0.95, 0.55);
+  P(m, 34); for (let y = 0.77; y < 0.87; y += 0.018) box(m, -0.112, y, 0.24, -0.106, y + 0.008, 0.54);
+  P(m, 3); cyl(m, [0.06, 0.99, 0.54], [0.02, 1.7, 0.58], 0.004, 4, false); for (const z of [0.28, 0.48]) cyl(m, [-0.111, 0.92, z], [-0.135, 0.92, z], 0.016, 10);
   // camp stove: green enamel box, lid up behind with wind wings, two burners, the fuel tank in front
-  P(m, 35); box(m, -0.13, 0.73, -0.45, 0.13, 0.84, -0.03); box(m, 0.13, 0.84, -0.45, 0.145, 1.1, -0.03);
-  for (const z of [-0.45, -0.03]) box(m, -0.13, 0.84, z - 0.005, 0.13, 1.0, z + 0.005);
-  P(m, 34); for (const z of [-0.34, -0.14]) cyl(m, [0, 0.84, z], [0, 0.85, z], 0.06, 12);
-  P(m, 3); cyl(m, [-0.15, 0.78, -0.4], [-0.15, 0.78, -0.08], 0.035, 12);
+  P(m, 35); box(m, -0.13, 0.73, -0.6, 0.13, 0.84, -0.18); box(m, 0.13, 0.84, -0.6, 0.145, 1.1, -0.18);
+  for (const z of [-0.6, -0.18]) box(m, -0.13, 0.84, z - 0.005, 0.13, 1.0, z + 0.005);
+  P(m, 34); for (const z of [-0.49, -0.29]) cyl(m, [0, 0.84, z], [0, 0.85, z], 0.06, 12);
+  P(m, 3); cyl(m, [-0.15, 0.78, -0.55], [-0.15, 0.78, -0.23], 0.035, 12);
   return m;
 }
 // 1950s amateur refractor: white tube on an equatorial head and a wooden tripod, aimed up at the eastern sky
@@ -622,20 +631,23 @@ function meshCamp() {
   for (let i = 0; i < 9; i++) { const l = rr(0.6, 0.85), r = rr(0.05, 0.075), y = r + (i / 3 | 0) * 0.12, x0 = -3.1 + i % 3 * 0.17 + (i / 3 | 0) * 0.08; cyl(m, [x0, y, -2.9], [x0 + rr(-0.1, 0.1), y, -2.9 + l], r, 7); }
   // duffel bag and a jerry can
   P(m, 17); m.tube([[2.5, 0.16, 5.0], [2.6, 0.17, 5.2], [2.95, 0.17, 5.5], [3.05, 0.16, 5.62]], (k) => [0.1, 0.17, 0.17, 0.1][k], 12, true);
-  P(m, 19); box(m, 5.75, 0, 1.0, 5.92, 0.47, 1.45); P(m, 21); box(m, 5.82, 0.47, 1.12, 5.85, 0.52, 1.33);
+  P(m, 19); box(m, 5.75, 0, 1.0, 5.92, 0.47, 1.45); for (const z of [1.14, 1.22, 1.3]) box(m, 5.81, 0.47, z, 5.86, 0.52, z + 0.03); cyl(m, [5.835, 0.44, 1.04], [5.835, 0.53, 1.0], 0.022, 8);
   return m;
 }
-// kerosene hurricane lantern, red paint and tin, origin at the flame
+// tubular kerosene hurricane lantern of the 1950s (Dietz style), red paint and tin, origin at the flame:
+// a wide flat fount at the bottom, the burner, a clear pear-shaped globe inside a wire guard, two air tubes up the sides
+// to the top chamber with its ventilated cap, and the wire bail
 function meshLantern() {
   const m = new Mesh();
-  P(m, 40); lathe(m, [[0, -0.165], [0.07, -0.165], [0.085, -0.15], [0.088, -0.11], [0.075, -0.085], [0.04, -0.075], [0.04, -0.07]], 20);
-  P(m, 41); lathe(m, [[0.03, -0.07], [0.048, -0.05], [0.062, -0.01], [0.062, 0.02], [0.05, 0.05], [0.035, 0.07]], 20);
-  P(m, 40); lathe(m, [[0.036, 0.07], [0.07, 0.085], [0.07, 0.1], [0.04, 0.13], [0.02, 0.14], [0, 0.145]], 20);
+  P(m, 40); lathe(m, [[0, -0.175], [0.075, -0.175], [0.09, -0.168], [0.094, -0.155], [0.09, -0.13], [0.07, -0.118], [0.035, -0.112], [0.03, -0.1]], 24); // fount
+  P(m, 42); lathe(m, [[0.03, -0.1], [0.034, -0.09], [0.034, -0.082], [0.028, -0.078]], 16); cyl(m, [0.035, -0.095, 0], [0.06, -0.095, 0], 0.004, 6); // burner, wick knob
+  P(m, 41); lathe(m, [[0.028, -0.078], [0.045, -0.06], [0.056, -0.025], [0.057, 0.005], [0.05, 0.04], [0.036, 0.065], [0.03, 0.072]], 22); // globe
   P(m, 42);
-  for (let i = 0; i < 4; i++) { const a = i / 4 * TAU + 0.4, c = cos(a), s = sin(a); cyl(m, [c * 0.072, -0.075, s * 0.072], [c * 0.072, 0.06, s * 0.072], 0.0035, 4, false); }
-  cyl(m, [0, -0.01, 0], [0, -0.004, 0], 0.075, 16, false);
-  P(m, 40);
-  for (const s of [-1, 1]) m.tube([[s * 0.08, -0.12, 0], [s * 0.095, -0.03, 0], [s * 0.088, 0.08, 0], [s * 0.05, 0.12, 0]], 0.009, 6, true);
-  P(m, 42); const bail = []; for (let i = 0; i <= 10; i++) { const a = i / 10 * PI; bail.push([cos(a) * 0.1, 0.0 + sin(a) * 0.16, 0]); } m.tube(bail, 0.0035, 4, false);
+  for (let i = 0; i < 4; i++) { const a = i / 4 * TAU + PI / 4, c = cos(a), s2 = sin(a); m.tube([[c * 0.034, -0.08, s2 * 0.034], [c * 0.063, -0.02, s2 * 0.063], [c * 0.062, 0.01, s2 * 0.062], [c * 0.04, 0.066, s2 * 0.04]], 0.0022, 4, false); } // guard wires
+  for (const [y, r] of [[-0.02, 0.064], [0.03, 0.058]]) { const ring = []; for (let i = 0; i <= 16; i++) ring.push([cos(i / 16 * TAU) * r, y, sin(i / 16 * TAU) * r]); m.tube(ring, 0.0022, 4, false); }
+  P(m, 40); lathe(m, [[0.03, 0.072], [0.07, 0.078], [0.076, 0.09], [0.07, 0.105], [0.045, 0.118], [0.03, 0.122]], 22); // top chamber
+  P(m, 42); lathe(m, [[0.03, 0.122], [0.032, 0.135], [0.022, 0.145], [0, 0.148]], 14); // ventilated cap
+  P(m, 40); for (const sd of [-1, 1]) m.tube([[sd * 0.088, -0.125, 0], [sd * 0.098, -0.07, 0], [sd * 0.098, 0.03, 0], [sd * 0.085, 0.09, 0], [sd * 0.06, 0.1, 0]], 0.0075, 8, true); // air tubes
+  P(m, 42); const bail = []; for (let i = 0; i <= 12; i++) { const a = i / 12 * PI; bail.push([cos(a) * 0.1, 0.07 + sin(a) * 0.15, 0]); } m.tube(bail, 0.003, 4, false);
   return m;
 }

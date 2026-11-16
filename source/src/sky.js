@@ -92,13 +92,14 @@ function starData() {
 }
 
 // ---------------------------------------------------------------- satellites
-// In the hour before dawn, satellites high up are still in sunlight while the ground is dark. In November 1957 the
-// bright ones were Sputnik 1's spent rocket stage (tumbling, so it pulsed between about magnitude 1 and 3) and
-// Sputnik 2 (launched 3 November, still joined to its own rocket stage, about magnitude 1.5, steadier).
+// In the hour before dawn, satellites high up are still in sunlight while the ground is dark. One pass only: Sputnik 2
+// (launched 3 November with the dog on board, still joined to its rocket stage, about magnitude 1.5), overhead about
+// 28 minutes into play, in the dark of totality. Its true pass times over this spot are not known (no 1957 orbit data):
+// the pass is plausible, not documented.
 // Each pass: start (seconds of play), heading of the ground track (degrees from north), how far the track passes from
 // overhead (degrees across the earth), height (km), magnitude at 1000 km, tumbling period (s, 0 steady).
 // The play is compressed, the sky is not: a pass takes its real ten-odd minutes horizon to horizon.
-const SATS = [[170, 135, 4, 640, 1.2, 7.5], [980, 40, -9, 760, 1.6, 0], [1830, 150, -13, 600, 1.2, 7.5], [2700, 45, 6, 780, 1.6, 0]];
+const SATS = [[1250, 135, -5, 760, 1.5, 0]];
 const SUN = altAz(-15.1, 99); // the sun at 5:05 a.m., below the eastern horizon
 const RE = 6371;
 // position of pass s at time t: world direction (xyz) and brightness; brightness 0 when it is below the horizon or in

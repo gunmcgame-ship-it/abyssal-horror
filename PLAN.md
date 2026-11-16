@@ -57,7 +57,7 @@ period-appropriate look (for example a 1950s typewriter or park-signage style), 
 | Canyon shape | Winding canyon with side pockets: bends hide what's ahead, small alcoves to explore. |
 | Park details | Wooden park sign at the landing reading the park name, an old fire ring and a picnic table. Everything must be 1950s-appropriate: no modern objects, signs, materials or fonts. |
 | Other people | Nobody else is there, but there are period-appropriate traces that others have been before (for example old tire tracks, an older cold fire ring, a rusted can or bottle, a faded trail marker). |
-| Date | The morning of 7 November 1957: one month after Sputnik 1 (October 4), four days after Sputnik 2 with the dog Laika (November 3), during the big early-November 1957 UFO wave (Levelland, Texas, November 2-3, and White Sands). Sputnik is heard on the radio only for now (note: Sputnik 1's transmitter had gone silent on October 26; the beeps in November would be Sputnik 2's). OPEN QUESTION for the owner: before dawn, satellites and Sputnik 1's rocket stage are sunlit and could be shown crossing the sky. |
+| Date | The morning of 7 November 1957: one month after Sputnik 1 (October 4), four days after Sputnik 2 with the dog Laika (November 3), during the big early-November 1957 UFO wave (Levelland, Texas, November 2-3, and White Sands). Sputnik is heard on the radio only for now (note: Sputnik 1's transmitter had gone silent on October 26; the beeps in November would be Sputnik 2's). Sky (owner decision): one satellite pass only, Sputnik 2 (with the dog, still joined to its rocket stage), crossing during totality and fading into the earth's shadow; plausible, not a documented pass time. The observer would know about the dog from the news (front-page from 4 November; US papers called it "Muttnik"). |
 | Title | Working title: "Ground Observer, 1957". Use it in the menu, page title and README. May change later; keep it in one easy-to-edit place. |
 | Menu text | The title plus a quiet date-and-place line: "<Park name>, 1957". |
 | Park name | Coldsupper Canyon National Monument. Shown on the wooden park sign at the landing and on the menu line ("Coldsupper Canyon National Monument, 1957"). |
@@ -126,7 +126,13 @@ recorder and the photos and clippings. Around the canyon, place only the period 
 tracks, older cold fire ring, rusted can or bottle, faded trail marker). The ruins hold only 1870s items
 (collapsed timber, broken crockery, an iron stove, a table).
 All procedural geometry. Paper and photos use generated textures (hand-drawn style lines and blocks, no readable
-real text needed, but a few big headline-like shapes are fine). No interaction.
+real text needed, but a few big headline-like shapes are fine). Newspapers carry halftone photos (normal in 1957).
+No interaction.
+Trailer interior (owner idea, placement to confirm): the trailer door stands open and the inside can be walked into,
+a 1950s travel-trailer interior (dinette, galley with icebox and stove, bunk, curtains, cabinets, the observer's
+things). Build the interior here in M3; M2 leaves the door opening walkable (collision follows the shell).
+Already in from M1 polish: folding table with radio, camp stove and a folded newspaper held down by a stone;
+telescope; tent interior with sleeping bag, pillow, tape recorder, photos and clippings.
 
 ### M4: Sound
 Rewrite `audio.js`. Layers: low wind with gusts, crickets, fire crackle near the fire, footsteps (M2), lantern

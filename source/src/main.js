@@ -460,7 +460,7 @@ function render() {
   m[63] = 10 * (1 + 0.12 * sin(t * 9.3) + 0.08 * sin(t * 15.1 + 2) + 0.06 * sin(t * 3.7));
   // the lantern: held low on the right, swinging a little round its handle; its flame is the light.
   // Holding Space lifts it up and out in front (F[LIFT] eases 0 .. 1), so its light reaches further across the ground.
-  const lu = F[LIFT] * F[LIFT] * (3 - 2 * F[LIFT]), lf = 0.8 - 0.18 * lu, lr = 0.4 - 0.06 * lu, ld = 0.4 - 0.36 * lu;
+  const lu = F[LIFT] * F[LIFT] * (3 - 2 * F[LIFT]), lf = 0.8 - 0.18 * lu, lr = 0.42 - 0.08 * lu, ld = 0.45 - 0.41 * lu;
   const sw = (sin(t * 1.1) * 0.035 + sin(t * 0.47 + 1) * 0.02) * (1 - 0.5 * lu), hx = rz, hz = -rx; // hx, hz: forward, level
   const lx = cx + fx * lf + rx * lr - ux * ld + hx * sw * 0.16, ly = cy + fy * lf - uy * ld, lz = cz + fz * lf + rz * lr - uz * ld + hz * sw * 0.16;
   m[64] = lx; m[65] = ly + 0.01; m[66] = lz;
