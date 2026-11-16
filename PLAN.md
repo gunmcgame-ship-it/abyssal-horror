@@ -34,6 +34,10 @@ A full chase and jump scare is planned for a LATER version (see section 8): leav
 | Hints of the threat | A figure on a distant ridge (there, then gone; its LOOK IS NOT DECIDED, see open questions), sounds (crickets and wind stop, then a distant call), signs it has been near camp (footprints, knocked-over chair, torn tent, moved props), and a patch of stars that goes out for a moment. |
 | Map edges | Canyon walls and cliffs block you (shaped terrain, not an invisible wall). |
 | Opening | You start inside the tent and step out because you hear something. Inside: rumpled sleeping bag with a pillow, a small lantern or candle already lit by the flap (you pick up your lantern as you leave), photos and clippings taped to the canvas. |
+| Map size | Small and dense, about 300 m across (same as the original world). |
+| Hint timing | Random timer with long gaps. No fixed trigger spots for v1. |
+| Goal | None. Pure exploration and mood. No ending in v1. |
+| Name | Working name 'abyssal-horror'. Owner wants name suggestions (see open questions). |
 | First milestone | Look-around only: camp and sky. Walking comes in milestone 2. |
 
 ## 3. How the current code is laid out (what to change)
@@ -109,6 +113,8 @@ Update README, title and menu text. Credit upstream.
 
 ## 4b. Open questions (owner has not decided)
 - What the ridge figure looks like. The owner wants this researched first. Before M5, propose 3-4 options based on how classic UFO and 1950s-era sightings, folklore and horror films handle a distant unexplained figure, and let the owner pick. Do not build it until chosen.
+
+- The game's title. Suggested options: Skywatch, Dead Air, Static Between Stars, Number Station, Kerosene, Night Watch. Owner will pick.
 
 ## 5. Visual references to match
 - Night in canyon country with a half moon: blue-black sky, rock faces that catch just a little light.
