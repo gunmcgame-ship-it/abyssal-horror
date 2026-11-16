@@ -41,6 +41,14 @@ A full chase and jump scare is planned for a LATER version (see section 8): leav
 | Darkness | Dark but readable: moonlight shows big shapes (mesas, rocks). Menu has a brightness slider. |
 | Weather and sky motion | Steady breeze with occasional gusts (moves plants and tent canvas, drives lantern flicker), occasional shooting stars, thin high clouds crossing the moon. No dust devils. |
 | Campfire | Burns low and steady the whole time. No dying fire in v1. |
+| Camp location | A landing (flat turnout) down in the canyon at the bottom of the dirt road/ramp that leads up and out. The pickup and camper trailer are parked across the ramp and block it, which explains why the player stays down in the canyon. Canyon walls form the rest of the boundary (collision on truck and camper too). |
+| Radio music | Slow 1950s crooner or ballad feel, synthesized melody that warbles and fades into static. |
+| Camp traces | Subtle: only noticed if you look (chair shifted a little, faint prints, a prop moved). |
+| Performance | Balanced, via the Low/Medium/High menu: High looks best, Low stays smooth. |
+| Backstory (props only) | The hobbyist came because of a recent sighting at this canyon: a newspaper clipping about lights over it, plus their notes and map trying to pin down the spot. |
+| Canyon shape | Winding canyon with side pockets: bends hide what's ahead, small alcoves to explore. |
+| Park details | Wooden park sign at the landing (made-up park name), an old fire ring and a picnic table. Everything must be 1950s-appropriate: no modern objects, signs, materials or fonts. |
+| Other people | Nobody else is there, but there are period-appropriate traces that others have been before (for example old tire tracks, an older cold fire ring, a rusted can or bottle, a faded trail marker). |
 | First milestone | Look-around only: camp and sky. Walking comes in milestone 2. |
 
 ## 3. How the current code is laid out (what to change)
