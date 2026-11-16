@@ -41,15 +41,25 @@
     const out = document.createElement('div');
     const rows = [['moon', 'Moonlight', 0, 1.5], ['fill', 'Shadow fill', 0, 2], ['blue', 'Blue', 0, 1], ['contrast', 'Contrast', 0, 1], ['bright', 'Brightness', 0.2, 1.6]];
     const show = () => { out.textContent = 'LOOK = ' + JSON.stringify(LOOK); };
-    for (const [k, name, a, b] of rows) {
+    // keyboard, so the mouse keeps looking around: Up/Down picks a slider, Left/Right moves it (hold Shift for big steps)
+    let sel = 0; const ui2 = [];
+    const set = (i, x) => { const [k, , a, b] = rows[i]; LOOK[k] = Math.min(b, Math.max(a, Math.round(x * 100) / 100)); ui2[i].r.value = LOOK[k]; ui2[i].v.textContent = LOOK[k].toFixed(2); show(); };
+    const mark = () => ui2.forEach((u, i) => { u.l.style.color = i === sel ? '#ffd27a' : '#ddd'; });
+    rows.forEach(([k, name, a, b], i) => {
       const l = document.createElement('label'), r = document.createElement('input'), v = document.createElement('span');
       r.type = 'range'; r.min = a; r.max = b; r.step = 0.01; r.value = LOOK[k]; r.style.cssText = 'width:220px;vertical-align:middle;margin:0 8px';
-      v.textContent = LOOK[k].toFixed(2); r.oninput = () => { LOOK[k] = +r.value; v.textContent = (+r.value).toFixed(2); show(); };
-      l.append(name.padEnd(12, ' '), r, v); l.style.display = 'block'; l.style.whiteSpace = 'pre'; p.append(l);
-    }
-    p.append(out); show(); document.body.append(p);
-    for (const e of ['keydown', 'pointerdown', 'mousedown', 'click']) p.addEventListener(e, (ev) => ev.stopPropagation());
-    addEventListener('keydown', (e) => { if (e.code === 'KeyT' && !e.repeat) { const on = p.style.display === 'none'; p.style.display = on ? 'block' : 'none'; if (on) document.exitPointerLock(); } });
+      v.textContent = LOOK[k].toFixed(2); r.oninput = () => set(i, +r.value);
+      l.append(name.padEnd(12, ' '), r, v); l.style.display = 'block'; l.style.whiteSpace = 'pre'; p.append(l); ui2.push({ l, r, v });
+    });
+    const help = document.createElement('div'); help.textContent = 'Up/Down: pick   Left/Right: change (Shift: faster)   T: hide'; help.style.color = '#999';
+    p.append(out, help); show(); mark(); document.body.append(p);
+    for (const e of ['pointerdown', 'mousedown', 'click']) p.addEventListener(e, (ev) => ev.stopPropagation());
+    addEventListener('keydown', (e) => {
+      if (e.code === 'KeyT' && !e.repeat) { p.style.display = p.style.display === 'none' ? 'block' : 'none'; return; }
+      if (p.style.display === 'none') return;
+      if (e.code === 'ArrowUp' || e.code === 'ArrowDown') { sel = (sel + (e.code === 'ArrowUp' ? rows.length - 1 : 1)) % rows.length; mark(); e.preventDefault(); }
+      else if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') { set(sel, LOOK[rows[sel][0]] + (e.code === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 0.1 : 0.02)); e.preventDefault(); }
+    });
   }
   // for screenshots from the browser console: dev.view(x, y, z, lookX, lookY, lookZ) places the camera, dev.play() hides the menu
   window.dev = { view: lookAt, play: () => ui(false), pose: (i) => lookAt(...POSES[i]),
