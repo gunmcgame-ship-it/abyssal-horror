@@ -464,7 +464,7 @@ function render() {
   const sw = (sin(t * 1.1) * 0.035 + sin(t * 0.47 + 1) * 0.02) * (1 - 0.5 * lu), hx = rz, hz = -rx; // hx, hz: forward, level
   const lx = cx + fx * lf + rx * lr - ux * ld + hx * sw * 0.16, ly = cy + fy * lf - uy * ld, lz = cz + fz * lf + rz * lr - uz * ld + hz * sw * 0.16;
   m[64] = lx; m[65] = ly + 0.01; m[66] = lz;
-  m[67] = 2.2 * (1 + 0.05 * sin(t * 17) + 0.04 * sin(t * 23 + 1) + 0.03 * sin(t * 7.3)) * (1 - 0.55 * gt * gt * (3 - 2 * gt));
+  m[67] = 1.6 * (1 + 0.05 * sin(t * 17) + 0.04 * sin(t * 23 + 1) + 0.03 * sin(t * 7.3)) * (1 - 0.55 * gt * gt * (3 - 2 * gt));
   const ss2 = sin(sw / 2), cs2 = cos(sw / 2), by = sin(-yaw / 2), bw = cos(-yaw / 2), qx = rx * ss2, qz = rz * ss2;
   LANT[0] = lx; LANT[1] = ly; LANT[2] = lz; LANT[4] = qx * bw - qz * by; LANT[5] = cs2 * by; LANT[6] = qx * by + qz * bw; LANT[7] = cs2 * bw;
   Q.writeBuffer(ibLant, 0, LANT);

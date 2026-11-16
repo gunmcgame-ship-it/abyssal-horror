@@ -193,8 +193,8 @@ const LOW = ${LV > 1};
 const MOON = vec3f(${MOON});
 const MWN = vec3f(${MWN});
 // sky light in the shadows: moonlight scattered by the air (blue, goes with the moon), and airglow + starlight (always there)
-const SKYA = vec3f(.018, .027, .058);
-const SKY0 = vec3f(.0030, .0036, .0052);
+const SKYA = vec3f(.030, .045, .095);
+const SKY0 = vec3f(.0045, .0055, .0085);
 const FIREC = vec3f(1., .40, .12);
 const LANTC = vec3f(1., .64, .34);
 fn sat(x: f32) -> f32 { return clamp(x, 0., 1.); }
@@ -241,7 +241,7 @@ fn shadowSoft(p: vec3f) -> f32 {
 fn vol(p: vec3f) -> vec4f { return textureSampleLevel(tV, sC, (p - vec3f(-192., -56., -192.)) / vec3f(384., 60., 384.), 0.); }
 // point lights: g.fire and g.lant are position + strength (flicker included); short range, fast fall-off, no shadows
 const FIRER = 16.; const LANTR = 10.;
-fn att(p: vec3f, l: vec4f, r: f32) -> f32 { let d = distance(l.xyz, p); let w = sat(1. - pow(d / r, 4.)); return l.w * w * w / (1. + d * d); }
+fn att(p: vec3f, l: vec4f, r: f32) -> f32 { let d = distance(l.xyz, p); let w = sat(1. - d * d / (r * r)); return l.w * w * w / (1. + 1.3 * d * d); }
 // The camp's big things as rounded boxes (camp coordinates, metres from the fire: centre + yaw, half size + rounding),
 // so the fire and the lantern cast soft shadows past them and the ground darkens a little under them.
 // Keep in step with meshCamp() in world.js. The tent is a hollow shell with its door open toward the fire.
@@ -308,7 +308,7 @@ fn airGlow(rd: vec3f, L: f32, lp: vec3f, I: f32) -> f32 {
   return I * (atan((L - t0) / h) - atan(-t0 / h)) / h;
 }
 fn inScatter(rd: vec3f, L: f32) -> vec3f {
-  return FIREC * airGlow(rd, L, g.fire.xyz + vec3f(0., .5, 0.), g.fire.w) * .0005 + LANTC * airGlow(rd, L, g.lant.xyz, g.lant.w) * .00025;
+  return FIREC * airGlow(rd, L, g.fire.xyz + vec3f(0., .5, 0.), g.fire.w) * .00035 + LANTC * airGlow(rd, L, g.lant.xyz, g.lant.w) * .00025;
 }
 fn fog(c: vec3f, wp: vec3f) -> vec3f {
   let v = wp - g.cam.xyz; let d = length(v); let rd = v / d;
@@ -416,8 +416,8 @@ fn prop(id: i32, op: vec3f, mc: f32, h: f32) -> PM {
       m.n = vec3f(sin(op.x * 9. + op.z * 4.), 0., cos(op.z * 11. - op.x * 3.)) * .12; }
     case 38 { m.a = vec3f(.07, .19, .11) * (.85 + .3 * mc); m.bp = .1; m.tl = .2; }   // dark green chair canvas
     case 39 { m.a = vec3f(.62, .57, .44); m.bp = 0.; }                                  // paper, map, logbook
-    case 67 { m.a = vec3f(.055, .08, .072) * (.7 + .6 * vn2d(op.xz * 60. + op.y * 37.)); m.bp = 1.8; m.tl = .25; }
-    case 68 { m.a = vec3f(.05, .075, .045) * (.7 + .6 * vn2d(op.xz * 70. + op.y * 41.)); m.bp = 1.8; m.tl = .25; }
+    case 67 { m.a = vec3f(.08, .11, .10) * (.7 + .6 * vn2d(op.xz * 60. + op.y * 37.)); m.bp = 1.8; m.tl = .25; }
+    case 68 { m.a = vec3f(.07, .10, .065) * (.7 + .6 * vn2d(op.xz * 70. + op.y * 41.)); m.bp = 1.8; m.tl = .25; }
     case 60 { m.a = vec3f(.10, .17, .08) * (.7 + .5 * h); m.gl = .3; m.bp = .5; }    // cactus
     case 61 { let fb = fract(sin(dot(floor(op.xz * vec2f(55., 47.)), vec2f(12.9, 78.2))) * 43758.5);
       m.a = vec3f(.20, .16, .13) * (.5 + .5 * h) * (.65 + .55 * fb); m.bp = 1.2; m.n = vec3f(sin(op.x * 120. + op.y * 6.), 0., cos(op.z * 110. - op.y * 5.)) * .3; }       // juniper bark
@@ -532,11 +532,11 @@ fn shape2(v: f32) -> f32 { return sin(3.14159 * sat(v)); }
   // per type: colour, y translucency, width profile, wave, flutter
   var col = vec3f(0.); var pr = vec4f(0.); var shp = vec2f(.75, .7); var wav = .2; var fls = .5;
   switch ty {
-    case 0 { col = mix(vec3f(.06, .085, .08), vec3f(.08, .10, .085), s1); pr = vec4f(0., .3, 0., 0.); shp = vec2f(.2, .6); wav = .35; }   // juniper sprays
+    case 0 { col = mix(vec3f(.085, .115, .105), vec3f(.11, .13, .11), s1); pr = vec4f(0., .3, 0., 0.); shp = vec2f(.2, .6); wav = .35; }   // juniper sprays
     case 1 { col = vec3f(.19, .15, .10) * (.8 + .4 * s1); pr = vec4f(0., .1, 0., 0.); shp = vec2f(.05, .1); wav = .02; fls = .1; }       // dry yucca stalk
     case 2 { col = mix(vec3f(.33, .36, .31), vec3f(.42, .44, .38), s1); pr = vec4f(0., .4, 0., 0.); shp = vec2f(.4, .5); }               // sagebrush
     case 3 { col = mix(vec3f(.13, .17, .08), vec3f(.19, .21, .10), s1); col = mix(col, vec3f(.30, .26, .16), step(.82, s2)); pr = vec4f(0., .5, 0., 0.); shp = vec2f(.25, .6); wav = .03; fls = .2; }   // yucca
-    case 4 { col = mix(vec3f(.05, .085, .05), vec3f(.07, .095, .055), s1); pr = vec4f(0., .3, 0., 0.); shp = vec2f(.15, .8); wav = .05; }   // pinyon needles
+    case 4 { col = mix(vec3f(.075, .11, .07), vec3f(.095, .12, .075), s1); pr = vec4f(0., .3, 0., 0.); shp = vec2f(.15, .8); wav = .05; }   // pinyon needles
     case 5 { col = mix(vec3f(.36, .31, .19), vec3f(.44, .38, .24), s1); pr = vec4f(0., .6, 0., 0.); shp = vec2f(.3, .5); wav = .4; fls = 1.; }   // dry grass
     default { col = mix(vec3f(.22, .22, .12), vec3f(.30, .27, .14), s1); pr = vec4f(0., .5, 0., 0.); shp = vec2f(.4, .5); wav = .3; }   // rabbitbrush
   }
@@ -631,8 +631,8 @@ fn stars(rd: vec3f, sc: f32, dens: f32, bright: f32, px: f32) -> vec3f {
   let n1 = fbm3(rd * 7., 5); let n2 = fbm3(rd * 22. + 3., 3);
   let dust = ss(.42, .62, fbm3(rd * 9. + 7., 5)) * exp(-bw * bw / .008);
   let mw = band * (.3 + 1.0 * ss(.3, .8, n1)) * (.6 + .6 * n2) * (1. - .7 * dust);
-  c += vec3f(.022, .023, .027) * mw * wash * ext * (1. - .85 * ml);
-  var st = stars(rd, 130., .012, .2, px) + stars(rd, 290., .03 + .35 * band * (1. - dust), .03, px) * wash * (1. - .8 * ml) + stars(rd, 520., .2 * band * (1. - dust), .01, px) * wash * (1. - .9 * ml);
+  c += vec3f(.036, .037, .043) * mw * wash * ext * (1. - .92 * ml);
+  var st = stars(rd, 130., .012, .2, px) + stars(rd, 290., .03 + .35 * band * (1. - dust), .045, px) * wash * (1. - .85 * ml) + stars(rd, 520., .2 * band * (1. - dust), .01, px) * wash * (1. - .9 * ml);
   // near the horizon the air makes them twinkle
   st *= ext * (1. + .6 * (1. - up) * sin(t * 9. + dot(rd, vec3f(3000., 2100., 2700.))));
   // thin high cloud drifting across the moon: it hides the stars behind it and glows where the moon is near
@@ -773,13 +773,13 @@ fn tmap(x: vec3f) -> vec3f { return sat3((x * (2.51 * x + .03)) / (x * (2.43 * x
   c = mix(c, bl, .05) + bl * .06;
   // exposure: brings the adapted brightness up toward a night key, but only so far: the eyes never fully see in the dark
   let ad = textureLoad(tA, vec2i(0), 0).r;
-  c *= g.mis.x * clamp(pow(.032 / max(ad, 1e-5), .6), .6, 2.6);
+  c *= g.mis.x * clamp(pow(.032 / max(ad, 1e-5), .55), .6, 2.1);
   let q = uv - .5;
   c *= 1. - dot(q, q) * .85;
   c = tmap(c);
   // the original project's contrast curve: deeper darks, a soft shoulder on the highlights
   let l0 = dot(c, vec3f(.2126, .7152, .0722));
-  c *= mix(l0, l0 * l0 * (3. - 2. * l0), .45) / max(l0, 1e-4);
+  c *= mix(l0, l0 * l0 * (3. - 2. * l0), .3) / max(l0, 1e-4);
   // in the dark the eye loses colour and sees a little bluer: only the dimmest parts of the image
   let l = dot(c, vec3f(.2126, .7152, .0722));
   c = mix(vec3f(l) * vec3f(.80, .93, 1.22), c, .5 + .5 * ss(.03, .45, l));
