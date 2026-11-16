@@ -27,7 +27,7 @@ period-appropriate look (for example a 1950s typewriter or park-signage style), 
 | Old underwater scene | Replace completely. Upstream repo keeps the original. |
 | Movement | Walk on the ground. Slow walk, no sprint, no jump, no crouch. |
 | Footsteps | Different sounds for sand and rock. Lantern bobs as you walk. |
-| Time and light | Deep night, half moon, dense stars and Milky Way. Realistic look, no film filter. |
+| Time and light | Deep night, around moonset (about 2-3 a.m.). Historically accurate moon for early October 1957: a bright waxing gibbous (about 80% lit) sitting LOW on the western horizon, about to set, slightly warm-tinted by the low angle, casting long shadows. Much of the canyon floor is in moon shadow. Dense stars and Milky Way. Realistic look, no film filter. |
 | Player light | One 1950s lantern: flickers and sways when walking, SHORT range (about 10-15 m, falls off fast). Wind makes it gutter: it dims and recovers within a second or two (never fully out). No flashlight. Fuel does not run out. |
 | Landscape | Southwest canyon country: red mesas, arches, pillars, canyons. |
 | Plants | Juniper, pinyon pine, sagebrush, yucca, prickly pear, small cacti (replaces kelp, sponges, coral). |
@@ -98,7 +98,7 @@ Each milestone ends with a build that runs. Stop and show the owner before movin
 Goal: you can stand at the tent and look around a believable desert night. Free camera is fine for M1.
 1. Remove all water: surface from below, caustics, bubbles, depth-blue fog, god rays, blue tint.
 2. Replace fog with thin dry night air: slight cool blue haze, short fog distance at ground level, no scattering color shift. Keep the distance fade so the edge of the world never shows.
-3. Sky: black-blue gradient, dense stars, a Milky Way band, a half moon, all procedural. One lighting source from the moon (reuse the sun shadow map, with the moon direction).
+3. Sky: black-blue gradient, dense stars, a Milky Way band, a low waxing gibbous moon near the western horizon (see Time and light), all procedural. One lighting source from the moon (reuse the sun shadow map, with the moon direction).
 4. Re-color terrain to red-orange sandstone and pale sand, lit only by moonlight. Dark overall. Rocks must still be readable.
 5. Camp set at the start pose (colors as in the decisions table): low campfire (warm flickering light and glow), canvas tent (enterable shape, open flap), a 1950s pickup towing a rounded metallic camper trailer, folding chair, cooler and gear. Clear the terrain there using the existing `CLEARS` mechanism so props sit on flat ground.
 6. Lantern: a single warm point light that follows the camera (hand position, slightly lower right), with short range and fast falloff, flicker, and sway. No shadows from it in M1.
@@ -147,7 +147,7 @@ Update README, title and menu text. Credit upstream.
 - What the ridge figure looks like. Owner is researching. Build the placeholder (plain tall dark silhouette) in M5, in one easy-to-swap place. Do not invent a final design.
 
 ## 5. Visual references to match
-- Night in canyon country with a half moon: blue-black sky, rock faces that catch just a little light.
+- Night in canyon country with a low moon about to set: blue-black sky, rock faces that catch just a little light.
 - Warm fire and lantern pools against cold surroundings. The contrast is the mood.
 - Keep large shapes readable at distance (mesas, arches) so the world feels huge and empty.
 
