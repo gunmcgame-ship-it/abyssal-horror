@@ -48,14 +48,14 @@ fn dens(p: vec3f) -> f32 {
   let w = vec3f(fbm(p * .04 + 11., 3), fbm(p * .04 + 47., 3), fbm(p * .04 + 83., 3)) - .5;
   let q = p + w * vec3f(15., 6., 15.);
   let g0 = -45.5 + 7. * (fbm(vec3f(q.xz * .011, 3.), 4) - .5) + 1.6 * (fbm(vec3f(q.xz * .07, 9.), 3) - .5);
-  let tn = 3. * (fbm(vec3f(q.xz * .09, 2.), 3) - .5);
+  let tn = 1. * (fbm(vec3f(q.xz * .09, 2.), 3) - .5); // mesa tops stay nearly flat
   var dm = -1e3; var de = 1e3;
   var k = 0u;
   for (var i = 0u; i < u.c.x; i++) {
     let a = P[k]; let b = P[k + 1u]; k += 2u;
     let yr = clamp((p.y - g0) / (b.y - g0), 0., 1.3);
     var e = seg2(q.xz, a.xy, a.zw) - b.x;
-    e -= b.z * ss(.3, .92, yr) + 3. * (1. - yr) * (1. - yr) - b.w * ss(.0, .5, yr) * (1. - ss(.5, 1., yr));
+    e -= b.z * .45 * ss(.3, .92, yr) + 3. * (1. - yr) * (1. - yr) - b.w * ss(.0, .5, yr) * (1. - ss(.5, 1., yr));
     dm = smax(dm, smin(-e, b.y + tn - p.y, 3.), 2.5);
     de = min(de, e);
   }
@@ -77,15 +77,20 @@ fn dens(p: vec3f) -> f32 {
   k = u.c.x * 2u;
   for (var i = 0u; i < u.c.y; i++) {
     let a = P[k]; let b = P[k + 1u]; k += 2u;
-    var r = p + w * 3. - a.xyz;
+    var r = p + w * 1.2 - a.xyz;
     let cs = cos(a.w); let sn = sin(a.w);
     r = vec3f(cs * r.x + sn * r.z, r.y / b.z, -sn * r.x + cs * r.z);
     d = smax(d, b.y - length(vec2f(length(r.xy) - b.x, r.z)), 1.5);
   }
   let hg = p.y - g0;
   let rk = mix(.1, 1., ss(.5, 5., hg)); // sandy floors stay fairly smooth, rock above them is rough
-  d += rk * ((.5 - wor(p * .17 + w * 2.)) * 3.4 + (.5 - wor(p * .41 + 7.)) * 1.3 + (fbm(p * .3, 3) - .5) * 2.2);
-  d += rk * 2.2 * (abs(fract(p.y * .21 + w.y * 2.2) - .5) - .25);
+  // sandstone: level beds of different hardness (hard ones stand out as ledges, soft ones weather back), crisp partings
+  // between them, vertical joints and flutes down the faces, and only a little lumpy roughness
+  let by = p.y * .32 + w.y * .4; let fb = fract(by);
+  let hard = h31(vec3f(floor(by), 3., 7.));
+  d += rk * ((hard - .5) * 2.2 + ss(.0, .1, fb) * ss(1., .88, fb) * .7 - .35);
+  d += rk * (fbm(vec3f(p.x * .22, p.y * .035, p.z * .22), 3) - .5) * 3.2;
+  d += rk * ((.5 - wor(p * .3 + 7.)) * .6 + (fbm(p * .7, 2) - .5) * .5);
   for (var i = 0u; i < u.c.z; i++) {
     let a = P[k]; let b = P[k + 1u]; k += 2u;
     d = smin(d, seg3(p + w * 2., a.xyz, b.xyz) - a.w, 2.);
@@ -181,7 +186,7 @@ const LOW = ${LV > 1};
 const MOON = vec3f(${MOON});
 const MWN = vec3f(${MWN});
 const MOONC = vec3f(1., .88, .74) * .5;
-const SKYA = vec3f(.020, .028, .056);
+const SKYA = vec3f(.030, .040, .075);
 const HAZE = vec3f(.011, .014, .025);
 const FIREC = vec3f(1., .40, .12);
 const LANTC = vec3f(1., .55, .22);
@@ -233,7 +238,7 @@ fn plS(p: vec3f, n: vec3f, V: vec3f, pw: f32) -> vec3f {
        + LANTC * att(p, g.lant, LANTR) * pow(sat(dot(n, normalize(V + ll))), pw) * sat(dot(n, ll) * 4.);
 }
 // sky light from above (sky: how open to the sky, from the baked volume) and a little warm bounce from the ground
-fn amb(n: vec3f, sky: f32) -> vec3f { let up = n.y * .5 + .5; return SKYA * (.2 + .8 * sky) * (.3 + .7 * up) + vec3f(.005, .0035, .0025) * (1. - up); }
+fn amb(n: vec3f, sky: f32) -> vec3f { let up = n.y * .5 + .5; return SKYA * (.2 + .8 * sky) * (.3 + .7 * up) + MOONC * .035 * (.4 + .6 * sat(dot(n, -vec3f(MOON.x, 0., MOON.z)))) * (.5 + .5 * sky); }
 // thin, dry night air: a faint cool haze, and at the far end of the draw distance everything fades into the sky
 fn fog(c: vec3f, wp: vec3f) -> vec3f {
   let v = wp - g.cam.xyz; let d = length(v); let rd = v / d;
@@ -271,22 +276,25 @@ fn tri(p: vec3f, n: vec3f, s: f32) -> TP {
   return o;
 }
 // part list: albedo, gloss, metal, bump, emission
-struct PM { a: vec3f, gl: f32, mt: f32, bp: f32, e: vec3f };
+struct PM { a: vec3f, gl: f32, mt: f32, bp: f32, e: vec3f, n: vec3f, tl: f32 }; // n: extra normal tilt, tl: translucency
 fn prop(id: i32, op: vec3f, mc: f32, h: f32) -> PM {
-  var m: PM; m.a = vec3f(.5); m.gl = .05; m.mt = 0.; m.bp = .4; m.e = vec3f(0.);
+  var m: PM; m.a = vec3f(.5); m.gl = .05; m.mt = 0.; m.bp = .4; m.e = vec3f(0.); m.n = vec3f(0.); m.tl = 0.;
   switch id {
-    case 1 { m.a = vec3f(.80, .74, .58); m.gl = .55; m.bp = .04; }             // cream paint
-    case 2 { m.a = vec3f(.13, .46, .43); m.gl = .55; m.bp = .04; }             // turquoise paint
-    case 3 { m.a = vec3f(.85, .85, .88); m.gl = 1.; m.mt = 1.; m.bp = .02; }   // chrome
+    case 1 { m.a = vec3f(.80, .74, .58); m.gl = .55; m.bp = 0.; }             // cream paint
+    case 2 { m.a = vec3f(.13, .46, .43); m.gl = .55; m.bp = 0.; }             // turquoise paint
+    case 3 { m.a = vec3f(.85, .85, .88); m.gl = 1.; m.mt = 1.; m.bp = 0.; }   // chrome
     case 4 { m.a = vec3f(.035); m.gl = .15; m.bp = .3; }                         // tyre rubber
     case 5 { m.a = vec3f(.72, .71, .67); m.gl = .2; m.bp = .1; }               // whitewall
     case 6 { m.a = vec3f(.02, .024, .03); m.gl = 1.; m.mt = .5; m.bp = 0.; }   // window glass
-    case 7 { m.a = vec3f(.72, .74, .76); m.gl = .8; m.mt = 1.; m.bp = .03; }   // polished aluminium
-    case 8 { m.a = vec3f(.78, .75, .66) * (.95 + .1 * mc); m.gl = .02; m.bp = .02; }   // white canvas, weathered
+    case 7 { m.a = vec3f(.72, .74, .76); m.gl = .75; m.mt = 1.; m.bp = 0.; }   // polished aluminium
+    case 8 {   // white canvas: sewn panels, soft wrinkles, thin enough to let some moonlight through
+      let sw = op.x + op.z; let seam = ss(.02, .0, abs(fract(sw / .92) - .5) - .47);
+      m.a = vec3f(.66, .63, .55) * (.93 + .1 * mc) * (1. - .25 * seam); m.gl = .02; m.bp = 0.; m.tl = .5;
+      m.n = vec3f(sin(op.y * 7. + sw * 2.3) + .5 * sin(op.y * 17. - sw * 5.), 0., cos(op.y * 5. - sw * 3.1) + .5 * cos(sw * 13. + op.y * 3.)) * .07; }   // white canvas, weathered
     case 9 { m.a = vec3f(.45, .30, .17) * (.7 + .5 * h); m.gl = .1; m.bp = .8; }      // wood
     case 10 { m.a = vec3f(.22, .15, .09); m.bp = .8; }                          // dark wood, poles
     case 11 { m.a = vec3f(.12, .26, .16); m.gl = .5; m.bp = .05; }             // green steel
-    case 12 { m.a = vec3f(.45, .03, .02); m.gl = .8; m.bp = 0.; }              // red tail light
+    case 12 { m.a = vec3f(.30, .02, .015); m.gl = .5; m.bp = 0.; }              // red tail light
     case 13 { m.a = vec3f(.33, .22, .16) * (.6 + .6 * h); m.bp = 1.4; }        // stone
     case 14 { m.a = vec3f(.035, .03, .028); m.bp = 1.2; }                      // charred wood
     case 15 { m.a = vec3f(.03, .02, .015); m.bp = 1.2;                          // embers in the fire bed
@@ -297,12 +305,12 @@ fn prop(id: i32, op: vec3f, mc: f32, h: f32) -> PM {
     case 19 { m.a = vec3f(.16, .18, .10); m.gl = .3; m.bp = .1; }              // olive drab steel
     case 20 { m.a = vec3f(.10, .20, .42); m.gl = .7; m.bp = .05; }             // blue enamel
     case 21 { m.a = vec3f(.04, .04, .045); m.gl = .2; m.bp = .3; }             // chassis
-    case 22 { m.a = vec3f(.6, .6, .55); m.gl = 1.; m.mt = .3; m.bp = 0.; }     // headlight glass
+    case 22 { m.a = vec3f(.35, .35, .33); m.gl = .6; m.mt = .2; m.bp = 0.; }     // headlight glass
     case 23 { m.a = vec3f(.78, .78, .74); m.gl = .5; m.bp = .05; }             // white paint
     case 24 { m.a = vec3f(.30, .28, .22); m.bp = .1; }                         // ground cloth
     case 40 { m.a = vec3f(.42, .05, .03); m.gl = .5; m.bp = .1; }              // lantern: red paint
     case 41 { m.a = vec3f(.1); m.gl = 1.; m.bp = 0.;                            // lantern: glass globe, lit from inside
-      m.e = LANTC * g.lant.w * (.5 + .9 * ss(.08, -.02, abs(op.y - .005))); }
+      m.e = LANTC * g.lant.w * (.35 + .5 * ss(.08, -.02, abs(op.y - .005))); }
     case 42 { m.a = vec3f(.30, .30, .31); m.gl = .6; m.mt = .8; m.bp = .05; } // lantern: tin and wire
     case 60 { m.a = vec3f(.10, .17, .08) * (.7 + .5 * h); m.gl = .3; m.bp = .5; }    // cactus
     case 61 { m.a = vec3f(.30, .26, .22) * (.6 + .6 * h); m.bp = 1.5; }       // juniper bark
@@ -323,7 +331,7 @@ fn prop(id: i32, op: vec3f, mc: f32, h: f32) -> PM {
   let ts = select(1., i.m.z, mat >= 2);
   let A = tri(i.op, on, .1 * ts); let B = tri(i.op, on, .43 * ts); let C = tri(i.op, on, 1.9 * ts); let F = tri(i.op, on, 6.7 * ts); let fk = ss(10., 1.5, dist) * f32(rock);
   let hgt = A.h * .5 + B.h * .35 + C.h * .15;
-  var bump = 1.7; var gloss = .04; var alb = vec3f(0.); var emi = vec3f(0.); var metal = 0.; var sgro = 0.; var rip = 0.; var aoK = ss(.12, .6, hgt);
+  var bump = 1.7; var gloss = .04; var alb = vec3f(0.); var emi = vec3f(0.); var metal = 0.; var sgro = 0.; var rip = 0.; var tilt = vec3f(0.); var tl = 0.; var aoK = ss(.12, .6, hgt);
   let big = textureSample(tD, sR, i.op.xz * .013 + i.op.y * .021).a;
   let big2 = textureSample(tD, sR, i.op.zx * .031 + i.op.y * .043 + .37).a;
   let sk = textureSample(tD, sR, vec2f((i.op.x + i.op.z) * .33, i.op.y * .035));
@@ -345,29 +353,31 @@ fn prop(id: i32, op: vec3f, mc: f32, h: f32) -> PM {
     sgro = -ss(.14, .0, sf) * vert * 1.2;
     if (mat == 0) {
       let flt = ss(.72, .93, n0.y);
-      let sand = mix(vec3f(.60, .43, .29), vec3f(.50, .34, .22), sat(gm.a * .8 + (B.c - .5))) * (.85 + .3 * C.h);
+      let sand = mix(vec3f(.50, .31, .19), vec3f(.40, .24, .14), sat(gm.a * .8 + (B.c - .5))) * (.85 + .3 * C.h);
       let sm = flt * ss(.2, .5, gm.a * .6 + A.c * .6);
       alb = mix(alb, sand, sm);
-      rip = sm * cos((i.wp.x * .8 + i.wp.z * .35) * 22. + A.c * 9.) * .25 * ss(20., 4., dist);
+      rip = sm * cos((i.wp.x * .8 + i.wp.z * .35 + B.h * 1.5) * 22. + A.c * 9.) * .12 * ss(16., 3., dist) * ss(.35, .6, B.c);
       bump = mix(bump, .5, sm);
     }
   } else {
     let pm = prop(i32(round(i.ao * 127.)), i.op, B.c, B.h);
-    alb = pm.a; gloss = pm.gl; metal = pm.mt; emi = pm.e; bump = pm.bp; aoK = 1.;
+    alb = pm.a; gloss = pm.gl; metal = pm.mt; emi = pm.e; bump = pm.bp; aoK = 1.; tilt = pm.n; tl = pm.tl;
   }
-  let N = normalize(qrot(i.q, normalize(on + (A.n * .85 + B.n * .65 + C.n * .45 * ss(60., 12., dist) + F.n * .5 * fk) * bump + vec3f(.8, sgro, .35) * vec3f(rip, 1., rip))));
+  let N = normalize(qrot(i.q, normalize(on + (A.n * .85 + B.n * .65 + C.n * .45 * ss(60., 12., dist) + F.n * .5 * fk) * bump + vec3f(.8, sgro, .35) * vec3f(rip, 1., rip) + tilt)));
   let V = normalize(g.cam.xyz - i.wp);
   let v1 = vol(i.wp + n0 * 1.5); let v2 = vol(i.wp + n0 * 4.5);
   let ao = (sat((v1.r - .5) * 8.) * .55 + sat((v2.r - .5) * 2.7) * .45) * aoK;
   let E = MOONC * shadow9(i.wp + n0 * .35);
   let ndl = sat(dot(N, MOON));
-  var c = alb * (1. - metal) * (E * ndl + amb(N, v1.g) * ao + plD(i.wp + n0 * .03, N)) + emi;
+  var c = alb * (1. - metal) * (E * (ndl + tl * sat(-dot(N, MOON))) + amb(N, v1.g) * ao + plD(i.wp + n0 * .03, N)) + emi;
   let pw = mix(8., 300., gloss);
   let F0 = mix(vec3f(.04), alb, metal);
   let Fr = F0 + (1. - F0) * pow(1. - sat(dot(N, V)), 5.);
   let H = normalize(V + MOON);
   c += Fr * gloss * ((pw + 2.) / 8.) * (E * pow(sat(dot(N, H)), pw) * ndl + plS(i.wp, N, V, pw));
   c += Fr * gloss * skyBase(reflect(-V, N)) * (.3 + .7 * ao) * 2.;
+  // the lantern's flame, seen through its glass
+  if (mat == 2 && i32(round(i.ao * 127.)) == 41) { let vf = 1. - dot(-V, normalize(g.lant.xyz - vec3f(0., .012, 0.) - g.cam.xyz)); c += vec3f(1., .75, .4) * g.lant.w * 6. * exp(-vf / .00012); }
   return fin(fog(c, i.wp));
 }
 `;
@@ -473,9 +483,9 @@ fn stars(rd: vec3f, sc: f32, dens: f32, bright: f32, px: f32) -> vec3f {
     if (h.x < dens) {
       let sp = normalize(c + .25 + .5 * hh3(c + 17.));
       let a = length(cross(rd, sp)) / px;
-      let m = (pow(h.y, 24.) * 14. + pow(h.y, 6.) * .7 + .03) * bright;
+      let m = (pow(h.y, 30.) * 20. + pow(h.y, 8.) * .6 + .015) * bright;
       let tint = mix(vec3f(1., .78, .58), vec3f(.78, .87, 1.15), h.z);
-      acc += tint * m * exp(-a * a * 2.2) * step(0., dot(rd, sp));
+      acc += tint * m * exp(-a * a * 3.) * step(0., dot(rd, sp));
     }
   }
   return acc;
@@ -491,12 +501,12 @@ fn stars(rd: vec3f, sc: f32, dens: f32, bright: f32, px: f32) -> vec3f {
   let ext = ss(-.01, .2, rd.y);                    // stars fade into the haze at the horizon
   // Milky Way: a soft band with clumps and dark dust lanes, and more faint stars inside it
   let bw = dot(rd, MWN);
-  let band = exp(-bw * bw / .03);
+  let band = exp(-bw * bw / .045);
   let n1 = fbm3(rd * 5., 4); let n2 = fbm3(rd * 13. + 3., 3);
   let dust = ss(.45, .68, fbm3(rd * 8. + 7., 4)) * exp(-bw * bw / .006);
   let mw = band * (.35 + .9 * n1) * (.5 + .7 * n2) * (1. - .8 * dust);
-  c += vec3f(.020, .022, .028) * mw * wash * ext;
-  var st = stars(rd, 130., .022, 1., px) + stars(rd, 290., .05 + .25 * band * (1. - dust), .18, px) * wash;
+  c += vec3f(.05, .052, .062) * mw * wash * ext;
+  var st = stars(rd, 130., .012, 1., px) + stars(rd, 290., .05 + .35 * band * (1. - dust), .12, px) * wash;
   // near the horizon the air makes them twinkle
   st *= ext * (1. + .6 * (1. - up) * sin(t * 9. + dot(rd, vec3f(3000., 2100., 2700.))));
   // thin high cloud drifting across the moon: it hides the stars behind it and glows where the moon is near
@@ -516,7 +526,7 @@ fn stars(rd: vec3f, sc: f32, dens: f32, bright: f32, px: f32) -> vec3f {
     let mar = fbm3(vec3f(q * 1.8, 3.), 5);
     let alb = mix(.6, 1., ss(.44, .58, mar)) * (.75 + .25 * nz);
     let disc = 1. - ss(1. - px / MR, 1. + px / MR, r);
-    let mc = vec3f(1., .9, .74) * 3.2 * alb * (lit + .006) * (1. - .5 * cd);
+    let mc = vec3f(1., .86, .66) * 3.2 * alb * (lit + .006) * (1. - .5 * cd);
     c = mix(c, mc, disc);
   }
   // a shooting star now and then: a short streak that flares and fades

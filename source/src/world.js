@@ -185,9 +185,11 @@ function makeWorld(D, T, flyPts, POSES) {
     solid(rnd() * 4 | 0, T.wp[k], T.wp[k + 1] + sc * 0.2, T.wp[k + 2], sc, qRand(), 1, rnd(), 1, 0);
   }
   rseed(10);
+  const gy0 = (x, z) => { const f = floorsAt(x, z); return f.length ? f[0 + f.length - 2] : -45; }; // lowest floor here
   for (let i = 0; i < 60000; i++) {
     const k = pickV(), x = T.wp[k], y = T.wp[k + 1], z = T.wp[k + 2], ny = T.wn[k + 1];
-    if (hypot(x, z) > 172 || y > -3 || (ny > 0.8 && rnd() < 0.6) || nearFly(x, y, z, 3.5) || nearCamp(x, z, 13)) continue;
+    // talus: fallen blocks only at the foot of the cliffs and on gentle slopes, never stuck to the cliff faces
+    if (hypot(x, z) > 172 || y > gy0(x, z) + 6 || ny < 0.25 || (ny > 0.8 && rnd() < 0.6) || nearFly(x, y, z, 3.5) || nearCamp(x, z, 13)) continue;
     const sc = (0.35 + 2.1 * pow(rnd(), 2.6)) * (ny > 0.8 ? 0.5 : 1), q = qRand();
     chunks[(sc > 1.15 ? 3 : 0) + (rnd() * 3 | 0)][cellOf(x, z)].push(x - T.wn[k] * sc * 0.3, y - ny * sc * 0.3, z - T.wn[k + 2] * sc * 0.3, sc, q[0], q[1], q[2], q[3], 1, rnd(), sc > 1.15 ? 0 : 96, 0);
   }
@@ -205,7 +207,7 @@ function makeWorld(D, T, flyPts, POSES) {
   // campfire: flame cards (x, y, z, half width | seed, 0, height) and embers (seed, 1)
   const fire = [];
   rseed(12);
-  for (let i = 0; i < 7; i++) { const a = rnd() * TAU, r = rr(0, 0.22); fire.push(CAMP[0] + cos(a) * r, CAMP[1] + 0.04, CAMP[2] + sin(a) * r, rr(0.16, 0.26), rnd(), 0, rr(0.4, 0.75), 0); }
+  for (let i = 0; i < 7; i++) { const a = rnd() * TAU, r = rr(0, 0.22); fire.push(CAMP[0] + cos(a) * r, CAMP[1] + 0.04, CAMP[2] + sin(a) * r, rr(0.2, 0.3), rnd(), 0, rr(0.55, 0.95), 0); }
   for (let i = 0; i < 36; i++) fire.push(CAMP[0] + rr(-0.2, 0.2), CAMP[1] + 0.15, CAMP[2] + rr(-0.2, 0.2), 0, rnd(), 1, 0, 0);
 
   // --- pack leaves (36 bytes: 8 floats + 4 unorm8), sorted by culling cell
@@ -437,7 +439,7 @@ function meshTrailer() {
     for (let i = 0; i < nt; i++) for (let j = 0; j < na; j++) m.quad(g[i][j], g[i + 1][j], g[i + 1][j + 1], g[i][j + 1]);
   };
   P(m, 6);
-  for (const [t0, t1] of [[-0.6, -0.25], [0.2, 0.55]]) { patch(t0, t1, 0.12, 0.45, 0.012); patch(t0, t1, PI - 0.45, PI - 0.12, 0.012); }
+  for (const [t0, t1] of [[-0.6, -0.25], [0.2, 0.55]]) for (const [a0, a1] of [[0.12, 0.45], [PI - 0.45, PI - 0.12]]) { P(m, 3); patch(t0 - 0.015, t1 + 0.015, a0 - 0.03, a1 + 0.03, 0.007); P(m, 6); patch(t0, t1, a0, a1, 0.012); }
   patch(-0.88, -0.76, 0.15, PI - 0.15, 0.012, 2, 12); // wraparound front window
   patch(0.86, 0.92, 1.2, PI - 1.2, 0.012, 2, 3);
   P(m, 3); patch(-0.97, 0.97, -0.03, 0.03, 0.016, 24, 1); patch(-0.97, 0.97, PI - 0.03, PI + 0.03, 0.016, 24, 1); // chrome belt line
@@ -458,7 +460,7 @@ function meshTent() {
     const g = []; for (let i = 0; i <= nu; i++) { const r = []; for (let j = 0; j <= nv; j++) r.push(m.v(...f(i / nu, j / nv))); g.push(r); }
     for (let i = 0; i < nu; i++) for (let j = 0; j < nv; j++) if (!skip || !skip((i + 0.5) / nu, (j + 0.5) / nv)) m.quad(g[i][j], g[i + 1][j], g[i + 1][j + 1], g[i][j + 1]);
   };
-  const sag = (u, v) => 0.04 * sin(PI * u) * sin(PI * v);
+  const sag = (u, v) => 0.07 * sin(PI * u) * sin(PI * v) * (0.7 + 0.3 * sin(PI * 3 * u));
   P(m, 8);
   for (const s of [-1, 1]) {
     const x = (u) => -W + 2 * W * u;
@@ -490,7 +492,7 @@ function meshFire() {
   P(m, 16); lathe(m, [[0, 0.012], [0.55, 0.008], [0.6, 0]], 20);
   P(m, 15); lathe(m, [[0, 0.07], [0.2, 0.06], [0.34, 0.03], [0.4, 0.01]], 20);
   for (let i = 0; i < 4; i++) {
-    const a = i / 4 * TAU + rr(-0.3, 0.3), c = cos(a), s = sin(a), r = rr(0.055, 0.075), l = rr(0.55, 0.75), y = 0.06 + i % 2 * 0.07;
+    const a = i / 4 * TAU + rr(-0.3, 0.3), c = cos(a), s = sin(a), r = rr(0.055, 0.075), l = rr(0.28, 0.38), y = 0.06 + i % 2 * 0.07;
     P(m, 15); cyl(m, [c * 0.06, y + 0.03, s * 0.06], [c * 0.3, y, s * 0.3], r, 8);
     P(m, 14); cyl(m, [c * 0.3, y, s * 0.3], [c * (0.3 + l), y - 0.04, s * (0.3 + l)], r, 8);
   }
@@ -532,7 +534,7 @@ function meshCamp() {
   put(m, meshCooler(), 2.3, 0, 2.4, 0.4);
   // firewood stacked by the fire
   rseed(450); P(m, 10);
-  for (let i = 0; i < 9; i++) { const l = rr(0.6, 0.85), r = rr(0.05, 0.075), y = r + (i / 3 | 0) * 0.12, x0 = -2.4 + i % 3 * 0.17 + (i / 3 | 0) * 0.08; cyl(m, [x0, y, -1.6], [x0 + rr(-0.1, 0.1), y, -1.6 + l], r, 7); }
+  for (let i = 0; i < 9; i++) { const l = rr(0.6, 0.85), r = rr(0.05, 0.075), y = r + (i / 3 | 0) * 0.12, x0 = -3.1 + i % 3 * 0.17 + (i / 3 | 0) * 0.08; cyl(m, [x0, y, -2.9], [x0 + rr(-0.1, 0.1), y, -2.9 + l], r, 7); }
   // duffel bag and a jerry can
   P(m, 17); m.tube([[2.5, 0.16, 5.0], [2.6, 0.17, 5.2], [2.95, 0.17, 5.5], [3.05, 0.16, 5.62]], (k) => [0.1, 0.17, 0.17, 0.1][k], 12, true);
   P(m, 19); box(m, 5.75, 0, 1.0, 5.92, 0.47, 1.45); P(m, 21); box(m, 5.82, 0.47, 1.12, 5.85, 0.52, 1.33);
