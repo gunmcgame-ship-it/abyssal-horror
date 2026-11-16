@@ -270,8 +270,8 @@ fn campVis(p: vec3f, l: vec3f, r: f32) -> f32 {
   if (dot(q.xz, q.xz) > 600. || distance(p, l) > r) { return 1.; }
   let dl = lq - q; let L = length(dl); let rd = dl / L;
   var t = .05; var v = 1.;
-  for (var k = 0; k < 16; k++) {
-    let h = campSD(q + rd * t); v = min(v, 8. * h / t); t += clamp(h, .04, .7);
+  for (var k = 0; k < 12; k++) {
+    let h = campSD(q + rd * t); v = min(v, 8. * h / t); t += clamp(h, .05, 1.5);
     if (t > L - .15 || v < .02) { break; }
   }
   return ss(0., 1., v);
@@ -526,7 +526,7 @@ fn shape2(v: f32) -> f32 { return sin(3.14159 * sat(v)); }
   let tr = (max(-ndl, 0.) * .85 + .15) * i.pr.y;
   let aov = sat((vv.r - .5) * 6.) * mix(.4, 1., i.uv.y);
   let am = (amb(n, vv.g) + amb(-n, vv.g) * i.pr.y * .5) * (.3 + .7 * aov);
-  let pv = plV(i.wp); let pd = plD(i.wp, n, pv) + plD(i.wp, -n, pv) * i.pr.y * .6;
+  let pv = vec2f(1.); let pd = plD(i.wp, n, pv) + plD(i.wp, -n, pv) * i.pr.y * .6;
   var c = alb * (E * (max(ndl, 0.) + tr) + am + pd);
   c += E * pow(sat(dot(n, normalize(V + L))), 30.) * .05;
   return fin(fog(c, i.wp));
