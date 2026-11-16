@@ -655,7 +655,9 @@ const go = () => {
 bDive.onclick = go; $('o').onclick = () => ui(true);
 // detail buttons: the current level is lit, the others reload the page with theirs
 $('q').querySelectorAll('button').forEach((b, i) => { if (i === 2 - LV) b.className = 'on'; else b.onclick = () => { keep('abyssal', 2 - i); location.reload(); }; });
-document.addEventListener('pointerlockchange', () => ui(!document.pointerLockElement));
+// keepPlay (dev tools): the mouse is free for a panel, but the game keeps running behind it
+let keepPlay = false;
+document.addEventListener('pointerlockchange', () => ui(!document.pointerLockElement && !keepPlay));
 
 // draw the first frame and wait for the GPU to finish it (pipelines get compiled on first use) before the reveal
 lookAt(...POSES[0]);

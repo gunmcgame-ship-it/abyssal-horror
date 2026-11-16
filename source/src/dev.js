@@ -51,11 +51,17 @@
       v.textContent = LOOK[k].toFixed(2); r.oninput = () => set(i, +r.value);
       l.append(name.padEnd(12, ' '), r, v); l.style.display = 'block'; l.style.whiteSpace = 'pre'; p.append(l); ui2.push({ l, r, v });
     });
-    const help = document.createElement('div'); help.textContent = 'Up/Down: pick   Left/Right: change (Shift: faster)   T: hide'; help.style.color = '#999';
+    const help = document.createElement('div'); help.textContent = 'Mouse: drag sliders, click scene to look   Keys: Up/Down pick, Left/Right change   T: free mouse / hide'; help.style.color = '#999';
     p.append(out, help); show(); mark(); document.body.append(p);
     for (const e of ['pointerdown', 'mousedown', 'click']) p.addEventListener(e, (ev) => ev.stopPropagation());
     addEventListener('keydown', (e) => {
-      if (e.code === 'KeyT' && !e.repeat) { p.style.display = p.style.display === 'none' ? 'block' : 'none'; return; }
+      // T: show the panel and free the mouse (drag the sliders; click the scene to look around again, the panel stays);
+      // T with the mouse already free hides the panel
+      if (e.code === 'KeyT' && !e.repeat) {
+        if (p.style.display === 'none' || document.pointerLockElement) { p.style.display = 'block'; keepPlay = true; document.exitPointerLock(); }
+        else { p.style.display = 'none'; keepPlay = false; }
+        return;
+      }
       if (p.style.display === 'none') return;
       if (e.code === 'ArrowUp' || e.code === 'ArrowDown') { sel = (sel + (e.code === 'ArrowUp' ? rows.length - 1 : 1)) % rows.length; mark(); e.preventDefault(); }
       else if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') { set(sel, LOOK[rows[sel][0]] + (e.code === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 0.1 : 0.02)); e.preventDefault(); }
