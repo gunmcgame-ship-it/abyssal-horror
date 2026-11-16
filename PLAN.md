@@ -52,7 +52,9 @@ A full chase and jump scare is planned for a LATER version (see section 8): leav
 | Year | 1957. |
 | Title | Working title: "Ground Observer, 1957". Use it in the menu, page title and README. May change later; keep it in one easy-to-edit place. |
 | Menu text | The title plus a quiet date-and-place line: "<Park name>, 1957". |
-| Park name reference | The park name is a subtle deep-cut cosmic-horror reference, shown ONLY on the park sign and menu line. No other eldritch symbols anywhere. Exact name TBD. |
+| Park name | Coldsupper Canyon National Monument. Shown on the wooden park sign at the landing and on the menu line ("Coldsupper Canyon National Monument, 1957"). |
+| Park backstory (environmental only, no text dumps) | A small frontier settlement of nine homes stood in the canyon in the 1870s. After a hard winter, a supply party found it empty: supper on the tables, and a lantern still burning in each of the nine windows. No tracks led away. Nobody remembers the settlement's original name; locals renamed the canyon Coldsupper, after the untouched meals, and the name stuck when it became a monument. |
+| Settlement ruins | Roofless stone ruins of the nine homes in one of the canyon's side pockets, explorable. Period-accurate 1870s frontier construction (dry-stacked stone, collapsed timber). Nine empty window openings. |
 | Ridge figure | Placeholder for now: a plain tall dark silhouette, built so its shape is easy to swap later. Owner is researching the final look. |
 | Run style | Milestone by milestone. Each milestone is one complete run with no questions asked mid-way; stop at the end for the owner to review. |
 | Self-check | Screenshot critic subagent (sees only renders, as in prompt.txt) on milestones 1 and 6 only. GPU timing check on every milestone. |
