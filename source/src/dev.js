@@ -106,7 +106,7 @@
     probe: (x, z) => { const g = groundAt(x, z), c = clamp(((x + 192) / 4) | 0, 0, OBC - 1) + OBC * clamp(((z + 192) / 4) | 0, 0, OBC - 1); return { g, rock: [0.5, 1, 1.6].map((h) => +sdP(x, g + h, z).toFixed(3)), obs: obCell[c].slice() }; },
     lshadow: (on) => (LSHOFF = !on), lpow: (k) => (LPOW = k),
     // dev.walkTo(x, z, yaw): stand there, walking
-    walkTo: (x, z, yaw = 0) => { FLYCAM = false; F[WAKE] = 1e9; F[FADE] = 1; F[LHOLD] = 1; placeAt(x, z, yaw); },
+    walkTo: (x, z, yaw = 0, pit = 0) => { FLYCAM = false; F[WAKE] = 1e9; F[FADE] = 1; F[LHOLD] = 1; placeAt(x, z, yaw); F[PIT] = pit; },
     // dev.wake(): play the opening again
     wake: () => { FLYCAM = false; F[WAKE] = 0; F[FADE] = 0; F[LHOLD] = 0; F[PLAY] = 0; wakeEv = 0; },
     // dev.clock(m): the eclipse clock, in game minutes after 3:35 a.m. (9 first bite, 90 totality, 111 deepest)

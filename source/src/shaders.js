@@ -347,7 +347,8 @@ fn lantF(p: vec3f) -> f32 {
   let v = p - g.lant.xyz; let d = length(v);
   if (d > LANTR) { return 0.; }
   let dir = v / max(d, 1e-3); let c = dot(dir, g.ld.xyz);
-  let fan = mix(mix(.2, .9, g.tn.w), mix(2.6, 2.2, g.tn.w), ss(mix(.2, -.3, g.tn.w), .9, c)); // lifted: spread round you                       // spill behind and aside .. the reflector's fan ahead
+  // the reflector: a soft wide fan with a hot centre (where it is aimed), the shielded spill behind and aside
+  let fan = mix(.2, .6, g.tn.w) + 1.7 * ss(.3, .85, c) + 3.3 * ss(.88, .985, c);                       // spill behind and aside .. the reflector's fan ahead
   let fount = 1. - .8 * ss(.82, .97, -dir.y);                    // the fount's shadow straight below
   return fan * fount * select(1., lantShadow(p), c > .05);
 }
@@ -846,8 +847,6 @@ fn tmap(x: vec3f) -> vec3f { return sat3((x * (2.51 * x + .03)) / (x * (2.43 * x
   // exposure: the eyes adjust only a little; a dark scene stays dark
   let ad = textureLoad(tA, vec2i(0), 0).r;
   c *= g.mis.x * g.mis.w * clamp(pow(.032 / max(ad, 1e-5), .4), .7, 1.5); // mis.w: the fade in at the start
-  // glare: a lantern lifted to eye height puts the flame in your eyes, and they lose the dark: the dim distance sinks
-  c *= 1. - .6 * g.tn.w * (1. - ss(.005, .07, lp));
   let q = uv - .5;
   c *= 1. - dot(q, q) * .85;
   c = tmap(c);

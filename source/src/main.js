@@ -486,8 +486,9 @@ function render() {
   m[60] = CAMP[0]; m[61] = CAMP[1] + 0.45; m[62] = CAMP[2];
   m[63] = 9 * (1 + 0.12 * sin(t * 9.3) + 0.08 * sin(t * 15.1 + 2) + 0.06 * sin(t * 3.7));
   // the lantern: held low on the right, swinging a little round its handle; its flame is the light.
-  // Holding Space lifts it up and out in front (F[LIFT] eases 0 .. 1), so its light reaches further across the ground.
-  const lu = F[LIFT] * F[LIFT] * (3 - 2 * F[LIFT]), lf = 0.8 - 0.02 * lu, lr = 0.4 + 0.02 * lu, ld = 0.37 - 0.39 * lu;
+  // Holding Space raises it high, above your head (F[LIFT] eases 0 .. 1): the flame is out of your eyes and the light
+  // comes down from 2 m and more, so it reaches up the walls and lies on the ground ahead instead of skimming it
+  const lu = F[LIFT] * F[LIFT] * (3 - 2 * F[LIFT]), lf = 0.8 - 0.25 * lu, lr = 0.4 - 0.1 * lu, ld = 0.37 - 0.67 * lu;
   // the swing: a damped pendulum, nudged by every step, with a little idle drift
   { const dt = F[DT]; F[SWV] += (-F[SWG] * 22 - F[SWV] * 2.2) * dt; F[SWG] += F[SWV] * dt; }
   const sw = (F[SWG] * 0.12 + sin(t * 1.1) * 0.02 + sin(t * 0.47 + 1) * 0.012) * (1 - 0.5 * lu), hx = rz, hz = -rx; // hx, hz: forward, level
@@ -502,8 +503,9 @@ function render() {
   const swl = sw * lh, yl = yaw * lh, ss2 = sin(swl / 2), cs2 = cos(swl / 2), qy = sin(-yl / 2), qw = cos(-yl / 2), qx = rx * ss2, qz = rz * ss2;
   LANT[0] = lx; LANT[1] = ly; LANT[2] = lz; LANT[4] = qx * qw - qz * qy; LANT[5] = cs2 * qy; LANT[6] = qx * qy + qz * qw; LANT[7] = cs2 * qw;
   Q.writeBuffer(ibLant, 0, LANT);
-  // the reflector's aim: your facing, tipped down (less when you lift the lantern), turned a little with the swing
-  { const tip = 0.13 + 0.25 * lu, ay = yaw + swl * 0.7, ch = cos(tip), dx = sin(ay) * ch, dy = -sin(tip), dz = -cos(ay) * ch;
+  // the reflector's aim: your facing, turned a little with the swing. Carried low it hangs from the bail and only half
+  // follows your gaze up or down (tipped a little toward the ground); raised, you turn it to what you look at
+  { const gp = Math.asin(clamp(fy, -1, 1)), tip = clamp((0.13 - 0.5 * gp) * (1 - lu) + (0.12 - gp) * lu, -1.2, 1.2), ay = yaw + swl * 0.7, ch = cos(tip), dx = sin(ay) * ch, dy = -sin(tip), dz = -cos(ay) * ch;
     m[96] = dx; m[97] = dy; m[98] = dz; m[99] = LSH && !LSHOFF && lh > 0.5 ? 1 : 0;
     if (LSH) { // perspective from the flame along the aim, 120 degrees wide, 0.15 .. 14 m, standard depth 0..1
       const rxl = cos(ay), rzl = sin(ay); // right (level); up = right x forward
