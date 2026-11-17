@@ -214,7 +214,7 @@ fn kar(c: vec3f) -> vec4f { let w = 1. / (1. + max(c.r, max(c.g, c.b))); return 
 const S_G = /*wgsl*/`
 // mc: moonlight (rgb, after the eclipse) and how much of the moon's light is left (w, 1 uneclipsed .. ~.01 in totality)
 // ec: the earth's shadow on the moon: its centre (xy, in moon radii, x right and y up on the disc), umbra and penumbra radii
-struct G { vp: mat4x4f, sm: mat4x4f, cam: vec4f, right: vec4f, up: vec4f, fwd: vec4f, sun: vec4f, res: vec4f, mis: vec4f, fire: vec4f, lant: vec4f, mc: vec4f, ec: vec4f, tn: vec4f };
+struct G { vp: mat4x4f, sm: mat4x4f, cam: vec4f, right: vec4f, up: vec4f, fwd: vec4f, sun: vec4f, res: vec4f, mis: vec4f, fire: vec4f, lant: vec4f, mc: vec4f, ec: vec4f, tn: vec4f, lm: mat4x4f, ld: vec4f };
 const TAU = 6.2831853;
 const LOW = ${LV > 1};
 const MOON = vec3f(${MOON});
@@ -249,6 +249,7 @@ const S_B = S_G + /*wgsl*/`
 @group(0) @binding(2) var sC: sampler;
 @group(0) @binding(3) var sS: sampler_comparison;
 @group(0) @binding(4) var tSh: texture_depth_2d;
+@group(0) @binding(5) var tLS: texture_depth_2d;
 @group(0) @binding(6) var tD: texture_2d<f32>;
 @group(0) @binding(7) var tV: texture_3d<f32>;
 @group(0) @binding(8) var tM: texture_2d<f32>;
@@ -267,8 +268,10 @@ fn shadowSoft(p: vec3f) -> f32 {
 }
 fn vol(p: vec3f) -> vec4f { return textureSampleLevel(tV, sC, (p - vec3f(-192., -56., -192.)) / vec3f(384., 60., 384.), 0.); }
 // point lights: g.fire and g.lant are position + strength (flicker included); short range, fast fall-off, no shadows
-const FIRER = 16.; const LANTR = 11.;
-fn att(p: vec3f, l: vec4f, r: f32) -> f32 { let d = distance(l.xyz, p); let w = sat(1. - d * d / (r * r)); return l.w * w * w / (1. + 1.3 * d * d); }
+const FIRER = 16.; const LANTR = 13.;
+// fall-off: k is how fast. The fire is physical (fast); the lantern's reflector and the eye's sensitivity to a warm
+// light at night make its pool fade more gently, so it shows the way ahead instead of only your feet
+fn att(p: vec3f, l: vec4f, r: f32) -> f32 { let d = distance(l.xyz, p); let w = sat(1. - d * d / (r * r)); return l.w * w * w / (1.6 + select(1.3, .32, r == LANTR) * d * d); }
 // The camp's big things as rounded boxes (camp coordinates, metres from the fire: centre + yaw, half size + rounding),
 // so the fire and the lantern cast soft shadows past them and the ground darkens a little under them.
 // Keep in step with meshCamp() in world.js. The tent is a hollow shell with its door open toward the fire.
@@ -314,7 +317,31 @@ fn campVis(p: vec3f, l: vec3f, r: f32) -> f32 {
 }
 // contact darkening on and near the camp things
 fn campAO(p: vec3f) -> f32 { let q = p - CAMPV; if (dot(q.xz, q.xz) > 600.) { return 1.; } return .4 + .6 * ss(0., .7, campBoxes(q)); } // not the tent: its walls are cloth, and a box is a poor fit for its roof
-fn plV(p: vec3f) -> vec2f { return vec2f(campVis(p, g.fire.xyz, FIRER), campVis(p, g.lant.xyz, LANTR)); }
+// The lantern with its clip-on tin reflector (g.ld.xyz: where the reflector throws the light). Ahead the reflector
+// adds its bounce to the flame, so the light fans forward; behind and to the sides only the shielded spill is left.
+// Straight down the lantern's own fount shades the ground (the dark disc under every hanging lantern). The forward fan
+// also has a shadow map (g.lm, tLS), so rocks, plants and the camp throw moving shadows as the lantern swings.
+fn lantShadow(p: vec3f) -> f32 {
+  if (g.ld.w < .5) { return 1.; }
+  let c = g.lm * vec4f(p, 1.);
+  if (c.w <= .05) { return 1.; }
+  let u = c.xy / c.w;
+  if (abs(u.x) > .98 || abs(u.y) > .98) { return 1.; }
+  let uv = vec2f(u.x * .5 + .5, .5 - u.y * .5); let z = c.z / c.w - .0006; let e = 1.3 / 1024.;
+  var a = textureSampleCompareLevel(tLS, sS, uv, z) * 2.;
+  a += textureSampleCompareLevel(tLS, sS, uv + vec2f(e, e), z) + textureSampleCompareLevel(tLS, sS, uv + vec2f(-e, e), z);
+  a += textureSampleCompareLevel(tLS, sS, uv + vec2f(e, -e), z) + textureSampleCompareLevel(tLS, sS, uv + vec2f(-e, -e), z);
+  return a / 6.;
+}
+fn lantF(p: vec3f) -> f32 {
+  let v = p - g.lant.xyz; let d = length(v);
+  if (d > LANTR) { return 0.; }
+  let dir = v / max(d, 1e-3); let c = dot(dir, g.ld.xyz);
+  let fan = mix(.22, 2.3, ss(.2, .88, c));                       // spill behind and aside .. the reflector's fan ahead
+  let fount = 1. - .8 * ss(.82, .97, -dir.y);                    // the fount's shadow straight below
+  return fan * fount * select(1., lantShadow(p), c > .05);
+}
+fn plV(p: vec3f) -> vec2f { return vec2f(campVis(p, g.fire.xyz, FIRER), campVis(p, g.lant.xyz, LANTR) * lantF(p)); }
 fn plD(p: vec3f, n: vec3f, v: vec2f) -> vec3f {
   let lf = normalize(g.fire.xyz - p); let ll = normalize(g.lant.xyz - p);
   return FIREC * att(p, g.fire, FIRER) * sat(dot(n, lf) * .8 + .2) * v.x + LANTC * att(p, g.lant, LANTR) * sat(dot(n, ll) * .8 + .2) * v.y;
@@ -603,7 +630,7 @@ fn shape2(v: f32) -> f32 { return sin(3.14159 * sat(v)); }
   let tr = (max(-ndl, 0.) * .85 + .15) * i.pr.y;
   let aov = sat((vv.r - .5) * 6.) * mix(.4, 1., i.uv.y);
   let am = (amb(n, vv.g) + amb(-n, vv.g) * i.pr.y * .5) * (.3 + .7 * aov);
-  let pv = vec2f(1.); let pd = plD(i.wp, n, pv) + plD(i.wp, -n, pv) * i.pr.y * .6;
+  let pv = vec2f(1., lantF(i.wp + n * .05)); let pd = plD(i.wp, n, pv) + plD(i.wp, -n, pv) * i.pr.y * .6;
   var c = alb * (E * (max(ndl, 0.) + tr) + am + pd);
   c += E * pow(sat(dot(n, normalize(V + L))), 30.) * .05;
   return fin(fog(c, i.wp));

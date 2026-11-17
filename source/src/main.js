@@ -43,14 +43,16 @@ const sClamp = device.createSampler({ magFilter: 'linear', minFilter: 'linear' }
 const sCmp = device.createSampler({ compare: 'less-equal', magFilter: 'linear', minFilter: 'linear' });
 const tShadow = tex(SHADOW, SHADOW, DEPTH, TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING);
 const tDummy = tex(1, 1, DEPTH, TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING);
+// the lantern's forward shadow map (High only), re-rendered every frame from the flame
+const LSH = !LV, tLShadow = tex(LSH ? 1024 : 1, LSH ? 1024 : 1, DEPTH, TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING);
 const tDetail = tex(1024, 1024, 'rgba8unorm', TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING, { mips: 11 });
 const tVol = tex(NX / 2, NY / 2, 'rg8unorm', TU.TEXTURE_BINDING | TU.COPY_DST, { d: NZ / 2 });
 const tMap = tex(512, 512, 'rgba8unorm', TU.TEXTURE_BINDING | TU.COPY_DST);
 
 // uniforms (struct G in shaders.js): view-projection, shadow matrix, camera, basis, moon, resolution, misc, fire, lantern,
 // moonlight, eclipse shadow
-const UB = new Float32Array(80), UBS = new Float32Array(80);
-const ubo = device.createBuffer({ size: 320, usage: BU.UNIFORM | BU.COPY_DST }), uboS = device.createBuffer({ size: 320, usage: BU.UNIFORM | BU.COPY_DST });
+const UB = new Float32Array(100), UBS = new Float32Array(100), UBL = new Float32Array(100);
+const ubo = device.createBuffer({ size: 400, usage: BU.UNIFORM | BU.COPY_DST }), uboS = device.createBuffer({ size: 400, usage: BU.UNIFORM | BU.COPY_DST }), uboL = device.createBuffer({ size: 400, usage: BU.UNIFORM | BU.COPY_DST });
 // the night look, in one place: moonlight, sky fill in the shadows, blue of night vision, contrast in the darks,
 // overall brightness (1 = as designed). The dev build has sliders for them (T).
 const LOOK = { moon: 1.15, fill: 0.73, blue: 1, contrast: 0.88, bright: 0.42 }; // set by the owner by eye
@@ -59,14 +61,14 @@ const VF = SS.VERTEX | SS.FRAGMENT;
 const bgl0 = device.createBindGroupLayout({ entries: [
   { binding: 0, visibility: VF, buffer: {} },
   { binding: 1, visibility: VF, sampler: {} }, { binding: 2, visibility: VF, sampler: {} }, { binding: 3, visibility: VF, sampler: { type: 'comparison' } },
-  { binding: 4, visibility: VF, texture: { sampleType: 'depth' } },
+  { binding: 4, visibility: VF, texture: { sampleType: 'depth' } }, { binding: 5, visibility: VF, texture: { sampleType: 'depth' } },
   { binding: 6, visibility: VF, texture: {} },
   { binding: 7, visibility: VF, texture: { viewDimension: '3d' } }, { binding: 8, visibility: VF, texture: {} }] });
-const mkBG0 = (u, sh) => device.createBindGroup({ layout: bgl0, entries: [
+const mkBG0 = (u, sh, ls = tDummy) => device.createBindGroup({ layout: bgl0, entries: [
   { binding: 0, resource: { buffer: u } }, { binding: 1, resource: sRep }, { binding: 2, resource: sClamp }, { binding: 3, resource: sCmp },
-  { binding: 4, resource: sh.createView() }, { binding: 6, resource: tDetail.createView() },
+  { binding: 4, resource: sh.createView() }, { binding: 5, resource: ls.createView() }, { binding: 6, resource: tDetail.createView() },
   { binding: 7, resource: tVol.createView() }, { binding: 8, resource: tMap.createView() }] });
-const bg0 = mkBG0(ubo, tShadow), bg0s = mkBG0(uboS, tDummy);
+const bg0 = mkBG0(ubo, tShadow, tLShadow), bg0s = mkBG0(uboS, tDummy), bg0l = mkBG0(uboL, tDummy);
 const pl0 = device.createPipelineLayout({ bindGroupLayouts: [bgl0] });
 
 const bglBlit = device.createBindGroupLayout({ entries: [{ binding: 0, visibility: SS.FRAGMENT, texture: {} }, { binding: 1, visibility: SS.FRAGMENT, sampler: {} }] });
@@ -416,7 +418,7 @@ function eclipse(m) {
 let hud = false;
 let kZoom = 0, kLift = 0, kf = 0, kb = 0, kl = 0, kr = 0, ku = 0, kd = 0, ks = 0, mdx = 0, mdy = 0, lkx = 0, lky = 0, l2x = 0, l2y = 0, hN = 0, hMax = 0, hMin = 1e9, hPer = 1e9, hLate = 0, hTot = 0, tId = -1, tN = 0, tx0 = 0, ty0 = 0, tx = 0, ty = 0;
 // LANTP: the lantern light (the glass and flame are scaled back to look the same); TANH narrows for the focus zoom
-const TANH0 = 0.6, NEAR = 0.1, LANTP = 15; let TANH = TANH0;
+const TANH0 = 0.6, NEAR = 0.1, LANTP = 4; let TANH = TANH0;
 const submitList = [null];
 const rowOrd = new Uint8Array(CELLS);
 // Draws the cells of a cell-sorted buffer that are in view and within [minD, maxD) (scaled by `det`, but not for the
@@ -448,6 +450,16 @@ function drawCells(r, start, lo, hi, mar, indexed, verts, minD, maxD) {
     }
   }
 }
+function drawNear(r, start, indexed, verts, px, pz, R) {
+  const c0 = clamp(floor((px - R - OX) / CELLW), 0, CELLS - 1), c1 = clamp(floor((px + R - OX) / CELLW), 0, CELLS - 1);
+  const r0 = clamp(floor((pz - R - OZ) / CELLW), 0, CELLS - 1), r1 = clamp(floor((pz + R - OZ) / CELLW), 0, CELLS - 1);
+  for (let rw = r0; rw <= r1; rw++) {
+    const a = start[rw * CELLS + c0], n = start[rw * CELLS + c1 + 1] - a;
+    if (n > 0) { if (indexed === 1) r.drawIndexed(n * 6, 1, a * 6, 0, nSolid); else if (indexed) r.drawIndexed(indexed.ib.length, n, indexed.i0, indexed.v0, a); else r.draw(verts, n, 0, a); }
+  }
+}
+let LSHOFF = false; // dev: turn the lantern shadows off to compare
+const passLS = { colorAttachments: [], depthStencilAttachment: { view: tLShadow.createView(), depthClearValue: 1, depthLoadOp: 'clear', depthStoreOp: 'store' } };
 function render() {
   // camera basis (right vector is horizontal)
   const cx = F[CX], cy = F[CY], cz = F[CZ], pitch = F[PIT], yaw = F[YAW];
@@ -490,6 +502,23 @@ function render() {
   const swl = sw * lh, yl = yaw * lh, ss2 = sin(swl / 2), cs2 = cos(swl / 2), qy = sin(-yl / 2), qw = cos(-yl / 2), qx = rx * ss2, qz = rz * ss2;
   LANT[0] = lx; LANT[1] = ly; LANT[2] = lz; LANT[4] = qx * qw - qz * qy; LANT[5] = cs2 * qy; LANT[6] = qx * qy + qz * qw; LANT[7] = cs2 * qw;
   Q.writeBuffer(ibLant, 0, LANT);
+  // the reflector's aim: your facing, tipped down (less when you lift the lantern), turned a little with the swing
+  { const tip = 0.24 - 0.14 * lu, ay = yaw + swl * 0.7, ch = cos(tip), dx = sin(ay) * ch, dy = -sin(tip), dz = -cos(ay) * ch;
+    m[96] = dx; m[97] = dy; m[98] = dz; m[99] = LSH && !LSHOFF && lh > 0.5 ? 1 : 0;
+    if (LSH) { // perspective from the flame along the aim, 120 degrees wide, 0.15 .. 14 m, standard depth 0..1
+      const rxl = cos(ay), rzl = sin(ay); // right (level); up = right x forward
+      const ux2 = -rzl * dy, uy2 = rzl * dx - rxl * dz, uz2 = rxl * dy, ul = hypot(ux2, uy2, uz2) || 1;
+      const Ux = ux2 / ul, Uy = uy2 / ul, Uz = uz2 / ul, f = 1 / Math.tan(PI / 3), n = 0.15, fr = 15, A = fr / (fr - n), B = -fr * n / (fr - n), L = UBL;
+      const tx = -(rxl * lx + rzl * lz), ty = -(Ux * lx + Uy * ly + Uz * lz), tz = -(dx * lx + dy * ly + dz * lz);
+      L[0] = rxl * f; L[4] = 0; L[8] = rzl * f; L[12] = tx * f;
+      L[1] = Ux * f; L[5] = Uy * f; L[9] = Uz * f; L[13] = ty * f;
+      L[2] = dx * A; L[6] = dy * A; L[10] = dz * A; L[14] = tz * A + B;
+      L[3] = dx; L[7] = dy; L[11] = dz; L[15] = tz;
+      for (let i = 0; i < 16; i++) m[80 + i] = L[i];
+      L[32] = lx; L[33] = ly; L[34] = lz; L[35] = t; L[58] = 1; L[52] = 0;
+      Q.writeBuffer(uboL, 0, UBL);
+    }
+  }
   satellite(F[PLAY], SATB); Q.writeBuffer(ibStars, (nStars - 1) * 32, SATB);
   Q.writeBuffer(ubo, 0, UB);
 
@@ -497,8 +526,24 @@ function render() {
   const e = device.createCommandEncoder();
   let slot = null;
   if (hasTS) { for (let i = 0; i < qRead.length; i++) if (!qRead[i].busy) { slot = qRead[i]; break; } }
-  passScene.timestampWrites = slot ? tsBegin : undefined;
   passPost.timestampWrites = slot ? tsEnd : undefined;
+  // the lantern's shadow map: everything within reach of its light, seen from the flame
+  const lsOn = LSH && UB[99] > 0.5;
+  passScene.timestampWrites = slot && !lsOn ? tsBegin : undefined;
+  if (lsOn) {
+    passLS.timestampWrites = slot ? tsBegin : undefined;
+    const r = e.beginRenderPass(passLS), lx = UB[64], lz = UB[66];
+    r.setBindGroup(0, bg0l);
+    r.setPipeline(pTerrSh); r.setVertexBuffer(0, vbTerrain); r.setVertexBuffer(1, ibSolids); r.setIndexBuffer(ibTerrain, 'uint32');
+    drawNear(r, T.start, 1, 0, lx, lz, 14);
+    r.setPipeline(pSolidSh); r.setVertexBuffer(0, vbMesh); r.setIndexBuffer(ibMesh, 'uint32');
+    for (let i = 0; i < 14; i++) { if (i === 11 || i === 13) continue; const g = Wd.solids.ranges[i]; if (g[1]) r.drawIndexed(meshes[i].ib.length, g[1], meshes[i].i0, meshes[i].v0, g[0]); }
+    for (let i = 0; i < NCHUNK; i++) { r.setVertexBuffer(1, ibChunk[i]); drawNear(r, Wd.chunks[i].start, meshes[14 + i], 0, lx, lz, 14); }
+    for (let i = 0; i < 6; i++) { r.setVertexBuffer(1, ibProp[i]); drawNear(r, Wd.props[i].start, meshes[4 + i], 0, lx, lz, 14); }
+    r.setPipeline(pLeafSh); r.setVertexBuffer(0, ibBig); drawNear(r, Wd.big.start, 0, 6, lx, lz, 14);
+    r.setVertexBuffer(0, ibSmall); drawNear(r, Wd.small.start, 0, 6, lx, lz, 10);
+    r.end();
+  }
   // scene
   let r = e.beginRenderPass(passScene);
   r.setBindGroup(0, bg0);

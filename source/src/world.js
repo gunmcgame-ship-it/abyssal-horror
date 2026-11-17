@@ -643,6 +643,10 @@ function meshLantern() {
   P(m, 42); lathe(m, [[0.03, 0.122], [0.032, 0.135], [0.022, 0.145], [0, 0.148]], 14); // ventilated cap
   P(m, 40); for (const sd of [-1, 1]) m.tube([[sd * 0.088, -0.125, 0], [sd * 0.098, -0.07, 0], [sd * 0.098, 0.03, 0], [sd * 0.085, 0.09, 0], [sd * 0.06, 0.1, 0]], 0.0075, 8, true); // air tubes
   P(m, 42); const bail = []; for (let i = 0; i <= 12; i++) { const a = i / 12 * PI; bail.push([cos(a) * 0.1, 0.07 + sin(a) * 0.15, 0]); } m.tube(bail, 0.003, 4, false);
+  // clip-on tin reflector: a polished half drum behind the globe (on your side), on two wire clips
+  P(m, 42); { const g = []; for (let i = 0; i <= 10; i++) { const a = PI * (0.08 + 0.84 * i / 10), r = []; for (let j = 0; j <= 3; j++) r.push(m.v(-cos(a) * 0.085, -0.075 + j * 0.028, sin(a) * 0.085)); g.push(r); }
+    for (let i = 0; i < 10; i++) for (let j = 0; j < 3; j++) { m.quad(g[i][j], g[i + 1][j], g[i + 1][j + 1], g[i][j + 1]); m.quad(g[i][j], g[i][j + 1], g[i + 1][j + 1], g[i + 1][j]); } }
+  P(m, 42); for (const y of [-0.06, 0.0]) cyl(m, [0, y, 0.058], [0, y, 0.086], 0.002, 4, false);
   return m;
 }
 // your gloved hand round the top of the lantern's bail (same origin as the lantern), drawn only while you hold it:

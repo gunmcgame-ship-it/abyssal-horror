@@ -104,6 +104,7 @@
     flyTo: (t) => { FLYCAM = true; flying = false; F[FLT] = t; flyAt(); },
     // dev.probe(x, z): what the walking sees there: ground height, rock distance at knee/waist/head, nearby obstacles
     probe: (x, z) => { const g = groundAt(x, z), c = clamp(((x + 192) / 4) | 0, 0, OBC - 1) + OBC * clamp(((z + 192) / 4) | 0, 0, OBC - 1); return { g, rock: [0.5, 1, 1.6].map((h) => +sdP(x, g + h, z).toFixed(3)), obs: obCell[c].slice() }; },
+    lshadow: (on) => (LSHOFF = !on),
     // dev.walkTo(x, z, yaw): stand there, walking
     walkTo: (x, z, yaw = 0) => { FLYCAM = false; F[WAKE] = 1e9; F[FADE] = 1; F[LHOLD] = 1; placeAt(x, z, yaw); },
     // dev.wake(): play the opening again
