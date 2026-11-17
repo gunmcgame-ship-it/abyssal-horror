@@ -185,50 +185,45 @@ let CG = new Int8Array(64 * 65534);
 }
 await say('Weathering the sandstone…', 0.32, 400);
 const T = buildTerrain(D);
+// HM: height of the lowest floor in every column of the density grid (0.75 m apart): what you walk on, under the
+// arches too. SANDM: sand (255) or bare rock (0) on the flats, for the footsteps.
+const HM = new Float32Array(NX * NZ);
+for (let iz = 0; iz < NZ; iz++) for (let ix = 0; ix < NX; ix++) {
+  let y = OY;
+  for (let gy = 0; gy < NY - 1; gy++) { const d = D[ix + NX * (gy + NY * iz)], da = D[ix + NX * (gy + 1 + NY * iz)]; if (d > 0 && da <= 0) { y = OY + (gy + d / (d - da)) * VS; break; } }
+  HM[ix + NX * iz] = y;
+}
+const groundAt = (x, z) => {
+  const fx = clamp((x - OX) / VS, 0, NX - 1.001), fz = clamp((z - OZ) / VS, 0, NZ - 1.001), ix = fx | 0, iz = fz | 0, u = fx - ix, v = fz - iz, i = ix + NX * iz;
+  return (HM[i] * (1 - u) + HM[i + 1] * u) * (1 - v) + (HM[i + NX] * (1 - u) + HM[i + NX + 1] * u) * v;
+};
 
-// preset viewpoints (position, look-at), keys 1-6; the world generator dresses the scene around them
-// 1: at the tent door, looking past the fire down the canyon to the setting moon; 2: the camp from outside
+// preset viewpoints (position with y above the ground, look-at), dev keys 1-6; the world generator keeps them clear
+// 1 tent door, 2 the camp from outside, 3 the ruins pocket, 4 the bend east of camp, 5 the south rim where the ridge
+// figure will stand (M5), 6 an overlook on the plateau north of the canyon
 const POSES = [
   [CAMP[0] + 1, 1.62, CAMP[2] + 6.4, CAMP[0] - 1, -44.0, CAMP[2] - 8],
   [CAMP[0] - 9, 2.2, CAMP[2] - 9, CAMP[0] + 3, -44.5, CAMP[2] + 3],
-  [-26, 2.2, -100, 0, -9, -108],
-  [-55, 1.5, -18, -60, -30, 8],
-  [10, 1.2, -62, 6, -22, -90],
-  [3, 1.6, 62, 1, -28, 100],
+  [-38, 1.7, -86, -60, -42, -88],
+  [-4, 1.7, 46, 14, -40, 76],
+  [2, 1.7, 22, -26, -14, 30],
+  [40, 1.7, -60, -2, -44, -40],
 ];
-// 60 s camera path (position + look-at, Catmull-Rom): the world generator keeps it clear, dev.js flies along it
-const FLY = new Float32Array([
-  10, -42.2, 7, -9, -31, -10,
-  7.5, -41.8, 5.5, -10, -31, -12,
-  9, -40.5, 18, 17, -37, 42,
-  22, -39.2, 40, 48, -36, 45,
-  38, -39.2, 46, 57, -27, 18,
-  50, -40.4, 35, 58, -24, 8,
-  55, -39, 20, 60, -18, -10,
-  58, -34, -12, 40, -26, -60,
-  50, -30, -44, 10, -26, -80,
-  30, -30, -70, 4, -28, -90,
-  12, -38.5, -62, 6, -27, -90,
-  -4, -36.5, -70, 0, -14, -100,
-  -16, -37, -84, 0, -22, -108,
-  -29, -38, -90, -44, -34, -60,
-  -41, -38, -70, -56, -34, -40,
-  -53, -38, -50, -60, -34, -20,
-  -58, -38, -28, -60, -32, 0,
-  -57, -38, -10, -60, -30, 16,
-  -60, -38, 10, -50, -36, 40,
-  -52, -37, 36, -20, -35, 44,
-  -22, -38, 43, 4, -38, 52,
-  -6, -39.2, 44.5, 4, -37, 70,
-  3, -40.6, 53, 3, -35, 84,
-  3, -41.5, 62, 1, -30, 100,
-  4, -39, 76, 3, -22, 100,
-]);
+// the benchmark walk (dev.js, F/B): 60 s along the canyon floor from the ruins basin, past camp, out east;
+// eye height above the floor, looking along the way
+const FLYXZ = [[-52, -86], [-30, -86], [-10, -78], [-6, -62], [0, -46], [-2, -20], [-6, -4], [-8, 8], [-8, 24], [-6, 38], [4, 56], [12, 72], [6, 88], [-4, 98], [-3, 108], [6, 124], [10, 134]];
+const FLY = new Float32Array(FLYXZ.length * 6);
+FLYXZ.forEach(([x, z], i) => { const [lx, lz] = FLYXZ[min(i + 2, FLYXZ.length - 1)], ex = i > FLYXZ.length - 3 ? x + (x - FLYXZ[i - 1][0]) * 3 : lx, ez = i > FLYXZ.length - 3 ? z + (z - FLYXZ[i - 1][1]) * 3 : lz;
+  FLY.set([x, groundAt(x, z) + 1.8, z, ex, groundAt(ex, ez) + 1.5, ez], i * 6); });
 const FLYN = FLY.length / 6, FLYT = 60, LUTN = 1024, flyLUT = new Float32Array(LUTN + 1);
 const flyPts = [];
 // per-frame float state lives in one preallocated array, so the frame loop allocates no heap numbers
-const F = new Float64Array(32), P6 = new Float64Array(6);
-const CX = 0, CY = 1, CZ = 2, YAW = 3, PIT = 4, FX = 5, FY = 6, FZ = 7, RX = 8, RZ = 9, UX = 10, UY = 11, UZ = 12, VX = 13, VY = 14, VZ = 15, TIME = 16, FLT = 17, LAST = 18, GPU = 19, HUDT = 20, SPL = 21, MX = 22, MY = 23, MZ = 24, DT = 25, ECT = 26, LIFT = 27, PLAY = 28;
+const F = new Float64Array(48), P6 = new Float64Array(6);
+const CX = 0, CY = 1, CZ = 2, YAW = 3, PIT = 4, FX = 5, FY = 6, FZ = 7, RX = 8, RZ = 9, UX = 10, UY = 11, UZ = 12, VX = 13, VY = 14, VZ = 15, TIME = 16, FLT = 17, LAST = 18, GPU = 19, HUDT = 20, SPL = 21, MX = 22, MY = 23, MZ = 24, DT = 25, ECT = 26, LIFT = 27, PLAY = 28,
+  PX = 29, PY = 30, PZ = 31, STEP = 32, AMP = 33, SWG = 34, SWV = 35, ZOOM = 36, WAKE = 37, LHOLD = 38, FADE = 39, BX = 40, BY = 41, BZ = 42, WX = 43, WZ = 44;
+F[WAKE] = -1; F[FADE] = 1; F[LHOLD] = 1;
+// DEV: the dev build (dev.js) sets it; FLYCAM: the old free camera (dev only), otherwise you walk
+let DEV = false, FLYCAM = false;
 // aim the camera from P6 = position + look-at point
 function aim() {
   const dx = P6[3] - P6[0], dy = P6[4] - P6[1], dz = P6[5] - P6[2];
@@ -263,6 +258,21 @@ for (const p of POSES) flyPts.push([p[0], -40, p[2]]);
 await say('Planting sagebrush and juniper…', 0.73, 2500);
 const Wd = makeWorld(D, T, flyPts, POSES);
 for (const p of POSES) p[1] += Wd.gy(p[0], p[2]);
+// ---------------------------------------------------------------- walking: the ground, and what is in the way
+const SANDM = new Uint8Array(512 * 512); for (let i = 0; i < SANDM.length; i++) SANDM[i] = Wd.gm[i * 4 + 3];
+const sandAt = (x, z) => SANDM[clamp(((x + 192) / 384 * 512) | 0, 0, 511) + 512 * clamp(((z + 192) / 384 * 512) | 0, 0, 511)] / 255;
+// obstacles (x, z, radius) in a 4 m grid: rocks, cacti, trunks, fallen blocks
+const OBC = 96, obCell = Array.from({ length: OBC * OBC }, () => []);
+for (let i = 0; i < Wd.obs.length; i += 3) { const c = clamp(((Wd.obs[i] + 192) / 4) | 0, 0, OBC - 1) + OBC * clamp(((Wd.obs[i + 1] + 192) / 4) | 0, 0, OBC - 1); obCell[c].push(Wd.obs[i], Wd.obs[i + 1], Wd.obs[i + 2]); }
+// the camp: boxes (camp x, z, half sizes, yaw) and circles (x, z, radius); keep in step with meshCamp() in world.js
+const CBOX = [
+  [8.3, -4.2, 1.35, 2.66, 0], [8.3, 2.96, 1.4, 3.22, 0], [8.3, -1.0, 1.0, 0.85, 0],  // pickup, trailer, the hitch (reaching back to the wall)
+  [1, 9.3, 1.6, 0.07, 0], [-0.5, 7.5, 0.07, 1.86, 0], [2.5, 7.5, 0.07, 1.86, 0], // tent: back and side walls
+  [-0.06, 5.7, 0.54, 0.07, 0], [2.06, 5.7, 0.54, 0.07, 0],                     // tent: front wall beside the door
+  [-0.15, 8.86, 0.24, 0.27, 0],                                                 // crate in the tent
+  [3.4, -0.9, 0.31, 0.63, 0.25], [2.3, 2.4, 0.34, 0.2, 0.4], [-3.0, -2.55, 0.32, 0.42, 0],
+  [5.83, 1.22, 0.1, 0.24, 0], [2.75, 5.3, 0.16, 0.39, 0.72], [-2.47, 5.98, 0.18, 0.14, 0],
+], CCIR = [[0, 0, 0.78], [-1.6, 1.1, 0.34], [-3.6, 3.9, 0.45], [-2.15, 6.05, 0.17]];
 D = Wd.gy = T.smp = null; // with gy goes the generator's working memory (about 200 MB)
 
 await say('Pitching camp…', 0.94, 1200);
@@ -318,7 +328,7 @@ Q.writeTexture({ texture: tMap }, Wd.gm, { bytesPerRow: 2048 }, [512, 512]);
 }
 // the GPU has its own copies now: let go of the generator's (about 300 MB)
 for (const o of [Wd.big, Wd.bigF, Wd.small, ...Wd.chunks, ...Wd.props]) o.buf = o.data = 0;
-Wd.volD = Wd.gm = T.vb = T.ib = T.wp = T.wn = 0;
+Wd.obs = Wd.volD = Wd.gm = T.vb = T.ib = T.wp = T.wn = 0;
 
 // ---------------------------------------------------------------- render targets (rebuilt on resize)
 // The scene is drawn at `pix` pixels and scaled up to the window. frame() tunes it and the draw distance scale `det`
@@ -404,8 +414,8 @@ function eclipse(m) {
 
 // ---------------------------------------------------------------- frame
 let hud = false;
-let kLift = 0, kf = 0, kb = 0, kl = 0, kr = 0, ku = 0, kd = 0, ks = 0, mdx = 0, mdy = 0, lkx = 0, lky = 0, l2x = 0, l2y = 0, hN = 0, hMax = 0, hMin = 1e9, hPer = 1e9, hLate = 0, hTot = 0, tId = -1, tN = 0, tx0 = 0, ty0 = 0, tx = 0, ty = 0;
-const TANH = 0.6, NEAR = 0.1;
+let kZoom = 0, kLift = 0, kf = 0, kb = 0, kl = 0, kr = 0, ku = 0, kd = 0, ks = 0, mdx = 0, mdy = 0, lkx = 0, lky = 0, l2x = 0, l2y = 0, hN = 0, hMax = 0, hMin = 1e9, hPer = 1e9, hLate = 0, hTot = 0, tId = -1, tN = 0, tx0 = 0, ty0 = 0, tx = 0, ty = 0;
+const TANH0 = 0.6, NEAR = 0.1; let TANH = TANH0; // TANH narrows for the focus zoom (right mouse)
 const submitList = [null];
 const rowOrd = new Uint8Array(CELLS);
 // Draws the cells of a cell-sorted buffer that are in view and within [minD, maxD) (scaled by `det`, but not for the
@@ -452,7 +462,7 @@ function render() {
   m[36] = rx; m[37] = 0; m[38] = rz; m[39] = TANH * asp;
   m[40] = ux; m[41] = uy; m[42] = uz; m[43] = TANH;
   m[44] = fx; m[45] = fy; m[46] = fz; m[47] = NEAR;
-  m[56] = LOOK.bright; m[57] = F[DT]; m[58] = det;
+  m[56] = LOOK.bright; m[57] = F[DT]; m[58] = det; m[59] = F[FADE];
   eclipse(m); m[68] *= LOOK.moon; m[69] *= LOOK.moon; m[70] *= LOOK.moon;
   m[76] = LOOK.fill; m[77] = LOOK.blue; m[78] = LOOK.contrast;
   const t = F[TIME];
@@ -465,12 +475,19 @@ function render() {
   // the lantern: held low on the right, swinging a little round its handle; its flame is the light.
   // Holding Space lifts it up and out in front (F[LIFT] eases 0 .. 1), so its light reaches further across the ground.
   const lu = F[LIFT] * F[LIFT] * (3 - 2 * F[LIFT]), lf = 0.8 - 0.18 * lu, lr = 0.42 - 0.08 * lu, ld = 0.45 - 0.41 * lu;
-  const sw = (sin(t * 1.1) * 0.035 + sin(t * 0.47 + 1) * 0.02) * (1 - 0.5 * lu), hx = rz, hz = -rx; // hx, hz: forward, level
-  const lx = cx + fx * lf + rx * lr - ux * ld + hx * sw * 0.16, ly = cy + fy * lf - uy * ld, lz = cz + fz * lf + rz * lr - uz * ld + hz * sw * 0.16;
+  // the swing: a damped pendulum, nudged by every step, with a little idle drift
+  { const dt = F[DT]; F[SWV] += (-F[SWG] * 22 - F[SWV] * 2.2) * dt; F[SWG] += F[SWV] * dt; }
+  const sw = (F[SWG] * 0.12 + sin(t * 1.1) * 0.02 + sin(t * 0.47 + 1) * 0.012) * (1 - 0.5 * lu), hx = rz, hz = -rx; // hx, hz: forward, level
+  // held in the hand: follows the body, not the head bob, with its own small bounce at each step
+  const hb = -abs(sin(F[STEP])) * 0.018 * F[AMP], bx = cx - F[BX], by = cy - F[BY] + hb, bz = cz - F[BZ];
+  let lx = bx + fx * lf + rx * lr - ux * ld + hx * sw * 0.16, ly = by + fy * lf - uy * ld, lz = bz + fz * lf + rz * lr - uz * ld + hz * sw * 0.16;
+  // standing on the tent floor by the flap until you pick it up (the opening)
+  const lh = F[LHOLD] * F[LHOLD] * (3 - 2 * F[LHOLD]);
+  if (lh < 1) { lx = WK_LANT[0] + (lx - WK_LANT[0]) * lh; ly = WK_LANT[1] + (ly - WK_LANT[1]) * lh; lz = WK_LANT[2] + (lz - WK_LANT[2]) * lh; }
   m[64] = lx; m[65] = ly + 0.01; m[66] = lz;
   m[67] = 5 * (1 + 0.05 * sin(t * 17) + 0.04 * sin(t * 23 + 1) + 0.03 * sin(t * 7.3)) * (1 - 0.55 * gt * gt * (3 - 2 * gt));
-  const ss2 = sin(sw / 2), cs2 = cos(sw / 2), by = sin(-yaw / 2), bw = cos(-yaw / 2), qx = rx * ss2, qz = rz * ss2;
-  LANT[0] = lx; LANT[1] = ly; LANT[2] = lz; LANT[4] = qx * bw - qz * by; LANT[5] = cs2 * by; LANT[6] = qx * by + qz * bw; LANT[7] = cs2 * bw;
+  const swl = sw * lh, yl = yaw * lh, ss2 = sin(swl / 2), cs2 = cos(swl / 2), qy = sin(-yl / 2), qw = cos(-yl / 2), qx = rx * ss2, qz = rz * ss2;
+  LANT[0] = lx; LANT[1] = ly; LANT[2] = lz; LANT[4] = qx * qw - qz * qy; LANT[5] = cs2 * qy; LANT[6] = qx * qy + qz * qw; LANT[7] = cs2 * qw;
   Q.writeBuffer(ibLant, 0, LANT);
   satellite(F[PLAY], SATB); Q.writeBuffer(ibStars, (nStars - 1) * 32, SATB);
   Q.writeBuffer(ubo, 0, UB);
@@ -530,6 +547,114 @@ function sd(j) {
   const p = a + (cv(ix + 1, iy, iz) - a) * u, q = b + (cv(ix + 1, iy + 1, iz) - b) * u, r = c + (cv(ix + 1, iy, iz + 1) - c) * u, s = d + (cv(ix + 1, iy + 1, iz + 1) - d) * u;
   const e = p + (q - p) * v; CS[j] = (e + (r + (s - r) * v - e) * (z - iz)) / 127;
 }
+// distance to the rock at a point (metres, clamped to +-1); 1 (far) outside the brick grid
+function sdP(X, Y, Z) {
+  const x = (X - OX) / VS - CO, y = (Y - OY) / VS, z = (Z - OZ) / VS - CO;
+  if (x < 1 || z < 1 || y < 1 || x > CN * 4 - 2 || z > CN * 4 - 2 || y > NY - 2) return 1;
+  const ix = x | 0, iy = y | 0, iz = z | 0, u = x - ix, v = y - iy, a = cv(ix, iy, iz), b = cv(ix, iy + 1, iz), c = cv(ix, iy, iz + 1), d = cv(ix, iy + 1, iz + 1);
+  const p = a + (cv(ix + 1, iy, iz) - a) * u, q = b + (cv(ix + 1, iy + 1, iz) - b) * u, r = c + (cv(ix + 1, iy, iz + 1) - c) * u, s2 = d + (cv(ix + 1, iy + 1, iz + 1) - d) * u;
+  const e = p + (q - p) * v; return (e + (r + (s2 - r) * v - e) * (z - iz)) / 127;
+}
+// ---------------------------------------------------------------- walking
+// P.T.-like: a slow, weighty walk (1.2 m/s), the eye at 1.65 m bobbing and swaying with the steps. No running,
+// jumping or crouching. Steep ground (over ~38 degrees) and everything solid stop you.
+const EYE = 1.65, WALK = 1.2, PR = 0.3;
+// push the feet position (F[WX], F[WZ]) out of everything solid
+function unblock(fy) {
+  for (let it = 0; it < 3; it++) {
+    let x = F[WX], z = F[WZ];
+    // rock faces: at knee, waist and head height, pushed along the rock's horizontal gradient
+    for (const h of [0.5, 1.0, 1.6]) {
+      const y = fy + h, d = sdP(x, y, z);
+      if (d < PR + 0.05) {
+        let gx = sdP(x + 0.3, y, z) - sdP(x - 0.3, y, z), gz = sdP(x, y, z + 0.3) - sdP(x, y, z - 0.3); const l = hypot(gx, gz);
+        if (l > 1e-4) { gx /= l; gz /= l; x += gx * (PR + 0.05 - d); z += gz * (PR + 0.05 - d); }
+      }
+    }
+    // rocks, cacti, trunks
+    const c0 = ((x + 192) / 4) | 0, c1 = ((z + 192) / 4) | 0;
+    for (let j = c1 - 1; j <= c1 + 1; j++) for (let i = c0 - 1; i <= c0 + 1; i++) {
+      if (i < 0 || j < 0 || i >= OBC || j >= OBC) continue;
+      const L = obCell[i + OBC * j];
+      for (let k = 0; k < L.length; k += 3) { const dx = x - L[k], dz = z - L[k + 1], r = L[k + 2] + PR, d = hypot(dx, dz); if (d < r && d > 1e-4) { x += dx / d * (r - d); z += dz / d * (r - d); } }
+    }
+    // camp things
+    const qx = x - CAMP[0], qz = z - CAMP[2];
+    if (qx * qx + qz * qz < 400) {
+      for (const [cx, cz, hx, hz, yw] of CBOX) {
+        const c = cos(yw), sn = sin(yw), lx = (qx - cx) * c - (qz - cz) * sn, lz = (qx - cx) * sn + (qz - cz) * c;
+        const px = clamp(lx, -hx, hx), pz = clamp(lz, -hz, hz), dx = lx - px, dz = lz - pz, d = hypot(dx, dz);
+        let ox = 0, oz = 0;
+        if (d > 1e-4) { if (d < PR) { ox = dx / d * (PR - d); oz = dz / d * (PR - d); } }
+        else { const ex = hx - abs(lx), ez = hz - abs(lz); if (ex < ez) ox = (ex + PR) * Math.sign(lx || 1); else oz = (ez + PR) * Math.sign(lz || 1); }
+        if (ox || oz) { x += ox * c + oz * sn; z += -ox * sn + oz * c; }
+      }
+      for (const [cx, cz, r0] of CCIR) { const dx = x - CAMP[0] - cx, dz = z - CAMP[2] - cz, r = r0 + PR, d = hypot(dx, dz); if (d < r && d > 1e-4) { x += dx / d * (r - d); z += dz / d * (r - d); } }
+    }
+    F[WX] = x; F[WZ] = z;
+  }
+}
+function walk(dt, yaw, move) {
+  const mf = move ? kf - kb : 0, mr = move ? kr - kl : 0, fx = sin(yaw), fz = -cos(yaw), rx = cos(yaw), rz = sin(yaw);
+  let dx = fx * mf + rx * mr, dz = fz * mf + rz * mr; const dl = hypot(dx, dz);
+  const sp = dl ? WALK * (mf < 0 ? 0.75 : 1) * (mr && !mf ? 0.85 : 1) / dl : 0; dx *= sp; dz *= sp;
+  // weighty: about half a second to get going, a little less to stop
+  const k = 1 - exp(-dt * (dl ? 2.6 : 3.8));
+  F[VX] += (dx - F[VX]) * k; F[VZ] += (dz - F[VZ]) * k;
+  const px = F[PX], pz = F[PZ], g0 = groundAt(px, pz);
+  let nx = px + F[VX] * dt, nz = pz + F[VZ] * dt;
+  // too steep to climb: try each axis alone (slide along the slope), else stop
+  const steep = (x, z) => groundAt(x, z) - g0 > 0.78 * hypot(x - px, z - pz) + 0.015;
+  if (steep(nx, nz)) { if (!steep(nx, pz)) { nz = pz; F[VZ] *= 0.5; } else if (!steep(px, nz)) { nx = px; F[VX] *= 0.5; } else { nx = px; nz = pz; F[VX] = F[VZ] = 0; } }
+  F[WX] = nx; F[WZ] = nz; unblock(F[PY]);
+  if (steep(F[WX], F[WZ])) { F[WX] = px; F[WZ] = pz; }
+  const mx = F[WX] - px, mz = F[WZ] - pz; F[PX] = F[WX]; F[PZ] = F[WZ];
+  // feet follow the ground smoothly (no snapping on bumps)
+  F[PY] += (groundAt(F[PX], F[PZ]) - F[PY]) * (1 - exp(-dt * 12));
+  // steps: the bob and sway follow the distance walked (one step every 0.72 m)
+  const v = hypot(mx, mz) / max(dt, 1e-4); F[AMP] += (min(v / WALK, 1) - F[AMP]) * (1 - exp(-dt * 5));
+  const s0 = F[STEP]; F[STEP] += hypot(mx, mz) / 0.72 * PI;
+  if (floor(F[STEP] / PI) !== floor(s0 / PI)) {
+    const rock = sandAt(F[PX], F[PZ]) < 0.5 || abs(groundAt(F[PX] + 0.5, F[PZ]) - groundAt(F[PX] - 0.5, F[PZ])) > 0.25;
+    SFX.step?.(rock, F[AMP]);
+    F[SWV] += (floor(F[STEP] / PI) & 1 ? 0.5 : -0.5) * F[AMP]; // each step nudges the lantern
+  }
+  const a = F[AMP], st = F[STEP], vb = (abs(sin(st)) - 0.64) * 0.034 * a, lat = sin(st) * 0.022 * a;
+  F[BX] = rx * lat; F[BY] = vb; F[BZ] = rz * lat;
+  F[CX] = F[PX] + F[BX]; F[CY] = F[PY] + EYE + vb; F[CZ] = F[PZ] + F[BZ];
+}
+// put the walker at x, z facing yaw
+const placeAt = (x, z, yaw, pitch = 0) => { F[PX] = F[WX] = x; F[PZ] = F[WZ] = z; F[PY] = groundAt(x, z); F[VX] = F[VZ] = 0; F[YAW] = yaw; F[PIT] = pitch; F[CX] = x; F[CY] = F[PY] + EYE; F[CZ] = z; };
+
+// ---------------------------------------------------------------- the opening: waking up in the tent
+// Lying in the sleeping bag, looking up at the canvas; sit up, stand, look down at the lantern by the door flap and
+// pick it up. Meanwhile the radio outside clicks on, something at camp clatters over, and the crickets go quiet.
+// Times in seconds after Begin; positions in the world (tent: camp x 1, z 7.5, door toward the fire).
+const WK = [ // t, eye x, y above the camp floor, z, yaw, pitch
+  [0, 1.95, 0.22, 10.68, 0, 1.0], [3.5, 1.95, 0.24, 10.66, 0.05, 0.88], [6.0, 1.85, 0.9, 10.25, -0.1, 0.05],
+  [8.0, 1.3, 1.65, 9.4, -0.05, -0.15], [9.0, 1.3, 1.6, 9.35, 0, -0.85], [10.2, 1.3, 1.65, 9.35, 0, -0.05]];
+const WK_LANT = [1.3, CAMP[1] + 0.17, 8.05], WKEND = 10.2;
+let wakeEv = 0;
+function wake(dt) {
+  const t = F[WAKE] += dt;
+  F[FADE] = clamp(t / 2.5, 0, 1); F[FADE] *= F[FADE];
+  let i = 0; while (i < WK.length - 2 && t > WK[i + 1][0]) i++;
+  const a = WK[i], b = WK[i + 1], u = clamp((t - a[0]) / (b[0] - a[0]), 0, 1), e = u * u * (3 - 2 * u), m = (j) => a[j] + (b[j] - a[j]) * e;
+  const br = t < 4 ? sin(t * 1.3) * 0.012 : 0; // breathing while lying
+  F[CX] = CAMP[0] + m(1); F[CY] = CAMP[1] + m(2) + br; F[CZ] = CAMP[2] + m(3) - 2;
+  // the mouse may look around a little once sitting up
+  F[YAW] = m(4) + F[WX] * 0; F[PIT] = m(5);
+  F[LHOLD] = clamp((t - 9.0) / 1.0, 0, 1);
+  if (wakeEv < 1 && t > 5.0) { wakeEv = 1; SFX.radioOn?.(); }
+  if (t >= WKEND) { F[WAKE] = 1e9; placeAt(F[CX], F[CZ], F[YAW], F[PIT]); F[FADE] = 1; F[LHOLD] = 1; }
+}
+// the later wake events run on the play clock (after you have control): the clatter, then the crickets stop
+function wakeLater() {
+  const t = F[PLAY];
+  if (wakeEv < 2 && t > 11.5) { wakeEv = 2; SFX.clatter?.(); }
+  if (wakeEv < 3 && t > 14.5) { wakeEv = 3; SFX.cricketsStop?.(); }
+}
+
 // Moves the camera by F[MX..MZ] in steps shorter than its radius CR (so it can't pass through thin rock), pushing it
 // back out after each step and dropping velocity into the rock, so it slides along.
 const CR = 0.5;
@@ -572,7 +697,9 @@ function frame(now) {
     dynN = dynT = dynG = dynGN = 0; resize();
   }
   F[TIME] += dt; F[DT] = dt;
-  if (!menu) { F[ECT] += dt * ECLX / 60; F[PLAY] += dt; }
+  if (!menu) { F[ECT] += dt * ECLX / 60; F[PLAY] += dt; wakeLater(); }
+  // focus zoom: hold the right mouse button to ease in to about 2x, release to ease back out
+  F[ZOOM] += ((kZoom && !menu ? 1 : 0) - F[ZOOM]) * (1 - exp(-dt * 2.8)); TANH = TANH0 / (1 + F[ZOOM] * F[ZOOM] * (3 - 2 * F[ZOOM]));
   F[LIFT] = clamp(F[LIFT] + (kLift ? dt : -dt) / 0.45, 0, 1);
   {
     // touch: holding the finger away from where it went down keeps turning, like a joystick
@@ -581,19 +708,23 @@ function frame(now) {
       jx = jx > 1 ? 1 : jx < -1 ? -1 : jx; jy = jy > 1 ? 1 : jy < -1 ? -1 : jy;
       lkx += jx * 1.5 * dt; lky += jy * dt;
     }
-    // mouse look through two cascaded low-pass stages
-    const kq = 1 - exp(-dt * 30); lkx += mdx * 0.0022; lky += mdy * 0.0022; mdx = 0; mdy = 0;
+    // mouse look through two cascaded low-pass stages: walking, it is slower and lags a little (heavy head)
+    const kq = 1 - exp(-dt * (FLYCAM ? 30 : 11)), ms = (FLYCAM ? 0.0022 : 0.0015) * TANH / TANH0; lkx += mdx * ms; lky += mdy * ms; mdx = 0; mdy = 0;
     const ax = lkx * kq, ay = lky * kq; lkx -= ax; lky -= ay; l2x += ax; l2y += ay;
     const dyw = l2x * kq, dpt = l2y * kq; l2x -= dyw; l2y -= dpt;
-    const yaw = F[YAW] + dyw; let pitch = F[PIT] - dpt; pitch = pitch < -1.55 ? -1.55 : pitch > 1.55 ? 1.55 : pitch;
+    const yaw = F[YAW] + dyw, pl = FLYCAM ? 1.55 : 1.3; let pitch = F[PIT] - dpt; pitch = pitch < -pl ? -pl : pitch > pl ? pl : pitch;
+    if (!FLYCAM) {
+      if (F[WAKE] >= 0 && F[WAKE] < WKEND) { if (!menu) wake(dt); }
+      else { F[YAW] = yaw; F[PIT] = pitch; walk(dt, yaw, !menu); }
+    } else {
     const sp = ks || tN > 1 ? 12 : 3.5, k = 1 - exp(-dt * 4.5), mf = tId >= 0 ? 0.7 : kf - kb, mr = kr - kl, mu = ku - kd, cp = cos(pitch), sy = sin(yaw), cw = cos(yaw);
     const vx = F[VX] + ((sy * cp * mf + cw * mr) * sp - F[VX]) * k, vy = F[VY] + ((sin(pitch) * mf + mu) * sp - F[VY]) * k, vz = F[VZ] + ((-cw * cp * mf + sy * mr) * sp - F[VZ]) * k;
-    let x = F[CX] + vx * dt, y = F[CY] + vy * dt, z = F[CZ] + vz * dt;
-    const rad = sqrt(x * x + z * z); if (rad > 150) { x *= 150 / rad; z *= 150 / rad; }
-    y = y < -52 ? -52 : y > -1.2 ? -1.2 : y;
+    const x = F[CX] + vx * dt, y = F[CY] + vy * dt, z = F[CZ] + vz * dt;
     F[YAW] = yaw; F[PIT] = pitch; F[VX] = vx; F[VY] = vy; F[VZ] = vz; F[MX] = x - F[CX]; F[MY] = y - F[CY]; F[MZ] = z - F[CZ];
     collide();
+    }
   }
+  if (!FLYCAM && !menu && F[WAKE] >= WKEND) SFX.listen?.(F[CX], F[CY], F[CZ], F[YAW]);
   render();
   if (hud) {
     hN++; if (dtr > hMax) hMax = dtr; if (dtr < hMin) hMin = dtr; if (dtr > hPer * 1.5) { hLate++; hTot++; }
@@ -608,19 +739,24 @@ const key = (e, v) => {
     case 'KeyW': kf = v; break; case 'KeyS': kb = v; break; case 'KeyA': kl = v; break; case 'KeyD': kr = v; break;
     case 'KeyE': ku = v; break; case 'KeyQ': kd = v; break; case 'ShiftLeft': case 'ShiftRight': ks = v; break; case 'Space': kLift = v; break;
     default: if (v && !e.repeat) {
-      if (e.code === 'KeyH') { hud = !hud; hTot = 0; hPer = 1e9; info.textContent = ''; }
+      if (e.code === 'KeyH' && DEV) { hud = !hud; hTot = 0; hPer = 1e9; info.textContent = ''; }
       else if (e.code === 'KeyM') mute();
       else if (e.code === 'Escape') ui(true);
-      else if (e.code >= 'Digit1' && e.code <= 'Digit6') lookAt(...POSES[e.code.charCodeAt(5) - 49]);
+      // dev build: 1-6 jump to the viewpoints (walking there, or as the free camera), G toggles the free camera
+      else if (DEV && e.code >= 'Digit1' && e.code <= 'Digit6') { const p = POSES[e.code.charCodeAt(5) - 49]; if (FLYCAM) lookAt(...p); else { F[WAKE] = 1e9; F[FADE] = 1; F[LHOLD] = 1; placeAt(p[0], p[2], atan2(p[3] - p[0], -(p[5] - p[2]))); } }
+      else if (DEV && e.code === 'KeyG') { FLYCAM = !FLYCAM; if (!FLYCAM) { F[WAKE] = 1e9; F[FADE] = 1; F[LHOLD] = 1; placeAt(F[CX], F[CZ], F[YAW], F[PIT]); } else { F[VX] = F[VY] = F[VZ] = 0; } }
     }
   }
 };
 // behind the menu only the stats and mute keys work
 addEventListener('keydown', (e) => { if (menu && e.code !== 'KeyH' && e.code !== 'KeyM') return; sound(); key(e, 1); });
 addEventListener('keyup', (e) => key(e, 0));
-const release = () => { kf = kb = kl = kr = ku = kd = ks = kLift = 0; tId = -1; tN = 0; };
+const release = () => { kf = kb = kl = kr = ku = kd = ks = kLift = kZoom = 0; tId = -1; tN = 0; };
 const capture = () => { sound(); const p = canvas.requestPointerLock({ unadjustedMovement: true }); if (p && p.catch) p.catch(() => canvas.requestPointerLock()).catch(() => 0); };
 canvas.addEventListener('click', capture);
+canvas.addEventListener('mousedown', (e) => { if (e.button === 2) kZoom = 1; });
+addEventListener('mouseup', (e) => { if (e.button === 2) kZoom = 0; });
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 addEventListener('mousemove', (e) => { if (document.pointerLockElement === canvas) { mdx += e.movementX; mdy += e.movementY; } });
 addEventListener('blur', release);
 const touch = (e) => {
@@ -648,6 +784,7 @@ const ui = (m) => {
 };
 const go = () => {
   sound(); ui(false); bDive.textContent = 'Resume';
+  if (F[WAKE] < 0 && !FLYCAM) { F[WAKE] = 0; F[FADE] = 0; F[LHOLD] = 0; F[PLAY] = 0; }
   // phones: go fullscreen and ask for landscape; where that is refused the CSS rotation still applies
   if (mob) document.documentElement.requestFullscreen?.()?.then(() => screen.orientation.lock('landscape')).catch(() => 0);
   if (!mob) capture();
@@ -660,7 +797,7 @@ let keepPlay = false;
 document.addEventListener('pointerlockchange', () => ui(!document.pointerLockElement && !keepPlay));
 
 // draw the first frame and wait for the GPU to finish it (pipelines get compiled on first use) before the reveal
-lookAt(...POSES[0]);
+lookAt(...POSES[0]); placeAt(CAMP[0] + 1.3, CAMP[2] + 7.35, 0); F[CX] = CAMP[0] + WK[0][1]; F[CY] = CAMP[1] + WK[0][2]; F[CZ] = CAMP[2] + WK[0][3] - 2; F[YAW] = WK[0][4]; F[PIT] = WK[0][5];
 await say('Letting the light in…', 1, 400);
 render(); await Q.onSubmittedWorkDone();
 setTimeout(keep, 15e3, 'abyssalLoad', ''); // the load counts as survived after 15 s of frames

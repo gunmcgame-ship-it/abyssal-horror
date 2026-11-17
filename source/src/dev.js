@@ -30,7 +30,7 @@
     if (e.code === 'KeyF' || e.code === 'KeyB') {
       if (flying) stop();
       else {
-        flying = true; bench = e.code === 'KeyB'; F[FLT] = 0; last = F[LAST]; nFrame = nGpu = 0;
+        FLYCAM = true; flying = true; bench = e.code === 'KeyB'; F[FLT] = 0; last = F[LAST]; nFrame = nGpu = 0;
         // a benchmark hides the stats line and holds the resolution: dynT at -Infinity keeps frame() from tuning it
         if (bench) { hud = false; info.textContent = ''; dynT = -Infinity; }
       }
@@ -84,9 +84,11 @@
     });
   }
   // for screenshots from the browser console: dev.view(x, y, z, lookX, lookY, lookZ) places the camera, dev.play() hides the menu
-  window.dev = { view: lookAt, play: () => ui(false), pose: (i) => lookAt(...POSES[i]),
+  DEV = true;
+  // the camera functions switch to the free camera (G switches back to walking)
+  window.dev = { view: (...a) => { FLYCAM = true; lookAt(...a); }, play: () => ui(false), pose: (i) => { FLYCAM = true; lookAt(...POSES[i]); },
     // dev.bench() starts the benchmark flight; dev.state() says how far it got (and the report once it is done)
-    bench: () => { ui(false); flying = bench = true; F[FLT] = 0; last = F[LAST]; nFrame = nGpu = 0; hud = false; info.textContent = ''; dynT = -Infinity; },
+    bench: () => { ui(false); FLYCAM = true; flying = bench = true; F[FLT] = 0; last = F[LAST]; nFrame = nGpu = 0; hud = false; info.textContent = ''; dynT = -Infinity; },
     res: (p) => { pix = p; W = 0; resize(); return W + 'x' + H; }, // hold the render size at p pixels (a benchmark keeps it there)
     // dev.shot('name.png'): the next frame, read back at render size and sent to the local dev server (which saves it)
     shot: async (name) => {
@@ -99,10 +101,16 @@
       return (await fetch('/save?name=' + name, { method: 'POST', body: await cv.convertToBlob({ type: name.endsWith('.jpg') ? 'image/jpeg' : 'image/png', quality: 0.92 }) })).text();
     },
     // put the benchmark camera at time t of the flight (for frames of the fly-through)
-    flyTo: (t) => { flying = false; F[FLT] = t; flyAt(); },
+    flyTo: (t) => { FLYCAM = true; flying = false; F[FLT] = t; flyAt(); },
+    // dev.walkTo(x, z, yaw): stand there, walking
+    walkTo: (x, z, yaw = 0) => { FLYCAM = false; F[WAKE] = 1e9; F[FADE] = 1; F[LHOLD] = 1; placeAt(x, z, yaw); },
+    // dev.wake(): play the opening again
+    wake: () => { FLYCAM = false; F[WAKE] = 0; F[FADE] = 0; F[LHOLD] = 0; F[PLAY] = 0; wakeEv = 0; },
     // dev.clock(m): the eclipse clock, in game minutes after 3:35 a.m. (9 first bite, 90 totality, 111 deepest)
     clock: (m) => (F[ECT] = m),
     // dev.playTime(s): seconds of play (the satellite passes run on it: one pass, overhead at about 1670)
     playTime: (s) => (F[PLAY] = s),
-    state: () => ({ flying, t: F[FLT], frames: nFrame, gpu: F[GPU], size: W + 'x' + H, report: info.textContent }) };
+    // dev.look({ bright: 2 }): change the night look from the console (same keys as the sliders)
+    look: (o) => Object.assign(LOOK, o),
+    state: () => ({ pos: [F[PX], F[PY], F[PZ]].map((v) => +v.toFixed(2)), cam: [F[CX], F[CY], F[CZ]].map((v) => +v.toFixed(2)), flycam: FLYCAM, flying, t: F[FLT], frames: nFrame, gpu: F[GPU], size: W + 'x' + H, report: info.textContent }) };
 }

@@ -8,6 +8,16 @@
 const MOON = (() => { const el = 13.45 * PI / 180, az = 9.36 * PI / 180; return [cos(el) * sin(az), sin(el), -cos(el) * cos(az)]; })();
 // Camp: centre of the flat clearing (x, ground height, z). The terrain generator flattens the ground around it.
 const CAMP = [0, -45, 2];
+// The canyon (M2): a winding main canyon, closed at both ends, with side pockets off it. Everything outside is the
+// plateau, standing 26-43 m above the floor, so the walls are the boundary of the map.
+// Main canyon centreline, west to east: x, z, half width.
+const CANYON = [[-18, -150, 9], [6, -124, 14], [-6, -82, 17], [0, -40, 16], [-4, 2, 13.5], [-6, 36, 15], [12, 70, 15], [-3, 106, 13], [10, 134, 11], [4, 150, 8]];
+// Side pockets: ax, az, bx, bz, half width at a, at b. The basin off the west reach holds the 1870s ruins (M3).
+const POCKETS = [[-6, -82, -40, -88, 10, 10], [-40, -88, -60, -86, 18, 18], [-6, 36, 30, 46, 7, 9], [-3, 106, -32, 118, 7, 8]];
+// The dirt road out: from the camp landing up through a cut in the north wall: x, z, height above the camp floor,
+// half width. Its foot is the landing behind the pickup and trailer, which are parked across it end to end.
+const RAMP = [[5, 1.7, 0, 6.45], [16, 1.7, 0, 6.45], [24, 3, 0.8, 4], [40, 8, 3.6, 4], [62, -2, 7.5, 4], [86, -18, 11.5, 4], [112, -30, 15.5, 4], [140, -40, 20, 4], [178, -50, 26, 4]];
+const wv = (a) => a.map((p) => 'vec' + p.length + 'f(' + p.join(', ') + ')').join(', ');
 // Milky Way: the normal of its plane is the galactic north pole, 32.7 degrees up at azimuth 78 (7 November 1957, 5 a.m.,
 // southern California). The band rises from the north-north-west horizon, passes 57 degrees up in the west (above the
 // moon) and comes down in the south-south-east; its bright centre is far below the horizon, so this is the faint half.
@@ -46,6 +56,24 @@ fn smax(a: f32, b: f32, k: f32) -> f32 { let h = max(k - abs(a - b), 0.) / k; re
 fn smin(a: f32, b: f32, k: f32) -> f32 { return -smax(-a, -b, k); }
 fn seg2(p: vec2f, a: vec2f, b: vec2f) -> f32 { let pa = p - a; let ba = b - a; let h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-4), 0., 1.); return length(pa - ba * h); }
 fn seg3(p: vec3f, a: vec3f, b: vec3f) -> f32 { let pa = p - a; let ba = b - a; let h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-4), 0., 1.); return length(pa - ba * h); }
+const NCAN = ${CANYON.length}; const NPOC = ${POCKETS.length}; const NRMP = ${RAMP.length};
+var<private> CAN: array<vec3f, NCAN> = array<vec3f, NCAN>(${wv(CANYON)});
+var<private> POC: array<vec3f, NPOC * 2> = array<vec3f, NPOC * 2>(${wv(POCKETS.flatMap((k) => [[k[0], k[1], k[4]], [k[2], k[3], k[5]]]))});
+var<private> RMP: array<vec4f, NRMP> = array<vec4f, NRMP>(${wv(RAMP)});
+fn segp(p: vec2f, a: vec2f, b: vec2f) -> vec2f { let pa = p - a; let ba = b - a; let h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-4), 0., 1.); return vec2f(length(pa - ba * h), h); }
+// signed distance to the canyon and its pockets in plan (negative inside)
+fn canyonD(p: vec2f) -> f32 {
+  var d = 1e3;
+  for (var i = 0; i < NCAN - 1; i++) { let a = CAN[i]; let b = CAN[i + 1]; let s = segp(p, a.xy, b.xy); d = smin(d, s.x - mix(a.z, b.z, s.y), 8.); }
+  for (var i = 0; i < NPOC; i++) { let a = POC[i * 2]; let b = POC[i * 2 + 1]; let s = segp(p, a.xy, b.xy); d = smin(d, s.x - mix(a.z, b.z, s.y), 6.); }
+  return d;
+}
+// the road: distance outside its corridor (x) and the height of its surface there (y)
+fn rampD(p: vec2f) -> vec2f {
+  var best = 1e3; var y = 0.;
+  for (var i = 0; i < NRMP - 1; i++) { let a = RMP[i]; let b = RMP[i + 1]; let s = segp(p, a.xy, b.xy); let dd = s.x - mix(a.w, b.w, s.y); if (dd < best) { best = dd; y = mix(a.z, b.z, s.y); } }
+  return vec2f(best, y);
+}
 fn dens(p: vec3f) -> f32 {
   let w = vec3f(fbm(p * .04 + 11., 3), fbm(p * .04 + 47., 3), fbm(p * .04 + 83., 3)) - .5;
   let q = p + w * vec3f(15., 6., 15.);
@@ -61,20 +89,16 @@ fn dens(p: vec3f) -> f32 {
     dm = smax(dm, smin(-e, b.y + tn - p.y, 3.), 2.5);
     de = min(de, e);
   }
-  var clr = 0.;
-  let kc = (u.c.x + u.c.y + u.c.z) * 2u;
-  for (var i = 0u; i < u.c.w; i++) {
-    let a = P[kc + i * 2u]; let b = P[kc + i * 2u + 1u];
-    clr = max(clr, 1. - ss(0., b.y, seg2(q.xz, a.xy, a.zw) - b.x));
-  }
-  let rad = length(p.xz) + w.x * 14.;
-  let n = fbm(vec3f(q.xz * .0125, 1.7), 4);
-  let ring = ss(156., 172., rad);
-  // toward the setting moon the far rim and the mesas are lower, so the moon shows above them from camp
+  // the camp clearing: flat ground (the walls around it stay put, and wander less there)
+  let pad = 1. - ss(15., 24., length(p.xz - vec2f(${CAMP[0]}, ${CAMP[2]})));
+  // the canyon in plan, its edge wandering a little; walls rise to the plateau within a few metres
+  let dc = canyonD(p.xz + w.xz * 5. * (1. - pad));
+  // toward the setting moon the rims are lower, so the moon shows above them from camp
   let msec = ss(.9, .975, dot(normalize(p.xz - vec2f(${CAMP[0]}, ${CAMP[2]})), normalize(vec2f(${MOON[0]}, ${MOON[2]}))));
-  let plat = max(ss(.5, .565, n) * (1. - clr) * (1. - msec), ring);
-  let th = g0 + plat * mix(26. + 17. * fbm(vec3f(q.xz * .03, 5.), 2), mix(60., 30., msec), ring);
-  var d = smax(g0 + 4.5 * ss(10., 0., de) - p.y, dm, 3.);
+  let plat = ss(-1.5, 2.5, dc);
+  let g1 = g0 + 3.5 * ss(-7., 0., dc) * (1. - pad); // a talus apron along the foot of the walls
+  let th = g1 + plat * (26. + 17. * fbm(vec3f(q.xz * .03, 5.), 2)) * (1. - .42 * msec);
+  var d = smax(g1 + 4.5 * ss(10., 0., de) - p.y, dm, 3.);
   d = smax(d, (th - p.y) * .7, 3.);
   k = u.c.x * 2u;
   for (var i = 0u; i < u.c.y; i++) {
@@ -100,9 +124,10 @@ fn dens(p: vec3f) -> f32 {
     let a = P[k]; let b = P[k + 1u]; k += 2u;
     d = smin(d, seg3(p + w * 2., a.xyz, b.xyz) - a.w, 2.);
   }
-  // the camp clearing: flat ground, blending into the canyon floor around it
-  let pad = 1. - ss(15., 24., length(p.xz - vec2f(${CAMP[0]}, ${CAMP[2]})));
-  d = mix(d, ${CAMP[1]} - p.y, pad);
+  d = mix(d, ${CAMP[1]} - p.y, pad * (1. - plat));
+  // the road: open air above its surface inside the cut, with ragged walls
+  let rd = rampD(p.xz);
+  d = min(d, max(rd.x + (fbm(p * .3 + 5., 2) - .5) * 1.6, ${CAMP[1]} + rd.y - p.y));
   return min(d, 3. - p.y);
 }
 @compute @workgroup_size(4, 4, 4) fn main(@builtin(global_invocation_id) id: vec3u) {
@@ -779,7 +804,7 @@ fn tmap(x: vec3f) -> vec3f { return sat3((x * (2.51 * x + .03)) / (x * (2.43 * x
   c = mix(sc * mix(vec3f(.78, .88, 1.05), vec3f(.52, .74, 1.3), g.tn.y), c, max(ss(.06, .5, lp), .14)); // a trace of colour survives
   // exposure: the eyes adjust only a little; a dark scene stays dark
   let ad = textureLoad(tA, vec2i(0), 0).r;
-  c *= g.mis.x * clamp(pow(.032 / max(ad, 1e-5), .4), .7, 1.5);
+  c *= g.mis.x * g.mis.w * clamp(pow(.032 / max(ad, 1e-5), .4), .7, 1.5); // mis.w: the fade in at the start
   let q = uv - .5;
   c *= 1. - dot(q, q) * .85;
   c = tmap(c);

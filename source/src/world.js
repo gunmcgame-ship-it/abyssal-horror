@@ -4,34 +4,20 @@
 
 // designed rock masses: ax, az, bx, bz, radius, top, overhang, waist
 const MESAS = [
-  [-37, -42, -33, -22, 9, -7, 3.5, 2], [-29, -15, -33, 5, 12, -14, 3, 2], [-36, 11, -30, 27, 9, -5, 4, 2],   // west wall of the main canyon
-  [30, -45, 35, -27, 9, -9, 4, 2], [37, -20, 31, -3, 11, -16, 3, 2], [32, 5, 35, 9, 7, -8, 4, 2],          // east wall
-  [19, -15, 19, -15, 4.4, -6, 2, 1.5],   // pillar with a window
-  [6, -88, 6, -88, 10, -34, 0, 0],       // low butte in the far basin
-  [44, 6, 47, -8, 7, -17, 3, 1],
-  [33, 29, 37, 12, 9, -19, -6.5, 0],     // sloped wall
-  [74, 14, 74, 14, 8, -15, 3, 1],
-  [-84, -34, -80, -12, 10, -7, 6, 2], [-78, -6, -83, 12, 12, -13, 5, 2], [-82, 18, -79, 32, 9, -8, 6, 2],   // west side canyon wall
-  [-17, 62, -19, 78, 10, -6, 9, 3], [-21, 84, -18, 100, 11, -9, 8, 3],     // overhang cliff
-  [22, 67, 24, 80, 7, -11, 6, 2],
-  [-16, 122, 34, 122, 9, -27, 3, 2],
+  [4, 96, 4, 96, 4.4, -6, 2, 1.5],      // pillar with a window, in the east reach
+  [6, -88, 6, -88, 10, -34, 0, 0],      // low butte splitting the west reach
 ];
 // vertical ring arches: cx, cy, cz, yaw, major radius, minor radius, y squash
 const ARCHES = [
-  [-23, -9.5, -16, 0.3, 4.2, 1.4, 1.2],
-  [0, -45, -34, 0, 16.5, 2.8, 1.2],        // spans the main canyon west of camp: the moon sets through it
-  [-40, -45, 44, 1.57, 10, 2.2, 1.3],
+  [0, -45, -34, 0, 16.5, 2.8, 1.2],      // spans the main canyon west of camp: the moon sets through it
+  [5, -45, 58, -0.53, 15, 2.2, 1.3],     // spans the canyon at the first bend east of camp
 ];
 // carved tunnels: ax, ay, az, radius, bx, by, bz
 const HOLES = [
-  [19, -21, -23, 2.5, 19, -21, -7],
-  [9, -37, 108, 4.2, 9, -34, 136],
+  [4, -21, 90, 2.5, 4, -21, 102],        // the pillar's window
 ];
-// regions kept free of random mesas: ax, az, bx, bz, radius, softness
-const CLEARS = [
-  [0, -45, 0, 35, 22, 10], [0, -86, 0, -86, 46, 12], [42, 24, 74, 6, 22, 10], [72, -26, 72, -26, 26, 10],
-  [-60, -36, -60, 36, 13, 8], [-60, 42, -18, 46, 12, 8], [4, 58, 8, 100, 24, 10], [-34, -74, -56, -46, 11, 8],
-];
+// (unused since the canyon layout: regions kept free of random mesas)
+const CLEARS = [];
 function primBuffer() {
   const a = [];
   for (const m of MESAS) a.push(m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7]);
@@ -87,7 +73,13 @@ function makeWorld(D, T, flyPts, POSES) {
   const leaf = (L, x, y, z, len, yaw, tilt, wid, hA, type, s1, s2, bend) => { if (type === 1 || !(nth++ % THIN)) L[cellOf(x, z)].push(x, y, z, len, yaw, tilt, type === 1 ? wid : wid * (1 + LV / 2), hA, type, s1, s2, bend); };
   const solids = []; // per mesh id: arrays of 12 floats
   const props = Array.from({ length: 6 }, () => Array.from({ length: nCells }, () => []));
-  const solid = (mesh, x, y, z, sc, q, mat, seed, ts = 1, bob = 0) => { (mesh > 3 && mesh < 10 ? props[mesh - 4][cellOf(x, z)] : (solids[mesh] ||= [])).push(x, y, z, sc, q[0], q[1], q[2], q[3], mat, seed, ts, bob); };
+  // things you can't walk through, for the walking (x, z, radius): rocks, cacti, tree trunks, fallen blocks
+  const obs = [];
+  const OBR = [0.55, 0.55, 0.55, 0.55, 0.22, 0.2, 0.32, 0.32, 0.22, 0.24];
+  const solid = (mesh, x, y, z, sc, q, mat, seed, ts = 1, bob = 0) => {
+    (mesh > 3 && mesh < 10 ? props[mesh - 4][cellOf(x, z)] : (solids[mesh] ||= [])).push(x, y, z, sc, q[0], q[1], q[2], q[3], mat, seed, ts, bob);
+    if (mesh < 10 && (mesh > 3 || sc > 0.45)) obs.push(x, z, OBR[mesh] * sc);
+  };
   const chunks = Array.from({ length: NCHUNK }, () => Array.from({ length: nCells }, () => []));
 
   // --- surface queries
@@ -106,7 +98,8 @@ function makeWorld(D, T, flyPts, POSES) {
   const nearFly = (x, y, z, r) => { for (const p of flyPts) if (hypot(x - p[0], z - p[2]) < r && y < p[1] + 3 && y > p[1] - 13) return true; return false; };
   const nearPose = (x, z, r = 3) => { for (const p of POSES) if (hypot(x - p[0], z - p[2]) < r) return true; return false; };
   // within r of the fire, or under the tent (nothing may poke through its floor)
-  const nearCamp = (x, z, r) => hypot(x - CAMP[0], z - CAMP[2]) < r || (abs(x - CAMP[0] - 1) < 2.2 && abs(z - CAMP[2] - 7.5) < 2.5);
+  const onRamp = (x, z) => { for (let i = 0; i < RAMP.length - 1; i++) { const a = RAMP[i], b = RAMP[i + 1], dx = b[0] - a[0], dz = b[1] - a[1], t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / (dx * dx + dz * dz), 0, 1); if (hypot(x - a[0] - dx * t, z - a[1] - dz * t) < mix(a[3], b[3], t) + 1) return true; } return false; };
+  const nearCamp = (x, z, r) => onRamp(x, z) || hypot(x - CAMP[0], z - CAMP[2]) < r || (abs(x - CAMP[0] - 1) < 2.2 && abs(z - CAMP[2] - 7.5) < 2.5);
   // a flat-ish ground point picked from the terrain mesh, or null
   const ground = (ny0, rCamp, rFly) => {
     const k = pickV(); if (T.wn[k + 1] < ny0) return null;
@@ -149,8 +142,8 @@ function makeWorld(D, T, flyPts, POSES) {
   };
   rseed(4);
   // a few by camp, so it does not stand in the open
-  for (const t of [[-11, 7, 0, 1.2], [10, 14, 1, 1.1], [-8, -13, 0, 1.3], [-14, -4, 0, 0.9], [14, 11, 0, 0.8]]) { const x = CAMP[0] + t[0], z = CAMP[2] + t[1]; tree(x, gy(x, z), z, t[2], t[3]); }
-  for (const [x0, z0, k] of [[-6.5, 5.5, 6], [5.5, -9.5, 7], [-9.5, -6, 6], [11.5, 4.5, 7], [-4.5, 11.5, 6], [6.5, 12, 5]]) { const x = CAMP[0] + x0, z = CAMP[2] + z0; solid(k, x, gy(x, z) - 0.04, z, k === 5 ? 1.2 : 1.1, qAxis(0, 1, 0, rnd() * TAU), 2, rnd(), 1, 0); }
+  for (const t of [[-11, 7, 0, 1.2], [-12, 18, 1, 1.1], [-8, -13, 0, 1.3], [-14, -4, 0, 0.9], [-6, 20, 0, 0.8]]) { const x = CAMP[0] + t[0], z = CAMP[2] + t[1]; tree(x, gy(x, z), z, t[2], t[3]); }
+  for (const [x0, z0, k] of [[-6.5, 5.5, 6], [5.5, -9.5, 7], [-9.5, -6, 6], [-12.5, 3.5, 7], [-4.5, 11.5, 6], [6.5, 12, 5]]) { const x = CAMP[0] + x0, z = CAMP[2] + z0; solid(k, x, gy(x, z) - 0.04, z, k === 5 ? 1.2 : 1.1, qAxis(0, 1, 0, rnd() * TAU), 2, rnd(), 1, 0); }
   const tocc = new Set();
   for (let i = 0, made = 0; i < 80000 && made < 340; i++) {
     const p = ground(0.75, 13, 3.5); if (!p) continue;
@@ -194,6 +187,7 @@ function makeWorld(D, T, flyPts, POSES) {
     if (hypot(x, z) > 172 || y > gy0(x, z) + 6 || ny < 0.25 || (ny > 0.8 && rnd() < 0.6) || nearFly(x, y, z, 3.5) || nearCamp(x, z, 13)) continue;
     if (rnd() < 0.55) continue;
     const sc = (0.35 + 1.7 * pow(rnd(), 3.2)) * (ny > 0.8 ? 0.5 : 1), q = qAxis(0, 1, 0, rnd() * TAU);
+    if (sc > 0.5) obs.push(x, z, 0.62 * sc);
     chunks[(sc > 1.15 ? 3 : 0) + (rnd() * 3 | 0)][cellOf(x, z)].push(x - T.wn[k] * sc * 0.3, y - ny * sc * 0.3, z - T.wn[k + 2] * sc * 0.3, sc, q[0], q[1], q[2], q[3], 1, rnd(), sc > 1.15 ? 0 : 96, 0);
   }
   rseed(11);
@@ -263,7 +257,7 @@ function makeWorld(D, T, flyPts, POSES) {
     for (let c = 0; c < nCells; c++) { const a = L[c]; for (let i = 0; i < a.length; i += 12) { for (let j = 0; j < 12; j++) data[k++] = a[i + j]; lo[c] = min(lo[c], a[i + 1] - 3); hi[c] = max(hi[c], a[i + 1] + 5); } }
     return { data, n, start, lo, hi };
   };
-  return { gy, trunks, chunks: chunks.map(packC), props: props.map(packC), big: pack(big), bigF: pack(big, 2, 1.5), small: pack(small), solids: { data: new Float32Array(sol.data), ranges: sol.ranges }, volD, gm, fire: new Float32Array(fire) };
+  return { obs: new Float32Array(obs), gy, trunks, chunks: chunks.map(packC), props: props.map(packC), big: pack(big), bigF: pack(big, 2, 1.5), small: pack(small), solids: { data: new Float32Array(sol.data), ranges: sol.ranges }, volD, gm, fire: new Float32Array(fire) };
 }
 const fract = (x) => x - floor(x);
 
