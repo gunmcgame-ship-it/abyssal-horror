@@ -11,12 +11,12 @@ const CAMP = [0, -45, 2];
 // The canyon (M2): a winding main canyon, closed at both ends, with side pockets off it. Everything outside is the
 // plateau, standing 26-43 m above the floor, so the walls are the boundary of the map.
 // Main canyon centreline, west to east: x, z, half width.
-const CANYON = [[-18, -150, 9], [6, -124, 14], [-6, -82, 17], [0, -40, 16], [-4, 2, 13.5], [-6, 36, 15], [12, 70, 15], [-3, 106, 13], [10, 134, 11], [4, 150, 8]];
+const CANYON = [[-18, -150, 9], [6, -124, 14], [-6, -82, 17], [0, -40, 16], [-4, 2, 13.5], [-6, 36, 15], [12, 70, 17], [8, 86, 7], [-3, 106, 15], [6, 122, 6.5], [10, 134, 11], [4, 150, 8]];
 // Side pockets: ax, az, bx, bz, half width at a, at b. The basin off the west reach holds the 1870s ruins (M3).
-const POCKETS = [[-6, -82, -40, -88, 10, 10], [-40, -88, -60, -86, 18, 18], [-6, 36, 30, 46, 7, 9], [-3, 106, -32, 118, 7, 8]];
+const POCKETS = [[-6, -82, -38, -88, 10, 9], [-38, -88, -54, -78, 13, 15], [-46, -86, -62, -98, 12, 9], [-52, -80, -66, -74, 9, 6], [-6, 36, 30, 46, 7, 9], [-3, 106, -32, 118, 7, 8]];
 // The dirt road out: from the camp landing up through a cut in the north wall: x, z, height above the camp floor,
 // half width. Its foot is the landing behind the pickup and trailer, which are parked across it end to end.
-const RAMP = [[5, 1.7, 0, 6.45], [16, 1.7, 0, 6.45], [24, 3, 0.8, 4], [40, 8, 3.6, 4], [62, -2, 7.5, 4], [86, -18, 11.5, 4], [112, -30, 15.5, 4], [140, -40, 20, 4], [178, -50, 26, 4]];
+const RAMP = [[5, 1.7, 0, 6.45], [12, 1.7, 0, 6.45], [17, 2.2, 0.6, 4.5], [24, 3, 1.5, 4], [40, 8, 3.6, 4], [62, -2, 7.5, 4], [86, -18, 11.5, 4], [112, -30, 15.5, 4], [140, -40, 20, 4], [178, -50, 26, 4]];
 const wv = (a) => a.map((p) => 'vec' + p.length + 'f(' + p.join(', ') + ')').join(', ');
 // Milky Way: the normal of its plane is the galactic north pole, 32.7 degrees up at azimuth 78 (7 November 1957, 5 a.m.,
 // southern California). The band rises from the north-north-west horizon, passes 57 degrees up in the west (above the
@@ -97,7 +97,8 @@ fn dens(p: vec3f) -> f32 {
   let msec = ss(.9, .975, dot(normalize(p.xz - vec2f(${CAMP[0]}, ${CAMP[2]})), normalize(vec2f(${MOON[0]}, ${MOON[2]}))));
   let plat = ss(-1.5, 2.5, dc);
   let g1 = g0 + 3.5 * ss(-7., 0., dc) * (1. - pad); // a talus apron along the foot of the walls
-  let th = g1 + plat * (26. + 17. * fbm(vec3f(q.xz * .03, 5.), 2)) * (1. - .42 * msec);
+  let bt = ss(.58, .7, fbm(vec3f(q.xz * .018, 8.), 3)) * 14. + ss(.5, .62, fbm(vec3f(q.xz * .05, 12.), 2)) * 5.;
+  let th = g1 + plat * (26. + 17. * fbm(vec3f(q.xz * .03, 5.), 2) + bt * ss(4., 14., dc)) * (1. - .42 * msec);
   var d = smax(g1 + 4.5 * ss(10., 0., de) - p.y, dm, 3.);
   d = smax(d, (th - p.y) * .7, 3.);
   k = u.c.x * 2u;
@@ -127,7 +128,8 @@ fn dens(p: vec3f) -> f32 {
   d = mix(d, ${CAMP[1]} - p.y, pad * (1. - plat));
   // the road: open air above its surface inside the cut, with ragged walls
   let rd = rampD(p.xz);
-  d = min(d, max(rd.x + (fbm(p * .3 + 5., 2) - .5) * 1.6, ${CAMP[1]} + rd.y - p.y));
+  let ry = ${CAMP[1]} + rd.y;
+  d = min(d, max(rd.x - max(p.y - ry, 0.) * .75 + (fbm(p * .3 + 5., 2) - .5) * 1.4, ry - p.y));
   return min(d, 3. - p.y);
 }
 @compute @workgroup_size(4, 4, 4) fn main(@builtin(global_invocation_id) id: vec3u) {
@@ -405,9 +407,9 @@ fn prop(id: i32, op: vec3f, mc: f32, h: f32) -> PM {
     case 21 { m.a = vec3f(.04, .04, .045); m.gl = .2; m.bp = .3; }             // chassis
     case 22 { m.a = vec3f(.35, .35, .33); m.gl = .6; m.mt = .2; m.bp = 0.; }     // headlight glass
     case 23 { m.a = vec3f(.78, .78, .74); m.gl = .5; m.bp = .05; }             // white paint
-    case 24 { m.a = vec3f(.30, .28, .22); m.bp = .1; }                         // ground cloth
+    case 24 { let wv = .5 + .5 * sin(op.x * 900.) * sin(op.z * 900.); m.a = vec3f(.36, .33, .25) * (.9 + .1 * wv) * (1. - .25 * ss(.02, .0, abs(fract(op.x / .9) - .5) - .47)); m.bp = 0.; }   // canvas groundsheet, seamed
     case 40 { m.a = vec3f(.42, .05, .03); m.gl = .5; m.bp = .1; }              // lantern: red paint
-    case 41 { m.a = vec3f(.04); m.gl = 1.; m.bp = 0.;                           // lantern: clear glass globe, faintly lit from inside
+    case 41 { m.a = vec3f(.04); m.gl = .4; m.bp = 0.;                           // lantern: clear glass globe, faintly lit from inside
       m.e = LANTC * g.lant.w * (.01 + .017 * ss(.06, -.03, op.y)); }
     case 42 { m.a = vec3f(.30, .30, .31); m.gl = .6; m.mt = .8; m.bp = .05; } // lantern: tin and wire
     case 25 { m.a = vec3f(.19, .21, .12) * (1. - .3 * ss(.03, .0, abs(fract(op.z / .16) - .5) - .45)); m.bp = .3; m.n = vec3f(sin(op.z * 40.), 0., cos(op.x * 31.)) * .06; } // sleeping bag: olive drab, quilted
@@ -443,6 +445,8 @@ fn prop(id: i32, op: vec3f, mc: f32, h: f32) -> PM {
     case 39 { m.a = vec3f(.62, .57, .44); m.bp = 0.; }                                  // paper, map, logbook
     case 67 { m.a = vec3f(.08, .11, .10) * (.7 + .6 * vn2d(op.xz * 60. + op.y * 37.)); m.bp = 1.8; m.tl = .25; }
     case 68 { m.a = vec3f(.07, .10, .065) * (.7 + .6 * vn2d(op.xz * 70. + op.y * 41.)); m.bp = 1.8; m.tl = .25; }
+    case 44 { m.a = vec3f(.07, .075, .09) * (.85 + .3 * mc); m.bp = .4; }   // dark wool shirt cuff
+    case 43 { m.a = vec3f(.30, .19, .10) * (.8 + .3 * mc); m.gl = .2; m.bp = .3; }   // leather work glove
     case 60 { m.a = vec3f(.10, .17, .08) * (.7 + .5 * h); m.gl = .3; m.bp = .5; }    // cactus
     case 61 { let fb = fract(sin(dot(floor(op.xz * vec2f(55., 47.)), vec2f(12.9, 78.2))) * 43758.5);
       m.a = vec3f(.20, .16, .13) * (.5 + .5 * h) * (.65 + .55 * fb); m.bp = 1.2; m.n = vec3f(sin(op.x * 120. + op.y * 6.), 0., cos(op.z * 110. - op.y * 5.)) * .3; }       // juniper bark
@@ -477,10 +481,10 @@ fn prop(id: i32, op: vec3f, mc: f32, h: f32) -> PM {
   let gm = textureSample(tM, sC, i.wp.xz / 384. + .5);
   if (rock) {
     // sandstone: red, orange and pale beds, dark desert varnish streaks down the steep faces, pale sand on the flats
-    let st = i.op.y * .32 + A.h * .35 + (big - .5) * .5 + (big2 - .5) * .25;
+    let st = i.op.y * .32 + A.h * .35 + (big - .5) * 1.1 + (big2 - .5) * .6 + (i.op.x * .006 - i.op.z * .004) * select(0., 1., mat == 0);
     let bed = hs(floor(st)); let sf = fract(st);
     alb = mix(vec3f(.42, .16, .08), vec3f(.56, .29, .14), bed);
-    alb = mix(alb, vec3f(.60, .47, .33), ss(.80, .86, bed));
+    alb = mix(alb, vec3f(.60, .47, .33), ss(.80, .86, bed) * ss(.25, .55, big2));
     alb = mix(alb, vec3f(.26, .12, .07), ss(.14, .08, bed));
     alb *= mix(vec3f(1.), vec3f(1.1, .95, .85), ss(.4, .7, A.c));
     let vert = 1. - abs(on.y);

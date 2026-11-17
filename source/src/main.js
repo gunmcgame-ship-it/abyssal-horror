@@ -277,11 +277,11 @@ D = Wd.gy = T.smp = null; // with gy goes the generator's working memory (about 
 
 await say('Pitching camp…', 0.94, 1200);
 // mesh ids: 0-3 rocks, 4 barrel cactus, 5 hedgehog cactus, 6-7 prickly pear, 8 juniper trunk, 9 pinyon trunk,
-// 10 the camp, 11 the lantern, 12 the folding chair, 13 unused, 14-20 rock chunks + pebbles, 21-22 unused,
+// 10 the camp, 11 the lantern, 12 the folding chair, 13 your hand on the lantern, 14-20 rock chunks + pebbles, 21-22 unused,
 // 23-25 far LOD of the large rock chunks
 const unused = () => { const m = new Mesh(); m.tri(m.v(0, 0, 0), m.v(0.01, 0, 0), m.v(0, 0.01, 0)); return m; };
 const meshes = [meshChunk(1, 3), meshChunk(7, 3), meshChunk(13, 3), meshChunk(22, 3), meshBarrel(), meshHedgehog(), meshPear(0), meshPear(1), Wd.trunks[0].m, Wd.trunks[1].m,
-  meshCamp(), meshLantern(), meshChair(), unused(),
+  meshCamp(), meshLantern(), meshChair(), meshHand(),
   meshChunk(3), meshChunk(11), meshChunk(29), meshChunk(5, 3), meshChunk(17, 3), meshChunk(41, 3), meshChunk(9, 1), unused(), unused(), meshChunk(5, 2, 1), meshChunk(17, 2, 1), meshChunk(41, 2, 1)].map((m) => m.build());
 let nV = 0, nI = 0;
 for (const m of meshes) { m.v0 = nV; m.i0 = nI; nV += m.nv; nI += m.ib.length; }
@@ -298,7 +298,7 @@ const ibFireB = buf(Wd.fire, BU.VERTEX), nFire = Wd.fire.length / 8;
 // the bright stars, and the satellite in the last slot (rewritten every frame)
 const STARB = starData(), ibStars = buf(STARB, BU.VERTEX), nStars = STARB.length / 8, SATB = STARB.subarray((nStars - 1) * 8);
 // the lantern is one instance, rewritten every frame (position, scale, rotation, material 2)
-const LANT = new Float32Array([0, 0, 0, 0.85, 0, 0, 0, 1, 2, 0, 1, 0]), ibLant = buf(LANT, BU.VERTEX), LANTM = meshes[11];
+const LANT = new Float32Array([0, 0, 0, 0.78, 0, 0, 0, 1, 2, 0, 1, 0]), ibLant = buf(LANT, BU.VERTEX), LANTM = meshes[11], HANDM = meshes[13];
 Q.writeTexture({ texture: tVol }, Wd.volD, { bytesPerRow: NX, rowsPerImage: NY / 2 }, [NX / 2, NY / 2, NZ / 2]);
 Q.writeTexture({ texture: tMap }, Wd.gm, { bytesPerRow: 2048 }, [512, 512]);
 
@@ -474,7 +474,7 @@ function render() {
   m[63] = 9 * (1 + 0.12 * sin(t * 9.3) + 0.08 * sin(t * 15.1 + 2) + 0.06 * sin(t * 3.7));
   // the lantern: held low on the right, swinging a little round its handle; its flame is the light.
   // Holding Space lifts it up and out in front (F[LIFT] eases 0 .. 1), so its light reaches further across the ground.
-  const lu = F[LIFT] * F[LIFT] * (3 - 2 * F[LIFT]), lf = 0.8 - 0.18 * lu, lr = 0.42 - 0.08 * lu, ld = 0.45 - 0.41 * lu;
+  const lu = F[LIFT] * F[LIFT] * (3 - 2 * F[LIFT]), lf = 0.8 - 0.18 * lu, lr = 0.4 - 0.06 * lu, ld = 0.37 - 0.33 * lu;
   // the swing: a damped pendulum, nudged by every step, with a little idle drift
   { const dt = F[DT]; F[SWV] += (-F[SWG] * 22 - F[SWV] * 2.2) * dt; F[SWG] += F[SWV] * dt; }
   const sw = (F[SWG] * 0.12 + sin(t * 1.1) * 0.02 + sin(t * 0.47 + 1) * 0.012) * (1 - 0.5 * lu), hx = rz, hz = -rx; // hx, hz: forward, level
@@ -506,6 +506,7 @@ function render() {
   r.setPipeline(pSolid); r.setVertexBuffer(0, vbMesh); r.setIndexBuffer(ibMesh, 'uint32');
   for (let i = 0; i < 14; i++) { const g = Wd.solids.ranges[i]; if (g[1]) r.drawIndexed(meshes[i].ib.length, g[1], meshes[i].i0, meshes[i].v0, g[0]); }
   r.setVertexBuffer(1, ibLant); r.drawIndexed(LANTM.ib.length, 1, LANTM.i0, LANTM.v0, 0);
+  if (F[LHOLD] > 0.5 && !FLYCAM) r.drawIndexed(HANDM.ib.length, 1, HANDM.i0, HANDM.v0, 0);
   for (let i = 0; i < NCHUNK; i++) {
     const c = Wd.chunks[i], big = i > 2 && i < 6; r.setVertexBuffer(1, ibChunk[i]);
     drawCells(r, c.start, c.lo, c.hi, 3, meshes[14 + i], 0, 0, i > 5 ? 30 : big ? 40 : 96);
@@ -631,7 +632,7 @@ const placeAt = (x, z, yaw, pitch = 0) => { F[PX] = F[WX] = x; F[PZ] = F[WZ] = z
 // pick it up. Meanwhile the radio outside clicks on, something at camp clatters over, and the crickets go quiet.
 // Times in seconds after Begin; positions in the world (tent: camp x 1, z 7.5, door toward the fire).
 const WK = [ // t, eye x, y above the camp floor, z, yaw, pitch
-  [0, 1.95, 0.22, 10.68, 0, 1.0], [3.5, 1.95, 0.24, 10.66, 0.05, 0.88], [6.0, 1.85, 0.9, 10.25, -0.1, 0.05],
+  [0, 1.95, 0.22, 10.68, 0, 0.62], [3.5, 1.95, 0.24, 10.66, 0.05, 0.5], [6.0, 1.85, 0.9, 10.25, -0.1, -0.4],
   [8.0, 1.3, 1.65, 9.4, -0.05, -0.15], [9.0, 1.3, 1.6, 9.35, 0, -0.85], [10.2, 1.3, 1.65, 9.35, 0, -0.05]];
 const WK_LANT = [1.3, CAMP[1] + 0.17, 8.05], WKEND = 10.2;
 let wakeEv = 0;

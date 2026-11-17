@@ -112,6 +112,7 @@ Goal: you can stand at the tent and look around a believable desert night. Free 
 Acceptance: a screenshot from the tent door shows camp lit by fire, a starry sky with moon, dark red cliffs in the distance, no water look anywhere.
 
 ### M2: Walking, canyon, boundaries
+Done in M2 (for the record): winding canyon with side pockets (the lobed basin off the west reach is for the ruins), a dirt road climbing out through a V-cut behind camp, blocked by the pickup and trailer; walking 1.2 m/s with head bob, slowed laggy look, hold right mouse to zoom, hold Space to lift the lantern; collision with rock, camp gear, plants and rocks; the wake-up opening; stand-in sounds (crickets, footsteps sand/rock, radio, clatter) to be rebuilt in M4. Dev build only: keys 1-6 viewpoints, G free camera, H stats, T night-look sliders, F/B fly and benchmark.
 1. Replace free-fly with walking in the P.T.-style feel (see decisions table), plus hold-right-mouse focus zoom: gravity, ground following with `Wd.gy`, eye height about 1.65 m, slow walk speed, no sprint, no jump, no crouch.
 2. Keep rock collision (`collide()`), tuned for a standing capsule.
 3. Lantern bob and sway tied to footsteps. Footstep sounds: sand versus rock, based on slope or surface type.

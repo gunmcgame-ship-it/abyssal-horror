@@ -351,7 +351,7 @@ function treeTrunk(kind) {
     P(m, 62); branch([0.05, 0.3, 0], [0.9, 0.5, 0.2], 0.04, 1.1, 0); tips.pop(); tips.pop(); // the dead branch carries no foliage
   }
   P(m, kind ? 68 : 67);
-  for (const t of tips) { rseed(500 + kind * 50 + (t[0] * 97 | 0)); const sd = rnd() * 9; put(m, tag(icosphere(2, (x, y, z) => { const r = 0.75 + 0.45 * fbm(x * 2.3 + sd, y * 2.3, z * 2.3, 3); return [x * r, y * r * 0.8, z * r]; }), kind ? 68 : 67), t[0], t[1], t[2], rnd() * TAU, t[3] * 0.62); }
+  for (const t of tips) { rseed(500 + kind * 50 + (t[0] * 97 | 0)); const sd = rnd() * 9; put(m, tag(icosphere(2, (x, y, z) => { const r = 0.75 + 0.45 * fbm(x * 2.3 + sd, y * 2.3, z * 2.3, 3); return [x * r, y * r * 0.8, z * r]; }), kind ? 68 : 67), t[0], t[1], t[2], rnd() * TAU, t[3] * 0.48); }
   return { m, tips };
 }
 // barrel cactus
@@ -489,7 +489,7 @@ function meshTent() {
   // door flaps: the left one rolled up beside the door, the right one hanging open
   m.tube([[-0.6, 0.15, -D - 0.11], [-0.58, 1.0, -D - 0.12], [-0.58, 1.86, -D - 0.11]], 0.065, 8, true); // clear of the wall, so it never pokes through
   grid((u, v) => { const a = 0.55 + 0.25 * (1 - v) * u, r = 0.56 * u, fo = 0.045 * sin(u * PI * 3.2) * (0.4 + 0.6 * (1 - v)); return [0.52 + r * cos(a) + fo * sin(a), 0.05 + v * 1.82 - 0.07 * u * u * v, -D - r * sin(a) + fo * cos(a) - 0.02 * sin(v * 7)]; }, 10, 14);
-  P(m, 24); box(m, -W + 0.05, 0, -D + 0.05, W - 0.05, 0.012, D - 0.05);
+  P(m, 24); box(m, -W - 0.04, -0.05, -D - 0.02, W + 0.04, 0.035, D + 0.02); // groundsheet, tucked under the walls
   P(m, 10);
   cyl(m, [0, 0, D - 0.06], [0, HR + 0.12, D - 0.06], 0.025, 8); // back pole (the front of the ridge is held by the front rope)
   cyl(m, [0, HR - 0.02, -D + 0.06], [0, HR - 0.02, D - 0.06], 0.025, 8);
@@ -643,5 +643,16 @@ function meshLantern() {
   P(m, 42); lathe(m, [[0.03, 0.122], [0.032, 0.135], [0.022, 0.145], [0, 0.148]], 14); // ventilated cap
   P(m, 40); for (const sd of [-1, 1]) m.tube([[sd * 0.088, -0.125, 0], [sd * 0.098, -0.07, 0], [sd * 0.098, 0.03, 0], [sd * 0.085, 0.09, 0], [sd * 0.06, 0.1, 0]], 0.0075, 8, true); // air tubes
   P(m, 42); const bail = []; for (let i = 0; i <= 12; i++) { const a = i / 12 * PI; bail.push([cos(a) * 0.1, 0.07 + sin(a) * 0.15, 0]); } m.tube(bail, 0.003, 4, false);
+  return m;
+}
+// your gloved hand round the top of the lantern's bail (same origin as the lantern), drawn only while you hold it:
+// a leather work glove, the wrist and the cuff of a dark wool shirt, going back toward you
+function meshHand() {
+  const m = new Mesh();
+  P(m, 43);
+  put(m, tag(icosphere(1, (x, y, z) => [x * 0.048, y * 0.034, z * 0.04]), 43), 0, 0.235, 0.012);
+  for (let i = 0; i < 4; i++) cyl(m, [-0.03 + i * 0.02, 0.212, -0.018], [-0.03 + i * 0.02, 0.244, -0.034], 0.0105, 6);
+  cyl(m, [0.004, 0.245, 0.03], [0.012, 0.29, 0.1], 0.03, 10);
+  P(m, 44); cyl(m, [0.011, 0.285, 0.09], [0.02, 0.32, 0.17], 0.04, 12);
   return m;
 }
