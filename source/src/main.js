@@ -220,7 +220,7 @@ const flyPts = [];
 // per-frame float state lives in one preallocated array, so the frame loop allocates no heap numbers
 const F = new Float64Array(48), P6 = new Float64Array(6);
 const CX = 0, CY = 1, CZ = 2, YAW = 3, PIT = 4, FX = 5, FY = 6, FZ = 7, RX = 8, RZ = 9, UX = 10, UY = 11, UZ = 12, VX = 13, VY = 14, VZ = 15, TIME = 16, FLT = 17, LAST = 18, GPU = 19, HUDT = 20, SPL = 21, MX = 22, MY = 23, MZ = 24, DT = 25, ECT = 26, LIFT = 27, PLAY = 28,
-  PX = 29, PY = 30, PZ = 31, STEP = 32, AMP = 33, SWG = 34, SWV = 35, ZOOM = 36, WAKE = 37, LHOLD = 38, FADE = 39, BX = 40, BY = 41, BZ = 42, WX = 43, WZ = 44;
+  PX = 29, PY = 30, PZ = 31, STEP = 32, AMP = 33, SWG = 34, SWV = 35, ZOOM = 36, WAKE = 37, LHOLD = 38, FADE = 39, BX = 40, BY = 41, BZ = 42, WX = 43, WZ = 44, SKIP = 45;
 F[WAKE] = -1; F[FADE] = 1; F[LHOLD] = 1;
 // DEV: the dev build (dev.js) sets it; FLYCAM: the old free camera (dev only), otherwise you walk
 let DEV = false, FLYCAM = false;
@@ -415,7 +415,8 @@ function eclipse(m) {
 // ---------------------------------------------------------------- frame
 let hud = false;
 let kZoom = 0, kLift = 0, kf = 0, kb = 0, kl = 0, kr = 0, ku = 0, kd = 0, ks = 0, mdx = 0, mdy = 0, lkx = 0, lky = 0, l2x = 0, l2y = 0, hN = 0, hMax = 0, hMin = 1e9, hPer = 1e9, hLate = 0, hTot = 0, tId = -1, tN = 0, tx0 = 0, ty0 = 0, tx = 0, ty = 0;
-const TANH0 = 0.6, NEAR = 0.1; let TANH = TANH0; // TANH narrows for the focus zoom (right mouse)
+// LANTP: the lantern light (the glass and flame are scaled back to look the same); TANH narrows for the focus zoom
+const TANH0 = 0.6, NEAR = 0.1, LANTP = 15; let TANH = TANH0;
 const submitList = [null];
 const rowOrd = new Uint8Array(CELLS);
 // Draws the cells of a cell-sorted buffer that are in view and within [minD, maxD) (scaled by `det`, but not for the
@@ -485,7 +486,7 @@ function render() {
   const lh = F[LHOLD] * F[LHOLD] * (3 - 2 * F[LHOLD]);
   if (lh < 1) { lx = WK_LANT[0] + (lx - WK_LANT[0]) * lh; ly = WK_LANT[1] + (ly - WK_LANT[1]) * lh; lz = WK_LANT[2] + (lz - WK_LANT[2]) * lh; }
   m[64] = lx; m[65] = ly + 0.01; m[66] = lz;
-  m[67] = 5 * (1 + 0.05 * sin(t * 17) + 0.04 * sin(t * 23 + 1) + 0.03 * sin(t * 7.3)) * (1 - 0.55 * gt * gt * (3 - 2 * gt));
+  m[67] = LANTP * (1 + 0.05 * sin(t * 17) + 0.04 * sin(t * 23 + 1) + 0.03 * sin(t * 7.3)) * (1 - 0.55 * gt * gt * (3 - 2 * gt));
   const swl = sw * lh, yl = yaw * lh, ss2 = sin(swl / 2), cs2 = cos(swl / 2), qy = sin(-yl / 2), qw = cos(-yl / 2), qx = rx * ss2, qz = rz * ss2;
   LANT[0] = lx; LANT[1] = ly; LANT[2] = lz; LANT[4] = qx * qw - qz * qy; LANT[5] = cs2 * qy; LANT[6] = qx * qy + qz * qw; LANT[7] = cs2 * qw;
   Q.writeBuffer(ibLant, 0, LANT);
@@ -559,7 +560,7 @@ function sdP(X, Y, Z) {
 // ---------------------------------------------------------------- walking
 // P.T.-like: a slow, weighty walk (1.2 m/s), the eye at 1.65 m bobbing and swaying with the steps. No running,
 // jumping or crouching. Steep ground (over ~38 degrees) and everything solid stop you.
-const EYE = 1.65, WALK = 1.2, PR = 0.3;
+const EYE = 1.65, WALK = 1.2, RUN = 2.6, PR = 0.3; // hold Shift to run: RUN times the walking speed
 // push the feet position (F[WX], F[WZ]) out of everything solid
 function unblock(fy) {
   for (let it = 0; it < 3; it++) {
@@ -601,7 +602,7 @@ function unblock(fy) {
 function walk(dt, yaw, move) {
   const mf = move ? kf - kb : 0, mr = move ? kr - kl : 0, fx = sin(yaw), fz = -cos(yaw), rx = cos(yaw), rz = sin(yaw);
   let dx = fx * mf + rx * mr, dz = fz * mf + rz * mr; const dl = hypot(dx, dz);
-  const sp = dl ? WALK * (mf < 0 ? 0.75 : 1) * (mr && !mf ? 0.85 : 1) / dl : 0; dx *= sp; dz *= sp;
+  const sp = dl ? WALK * (ks && mf > 0 ? RUN : 1) * (mf < 0 ? 0.75 : 1) * (mr && !mf ? 0.85 : 1) / dl : 0; dx *= sp; dz *= sp;
   // weighty: about half a second to get going, a little less to stop
   const k = 1 - exp(-dt * (dl ? 2.6 : 3.8));
   F[VX] += (dx - F[VX]) * k; F[VZ] += (dz - F[VZ]) * k;
@@ -616,7 +617,7 @@ function walk(dt, yaw, move) {
   // feet follow the ground smoothly (no snapping on bumps)
   F[PY] += (groundAt(F[PX], F[PZ]) - F[PY]) * (1 - exp(-dt * 12));
   // steps: the bob and sway follow the distance walked (one step every 0.72 m)
-  const v = hypot(mx, mz) / max(dt, 1e-4); F[AMP] += (min(v / WALK, 1) - F[AMP]) * (1 - exp(-dt * 5));
+  const v = hypot(mx, mz) / max(dt, 1e-4); F[AMP] += (min(v / WALK, 1.6) - F[AMP]) * (1 - exp(-dt * 5));
   const s0 = F[STEP]; F[STEP] += hypot(mx, mz) / 0.72 * PI;
   if (floor(F[STEP] / PI) !== floor(s0 / PI)) {
     const rock = sandAt(F[PX], F[PZ]) < 0.5 || abs(groundAt(F[PX] + 0.5, F[PZ]) - groundAt(F[PX] - 0.5, F[PZ])) > 0.25;
@@ -650,7 +651,9 @@ function wake(dt) {
   F[YAW] = m(4) + F[WX] * 0; F[PIT] = m(5);
   F[LHOLD] = clamp((t - 9.0) / 1.0, 0, 1);
   if (wakeEv < 1 && t > 5.0) { wakeEv = 1; SFX.radioOn?.(); }
-  if (t >= WKEND) { F[WAKE] = 1e9; placeAt(F[CX], F[CZ], F[YAW], F[PIT]); F[FADE] = 1; F[LHOLD] = 1; }
+  F[SKIP] = kLift ? F[SKIP] + dt : 0;
+  if (F[SKIP] > 0.5) { const e = WK[WK.length - 1]; F[CX] = CAMP[0] + e[1]; F[CY] = CAMP[1] + e[2]; F[CZ] = CAMP[2] + e[3] - 2; F[YAW] = e[4]; F[PIT] = e[5]; if (wakeEv < 1) { wakeEv = 1; SFX.radioOn?.(); } F[WAKE] = WKEND; }
+  if (F[WAKE] >= WKEND) { F[WAKE] = 1e9; placeAt(F[CX], F[CZ], F[YAW], F[PIT]); F[FADE] = 1; F[LHOLD] = 1; }
 }
 // the later wake events run on the play clock (after you have control): the clatter, then the crickets stop
 function wakeLater() {

@@ -335,7 +335,7 @@ fn airGlow(rd: vec3f, L: f32, lp: vec3f, I: f32) -> f32 {
   return I * (atan((L - t0) / h) - atan(-t0 / h)) / h;
 }
 fn inScatter(rd: vec3f, L: f32) -> vec3f {
-  return FIREC * airGlow(rd, L, g.fire.xyz + vec3f(0., .5, 0.), g.fire.w) * .00035 + LANTC * airGlow(rd, L, g.lant.xyz, g.lant.w) * .00008;
+  return FIREC * airGlow(rd, L, g.fire.xyz + vec3f(0., .5, 0.), g.fire.w) * .00035 + LANTC * airGlow(rd, L, g.lant.xyz, g.lant.w) * .000027;
 }
 fn fog(c: vec3f, wp: vec3f) -> vec3f {
   let v = wp - g.cam.xyz; let d = length(v); let rd = v / d;
@@ -410,7 +410,7 @@ fn prop(id: i32, op: vec3f, mc: f32, h: f32) -> PM {
     case 24 { let wv = .5 + .5 * sin(op.x * 900.) * sin(op.z * 900.); m.a = vec3f(.36, .33, .25) * (.9 + .1 * wv) * (1. - .25 * ss(.02, .0, abs(fract(op.x / .9) - .5) - .47)); m.bp = 0.; }   // canvas groundsheet, seamed
     case 40 { m.a = vec3f(.42, .05, .03); m.gl = .5; m.bp = .1; }              // lantern: red paint
     case 41 { m.a = vec3f(.04); m.gl = .4; m.bp = 0.;                           // lantern: clear glass globe, faintly lit from inside
-      m.e = LANTC * g.lant.w * (.01 + .017 * ss(.06, -.03, op.y)); }
+      m.e = LANTC * g.lant.w * (.0033 + .0057 * ss(.06, -.03, op.y)); }
     case 42 { m.a = vec3f(.30, .30, .31); m.gl = .6; m.mt = .8; m.bp = .05; } // lantern: tin and wire
     case 25 { m.a = vec3f(.19, .21, .12) * (1. - .3 * ss(.03, .0, abs(fract(op.z / .16) - .5) - .45)); m.bp = .3; m.n = vec3f(sin(op.z * 40.), 0., cos(op.x * 31.)) * .06; } // sleeping bag: olive drab, quilted
     case 26 { let px = step(.5, fract(op.x / .09)); let pz = step(.5, fract(op.z / .09));                   // sleeping bag lining: red plaid flannel
@@ -530,7 +530,7 @@ fn prop(id: i32, op: vec3f, mc: f32, h: f32) -> PM {
     let fx = dot(dv, g.right.xyz); let fy = dot(dv, g.up.xyz) + .004;
     let wd = .0055 * (1. - .7 * ss(-.004, .022, fy)) + .0008;
     let fl = exp(-(fx * fx) / (wd * wd) - pow(max(abs(fy - .008) - .012, 0.), 2.) / .00002);
-    c += mix(vec3f(1., .45, .12), vec3f(1., .85, .55), ss(.2, .8, fl)) * g.lant.w * 1.3 * fl + LANTC * g.lant.w * .08 * exp(-(fx * fx + fy * fy) / .0009);
+    c += mix(vec3f(1., .45, .12), vec3f(1., .85, .55), ss(.2, .8, fl)) * g.lant.w * .43 * fl + LANTC * g.lant.w * .027 * exp(-(fx * fx + fy * fy) / .0009);
   }
   return fin(fog(c, i.wp));
 }
