@@ -268,10 +268,18 @@ fn shadowSoft(p: vec3f) -> f32 {
 }
 fn vol(p: vec3f) -> vec4f { return textureSampleLevel(tV, sC, (p - vec3f(-192., -56., -192.)) / vec3f(384., 60., 384.), 0.); }
 // point lights: g.fire and g.lant are position + strength (flicker included); short range, fast fall-off, no shadows
-const FIRER = 16.; const LANTR = 20.;
+const FIRER = 16.; const LANTR = 42.;
 // fall-off: k is how fast. The fire is physical (fast); the lantern's reflector and the eye's sensitivity to a warm
 // light at night make its pool fade more gently, so it shows the way ahead instead of only your feet
-fn att(p: vec3f, l: vec4f, r: f32) -> f32 { let d = distance(l.xyz, p); let w = sat(1. - d * d / (r * r)); return l.w * w * w / (1.6 + select(1.3, mix(.2, .1, g.tn.w), r == LANTR) * d * d); }
+fn att(p: vec3f, l: vec4f, r: f32) -> f32 {
+  let d = distance(l.xyz, p);
+  if (r == LANTR) { // the lantern: a long faint tail (a far wall gets a trace of light that grows as you come closer),
+    // the window only tapers the last stretch to nothing so there is no edge
+    let q = d / LANTR; let w = sat(1. - q * q * q * q);
+    return l.w * w * w / (1.6 + mix(.2, .1, g.tn.w) * d * d);
+  }
+  let w = sat(1. - d * d / (r * r)); return l.w * w * w / (1.6 + 1.3 * d * d);
+}
 // The camp's big things as rounded boxes (camp coordinates, metres from the fire: centre + yaw, half size + rounding),
 // so the fire and the lantern cast soft shadows past them and the ground darkens a little under them.
 // Keep in step with meshCamp() in world.js. The tent is a hollow shell with its door open toward the fire.
@@ -327,7 +335,8 @@ fn lantShadow(p: vec3f) -> f32 {
   if (c.w <= .05) { return 1.; }
   let u = c.xy / c.w;
   if (abs(u.x) > .98 || abs(u.y) > .98) { return 1.; }
-  let uv = vec2f(u.x * .5 + .5, .5 - u.y * .5); let z = c.z / c.w - .0006; let e = 1.3 / 1024.;
+  let uv = vec2f(u.x * .5 + .5, .5 - u.y * .5); let z = c.z / c.w - .0006;
+  if (z >= 1.) { return 1.; } let e = 1.3 / 1024.;
   var a = textureSampleCompareLevel(tLS, sS, uv, z) * 2.;
   a += textureSampleCompareLevel(tLS, sS, uv + vec2f(e, e), z) + textureSampleCompareLevel(tLS, sS, uv + vec2f(-e, e), z);
   a += textureSampleCompareLevel(tLS, sS, uv + vec2f(e, -e), z) + textureSampleCompareLevel(tLS, sS, uv + vec2f(-e, -e), z);

@@ -458,7 +458,7 @@ function drawNear(r, start, indexed, verts, px, pz, R) {
     if (n > 0) { if (indexed === 1) r.drawIndexed(n * 6, 1, a * 6, 0, nSolid); else if (indexed) r.drawIndexed(indexed.ib.length, n, indexed.i0, indexed.v0, a); else r.draw(verts, n, 0, a); }
   }
 }
-let LSHOFF = false; // dev: turn the lantern shadows off to compare
+let LSHOFF = false, LPOW = 1; // dev: turn the lantern shadows off, scale the lantern (0 = out) to compare
 const passLS = { colorAttachments: [], depthStencilAttachment: { view: tLShadow.createView(), depthClearValue: 1, depthLoadOp: 'clear', depthStoreOp: 'store' } };
 function render() {
   // camera basis (right vector is horizontal)
@@ -498,7 +498,7 @@ function render() {
   const lh = F[LHOLD] * F[LHOLD] * (3 - 2 * F[LHOLD]);
   if (lh < 1) { lx = WK_LANT[0] + (lx - WK_LANT[0]) * lh; ly = WK_LANT[1] + (ly - WK_LANT[1]) * lh; lz = WK_LANT[2] + (lz - WK_LANT[2]) * lh; }
   m[64] = lx; m[65] = ly + 0.01; m[66] = lz;
-  m[67] = LANTP * (1 + 0.45 * m[79]) * (1 + 0.05 * sin(t * 17) + 0.04 * sin(t * 23 + 1) + 0.03 * sin(t * 7.3)) * (1 - 0.55 * gt * gt * (3 - 2 * gt));
+  m[67] = LANTP * LPOW * (1 + 0.45 * m[79]) * (1 + 0.05 * sin(t * 17) + 0.04 * sin(t * 23 + 1) + 0.03 * sin(t * 7.3)) * (1 - 0.55 * gt * gt * (3 - 2 * gt));
   const swl = sw * lh, yl = yaw * lh, ss2 = sin(swl / 2), cs2 = cos(swl / 2), qy = sin(-yl / 2), qw = cos(-yl / 2), qx = rx * ss2, qz = rz * ss2;
   LANT[0] = lx; LANT[1] = ly; LANT[2] = lz; LANT[4] = qx * qw - qz * qy; LANT[5] = cs2 * qy; LANT[6] = qx * qy + qz * qw; LANT[7] = cs2 * qw;
   Q.writeBuffer(ibLant, 0, LANT);
