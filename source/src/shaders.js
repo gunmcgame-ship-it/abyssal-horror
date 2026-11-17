@@ -268,15 +268,16 @@ fn shadowSoft(p: vec3f) -> f32 {
 }
 fn vol(p: vec3f) -> vec4f { return textureSampleLevel(tV, sC, (p - vec3f(-192., -56., -192.)) / vec3f(384., 60., 384.), 0.); }
 // point lights: g.fire and g.lant are position + strength (flicker included); short range, fast fall-off, no shadows
-const FIRER = 16.; const LANTR = 42.;
+const FIRER = 16.; const LANTR = 70.;
 // fall-off: k is how fast. The fire is physical (fast); the lantern's reflector and the eye's sensitivity to a warm
 // light at night make its pool fade more gently, so it shows the way ahead instead of only your feet
 fn att(p: vec3f, l: vec4f, r: f32) -> f32 {
   let d = distance(l.xyz, p);
-  if (r == LANTR) { // the lantern: a long faint tail (a far wall gets a trace of light that grows as you come closer),
-    // the window only tapers the last stretch to nothing so there is no edge
+  if (r == LANTR) { // the lantern: inverse square, like a real flame (a 10-candle lantern, doubled ahead by the
+    // reflector: about full moonlight on a wall 10 m ahead, a quarter moon at 25 m, a little over starlight at 50 m);
+    // the 1.6 is the flame and globe's size, the window only takes the last stretch to nothing
     let q = d / LANTR; let w = sat(1. - q * q * q * q);
-    return l.w * w * w / (1.6 + mix(.2, .1, g.tn.w) * d * d);
+    return l.w * w * w / (1.6 + .2 * d * d);
   }
   let w = sat(1. - d * d / (r * r)); return l.w * w * w / (1.6 + 1.3 * d * d);
 }
@@ -346,7 +347,7 @@ fn lantF(p: vec3f) -> f32 {
   let v = p - g.lant.xyz; let d = length(v);
   if (d > LANTR) { return 0.; }
   let dir = v / max(d, 1e-3); let c = dot(dir, g.ld.xyz);
-  let fan = mix(.2, mix(2.6, 3.4, g.tn.w), ss(mix(.2, .45, g.tn.w), .9, c));  // lifted: a tighter, longer throw                       // spill behind and aside .. the reflector's fan ahead
+  let fan = mix(mix(.2, .9, g.tn.w), mix(2.6, 2.2, g.tn.w), ss(mix(.2, -.3, g.tn.w), .9, c)); // lifted: spread round you                       // spill behind and aside .. the reflector's fan ahead
   let fount = 1. - .8 * ss(.82, .97, -dir.y);                    // the fount's shadow straight below
   return fan * fount * select(1., lantShadow(p), c > .05);
 }
@@ -845,6 +846,8 @@ fn tmap(x: vec3f) -> vec3f { return sat3((x * (2.51 * x + .03)) / (x * (2.43 * x
   // exposure: the eyes adjust only a little; a dark scene stays dark
   let ad = textureLoad(tA, vec2i(0), 0).r;
   c *= g.mis.x * g.mis.w * clamp(pow(.032 / max(ad, 1e-5), .4), .7, 1.5); // mis.w: the fade in at the start
+  // glare: a lantern lifted to eye height puts the flame in your eyes, and they lose the dark: the dim distance sinks
+  c *= 1. - .6 * g.tn.w * (1. - ss(.005, .07, lp));
   let q = uv - .5;
   c *= 1. - dot(q, q) * .85;
   c = tmap(c);
