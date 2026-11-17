@@ -268,10 +268,10 @@ fn shadowSoft(p: vec3f) -> f32 {
 }
 fn vol(p: vec3f) -> vec4f { return textureSampleLevel(tV, sC, (p - vec3f(-192., -56., -192.)) / vec3f(384., 60., 384.), 0.); }
 // point lights: g.fire and g.lant are position + strength (flicker included); short range, fast fall-off, no shadows
-const FIRER = 16.; const LANTR = 13.;
+const FIRER = 16.; const LANTR = 20.;
 // fall-off: k is how fast. The fire is physical (fast); the lantern's reflector and the eye's sensitivity to a warm
 // light at night make its pool fade more gently, so it shows the way ahead instead of only your feet
-fn att(p: vec3f, l: vec4f, r: f32) -> f32 { let d = distance(l.xyz, p); let w = sat(1. - d * d / (r * r)); return l.w * w * w / (1.6 + select(1.3, .32, r == LANTR) * d * d); }
+fn att(p: vec3f, l: vec4f, r: f32) -> f32 { let d = distance(l.xyz, p); let w = sat(1. - d * d / (r * r)); return l.w * w * w / (1.6 + select(1.3, mix(.2, .1, g.tn.w), r == LANTR) * d * d); }
 // The camp's big things as rounded boxes (camp coordinates, metres from the fire: centre + yaw, half size + rounding),
 // so the fire and the lantern cast soft shadows past them and the ground darkens a little under them.
 // Keep in step with meshCamp() in world.js. The tent is a hollow shell with its door open toward the fire.
@@ -337,7 +337,7 @@ fn lantF(p: vec3f) -> f32 {
   let v = p - g.lant.xyz; let d = length(v);
   if (d > LANTR) { return 0.; }
   let dir = v / max(d, 1e-3); let c = dot(dir, g.ld.xyz);
-  let fan = mix(.22, 2.3, ss(.2, .88, c));                       // spill behind and aside .. the reflector's fan ahead
+  let fan = mix(.2, mix(2.6, 3.4, g.tn.w), ss(mix(.2, .45, g.tn.w), .9, c));  // lifted: a tighter, longer throw                       // spill behind and aside .. the reflector's fan ahead
   let fount = 1. - .8 * ss(.82, .97, -dir.y);                    // the fount's shadow straight below
   return fan * fount * select(1., lantShadow(p), c > .05);
 }

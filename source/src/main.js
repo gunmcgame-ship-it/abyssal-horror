@@ -477,7 +477,7 @@ function render() {
   m[44] = fx; m[45] = fy; m[46] = fz; m[47] = NEAR;
   m[56] = LOOK.bright; m[57] = F[DT]; m[58] = det; m[59] = F[FADE];
   eclipse(m); m[68] *= LOOK.moon; m[69] *= LOOK.moon; m[70] *= LOOK.moon;
-  m[76] = LOOK.fill; m[77] = LOOK.blue; m[78] = LOOK.contrast;
+  m[76] = LOOK.fill; m[77] = LOOK.blue; m[78] = LOOK.contrast; m[79] = F[LIFT] * F[LIFT] * (3 - 2 * F[LIFT]); // tn.w: the lantern lifted
   const t = F[TIME];
   // the breeze (same as gust() in shaders.js): in a strong gust the lantern gutters, dimming for a second or two
   const gs = t - (cx * 0.05 + cz * 0.02), gb = 0.5 + 0.5 * sin(gs * 0.37) * sin(gs * 0.23 + 1.3), gu = 0.35 + 0.65 * gb * gb;
@@ -487,7 +487,7 @@ function render() {
   m[63] = 9 * (1 + 0.12 * sin(t * 9.3) + 0.08 * sin(t * 15.1 + 2) + 0.06 * sin(t * 3.7));
   // the lantern: held low on the right, swinging a little round its handle; its flame is the light.
   // Holding Space lifts it up and out in front (F[LIFT] eases 0 .. 1), so its light reaches further across the ground.
-  const lu = F[LIFT] * F[LIFT] * (3 - 2 * F[LIFT]), lf = 0.8 - 0.18 * lu, lr = 0.4 - 0.06 * lu, ld = 0.37 - 0.33 * lu;
+  const lu = F[LIFT] * F[LIFT] * (3 - 2 * F[LIFT]), lf = 0.8 - 0.02 * lu, lr = 0.4 + 0.02 * lu, ld = 0.37 - 0.39 * lu;
   // the swing: a damped pendulum, nudged by every step, with a little idle drift
   { const dt = F[DT]; F[SWV] += (-F[SWG] * 22 - F[SWV] * 2.2) * dt; F[SWG] += F[SWV] * dt; }
   const sw = (F[SWG] * 0.12 + sin(t * 1.1) * 0.02 + sin(t * 0.47 + 1) * 0.012) * (1 - 0.5 * lu), hx = rz, hz = -rx; // hx, hz: forward, level
@@ -498,17 +498,17 @@ function render() {
   const lh = F[LHOLD] * F[LHOLD] * (3 - 2 * F[LHOLD]);
   if (lh < 1) { lx = WK_LANT[0] + (lx - WK_LANT[0]) * lh; ly = WK_LANT[1] + (ly - WK_LANT[1]) * lh; lz = WK_LANT[2] + (lz - WK_LANT[2]) * lh; }
   m[64] = lx; m[65] = ly + 0.01; m[66] = lz;
-  m[67] = LANTP * (1 + 0.05 * sin(t * 17) + 0.04 * sin(t * 23 + 1) + 0.03 * sin(t * 7.3)) * (1 - 0.55 * gt * gt * (3 - 2 * gt));
+  m[67] = LANTP * (1 + 0.45 * m[79]) * (1 + 0.05 * sin(t * 17) + 0.04 * sin(t * 23 + 1) + 0.03 * sin(t * 7.3)) * (1 - 0.55 * gt * gt * (3 - 2 * gt));
   const swl = sw * lh, yl = yaw * lh, ss2 = sin(swl / 2), cs2 = cos(swl / 2), qy = sin(-yl / 2), qw = cos(-yl / 2), qx = rx * ss2, qz = rz * ss2;
   LANT[0] = lx; LANT[1] = ly; LANT[2] = lz; LANT[4] = qx * qw - qz * qy; LANT[5] = cs2 * qy; LANT[6] = qx * qy + qz * qw; LANT[7] = cs2 * qw;
   Q.writeBuffer(ibLant, 0, LANT);
   // the reflector's aim: your facing, tipped down (less when you lift the lantern), turned a little with the swing
-  { const tip = 0.24 - 0.14 * lu, ay = yaw + swl * 0.7, ch = cos(tip), dx = sin(ay) * ch, dy = -sin(tip), dz = -cos(ay) * ch;
+  { const tip = 0.13 * (1 - lu) - 0.03 * lu, ay = yaw + swl * 0.7, ch = cos(tip), dx = sin(ay) * ch, dy = -sin(tip), dz = -cos(ay) * ch;
     m[96] = dx; m[97] = dy; m[98] = dz; m[99] = LSH && !LSHOFF && lh > 0.5 ? 1 : 0;
     if (LSH) { // perspective from the flame along the aim, 120 degrees wide, 0.15 .. 14 m, standard depth 0..1
       const rxl = cos(ay), rzl = sin(ay); // right (level); up = right x forward
       const ux2 = -rzl * dy, uy2 = rzl * dx - rxl * dz, uz2 = rxl * dy, ul = hypot(ux2, uy2, uz2) || 1;
-      const Ux = ux2 / ul, Uy = uy2 / ul, Uz = uz2 / ul, f = 1 / Math.tan(PI / 3), n = 0.15, fr = 15, A = fr / (fr - n), B = -fr * n / (fr - n), L = UBL;
+      const Ux = ux2 / ul, Uy = uy2 / ul, Uz = uz2 / ul, f = 1 / Math.tan(PI / 3), n = 0.15, fr = 21, A = fr / (fr - n), B = -fr * n / (fr - n), L = UBL;
       const tx = -(rxl * lx + rzl * lz), ty = -(Ux * lx + Uy * ly + Uz * lz), tz = -(dx * lx + dy * ly + dz * lz);
       L[0] = rxl * f; L[4] = 0; L[8] = rzl * f; L[12] = tx * f;
       L[1] = Ux * f; L[5] = Uy * f; L[9] = Uz * f; L[13] = ty * f;
@@ -535,12 +535,12 @@ function render() {
     const r = e.beginRenderPass(passLS), lx = UB[64], lz = UB[66];
     r.setBindGroup(0, bg0l);
     r.setPipeline(pTerrSh); r.setVertexBuffer(0, vbTerrain); r.setVertexBuffer(1, ibSolids); r.setIndexBuffer(ibTerrain, 'uint32');
-    drawNear(r, T.start, 1, 0, lx, lz, 14);
+    drawNear(r, T.start, 1, 0, lx, lz, 20);
     r.setPipeline(pSolidSh); r.setVertexBuffer(0, vbMesh); r.setIndexBuffer(ibMesh, 'uint32');
     for (let i = 0; i < 14; i++) { if (i === 11 || i === 13) continue; const g = Wd.solids.ranges[i]; if (g[1]) r.drawIndexed(meshes[i].ib.length, g[1], meshes[i].i0, meshes[i].v0, g[0]); }
-    for (let i = 0; i < NCHUNK; i++) { r.setVertexBuffer(1, ibChunk[i]); drawNear(r, Wd.chunks[i].start, meshes[14 + i], 0, lx, lz, 14); }
-    for (let i = 0; i < 6; i++) { r.setVertexBuffer(1, ibProp[i]); drawNear(r, Wd.props[i].start, meshes[4 + i], 0, lx, lz, 14); }
-    r.setPipeline(pLeafSh); r.setVertexBuffer(0, ibBig); drawNear(r, Wd.big.start, 0, 6, lx, lz, 14);
+    for (let i = 0; i < NCHUNK; i++) { r.setVertexBuffer(1, ibChunk[i]); drawNear(r, Wd.chunks[i].start, meshes[14 + i], 0, lx, lz, 20); }
+    for (let i = 0; i < 6; i++) { r.setVertexBuffer(1, ibProp[i]); drawNear(r, Wd.props[i].start, meshes[4 + i], 0, lx, lz, 20); }
+    r.setPipeline(pLeafSh); r.setVertexBuffer(0, ibBig); drawNear(r, Wd.big.start, 0, 6, lx, lz, 20);
     r.setVertexBuffer(0, ibSmall); drawNear(r, Wd.small.start, 0, 6, lx, lz, 10);
     r.end();
   }
