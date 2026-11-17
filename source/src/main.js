@@ -564,12 +564,15 @@ const EYE = 1.65, WALK = 1.2, PR = 0.3;
 function unblock(fy) {
   for (let it = 0; it < 3; it++) {
     let x = F[WX], z = F[WZ];
-    // rock faces: at knee, waist and head height, pushed along the rock's horizontal gradient
+    // rock faces: at knee, waist and head height. sdP is positive inside rock, so the distance to the rock is -sdP and
+    // its gradient points away from it. Only wall-like rock pushes (mostly sideways gradient): the ground under your
+    // feet is the height map's job, not this.
     for (const h of [0.5, 1.0, 1.6]) {
-      const y = fy + h, d = sdP(x, y, z);
+      const y = fy + h, d = -sdP(x, y, z);
       if (d < PR + 0.05) {
-        let gx = sdP(x + 0.3, y, z) - sdP(x - 0.3, y, z), gz = sdP(x, y, z + 0.3) - sdP(x, y, z - 0.3); const l = hypot(gx, gz);
-        if (l > 1e-4) { gx /= l; gz /= l; x += gx * (PR + 0.05 - d); z += gz * (PR + 0.05 - d); }
+        const gx = sdP(x - 0.3, y, z) - sdP(x + 0.3, y, z), gz = sdP(x, y, z - 0.3) - sdP(x, y, z + 0.3), gy = sdP(x, y - 0.3, z) - sdP(x, y + 0.3, z);
+        const l = hypot(gx, gz);
+        if (l > 1e-4 && l > 0.6 * abs(gy)) { const p = min(PR + 0.05 - d, 0.15); x += gx / l * p; z += gz / l * p; }
       }
     }
     // rocks, cacti, trunks
