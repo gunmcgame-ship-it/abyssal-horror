@@ -148,11 +148,33 @@ fn woodPM(id: i32, op: vec3f, on: vec3f, h: f32, pfw: f32, sd: f32) -> PM {
   let cp = vec2f(dot(c, B1), dot(c, B2)); let cr = length(cp);
   let wq = ss(.35, .65, abs(dot(on, B1)));       // a face turned toward B1 runs along B2
   let fg = ss(.003, .001, pfw); let mg = ss(.015, .004, pfw);
-  let wob = (gN(al * .9, cp * 6., wq) - .5) * .03 + (gN(al * .2 + 3., cp * 1.5, wq) - .5) * .08;
-  let ring = fract((cr + wob) * select(select(95., 60., beam), 26., logw));
-  let late = ss(.8, .9, ring) * ss(1., .94, ring);   // the latewood: a thin hard line in each ring
-  let s1 = gN(al * .4, cp * 30., wq); let s2 = gN(al * 1.2 + 7., cp * 110., wq); let s3 = gN(al * 3. + 13., cp * 330., wq);
-  let fib = s1 * .4 + mix(.5, s2, mg) * .35 + mix(.5, s3, fg * ss(.0018, .0008, pfw)) * .25;
+  // each board was sawn from its own log: the boards across the grain (cells about a board wide) each get their own
+  // pith, off to one side of the board and drifting a little along it, so a flat face cuts the rings at a slant and
+  // shows the arched "cathedral" figure, tight on one board and wide on the next, instead of straight parallel lines
+  let bw = select(.14, .5, logw || beam); let pc = floor(cp / bw); let hp = fract(sin(dot(pc, vec2f(12.9898, 78.233)) + so * 3.1) * 43758.55);
+  let hq = fract(hp * 7.13 + .37);
+  let pa = hp * TAU; let pr = select(mix(.05, .32, hq), 0., logw || beam);
+  let pith = select((pc + .5) * bw + vec2f(cos(pa), sin(pa)) * pr, vec2f(0.), logw || beam)
+           + vec2f(sin(al * .21 + hp * 6.), cos(al * .17 + hq * 9.)) * .025 + vec2f(1., -.6) * al * (hq - .5) * .045;
+  // the grain wanders: slow waves along the board, and the fibres swirl round knots
+  var q = cp - pith + vec2f(gN(al * .8 + 11., cp * 2., wq) - .5, gN(al * .6 + 23., cp * 2., wq) - .5) * .012;
+  // knots: one now and then along each board, a branch running out from the pith; on the face a dark oval with the rings
+  // crowding round it
+  let kc = floor(al / .55); let hk = fract(sin(kc * 91.7 + hp * 311.) * 23421.6);
+  let ka = (kc + .2 + .6 * fract(hk * 3.7)) * .55; let kt = hk * 41.; let kd = vec2f(cos(kt), sin(kt));
+  let kr = .007 + .013 * fract(hk * 5.3); let ql = dot(q, kd);
+  let kdist = length(vec2f(al - ka, length(q - kd * ql))) / kr;
+  let kon = select(0., 1., hk > .45 && ql > 0. && !logw);
+  let kw = kon * exp(-kdist * kdist * .08);                           // how far the knot pulls the rings round itself
+  let rr = length(q) + kw * kr * 1.6;
+  let wob = (gN(al * .9, cp * 6., wq) - .5) * .006 + (gN(al * .25 + 3., cp * 1.5, wq) - .5) * .02;
+  let rpm = select(select(mix(38., 75., hq), 60., beam), 26., logw);  // rings per metre: slow and fast grown trees
+  let ring = fract((rr + wob) * rpm);
+  let late = ss(.62, .86, ring) * ss(1., .9, ring);   // latewood: the darker, harder band of each year
+  // fibre streaks: short, broken, a little wavy; the fine ones only show up close
+  let s1 = gN(al * 1.6, q * 26., wq); let s2 = gN(al * 4. + 7., q * 90., wq); let s3 = gN(al * 9. + 13., q * 260., wq);
+  let fib = s1 * .45 + mix(.5, s2, mg) * .35 + mix(.5, s3, fg * ss(.0018, .0008, pfw)) * .2;
+  let knot = kon * (1. - ss(.75, 1.15, kdist));
   let cn = gN(al * .35 + 21., cp * 22., wq); let cw = .012 + .03 * ss(.5, .9, gN(al * .8 + 5., cp * 3., wq));
   let chk = (1. - ss(0., cw, abs(cn - .5))) * ss(.44, .52, gN(al * .5 + 40., cp * 4., wq)) * mg;
   let cn2 = gN(al * 1.2 + 31., cp * 70., wq);
@@ -162,10 +184,15 @@ fn woodPM(id: i32, op: vec3f, on: vec3f, h: f32, pfw: f32, sd: f32) -> PM {
   let ang = atan2(cp.y, cp.x);
   let rad = (1. - ss(0., .04, abs(vn2d(vec2f(ang * 5. + so, cr * 4.)) - .5))) * ss(.4, .6, vn2d(vec2f(ang * 2., so)));
   let wear = ss(.3, .8, on.y * .6 + gN(al * .7 + 60., cp * 8., wq) * .8 - .1);
-  var top = select(vec3f(.25, .235, .215), vec3f(.21, .19, .165), logw || beam); var dark = vec3f(.06, .05, .04);
-  if (brown) { top = mix(vec3f(.17, .10, .055), vec3f(.27, .245, .215), wear * .55); dark = vec3f(.055, .032, .018); }
-  var col = mix(dark, top, .3 + .7 * fib) * (1. - .45 * late * mg);
-  col *= .85 + .3 * gN(al * .15 + 80., cp * 1.2, wq);
+  // sun-greyed wood keeps a warm undertone; the stained park wood is a warm brown, worn back to grey-tan on the tops
+  var top = select(vec3f(.27, .245, .21), vec3f(.23, .20, .165), logw || beam); var dark = vec3f(.085, .068, .05);
+  if (brown) { top = mix(vec3f(.25, .145, .075), vec3f(.31, .265, .205), wear * .5); dark = vec3f(.085, .048, .024); }
+  var col = mix(dark, top, .45 + .55 * fib) * (1. - .32 * late * (.35 + .65 * mg));
+  // every board a little different in tone and hue
+  col *= (.8 + .38 * hp) * vec3f(1. + .06 * (hq - .5), 1., 1. - .1 * (hq - .5));
+  col *= .88 + .24 * gN(al * .15 + 80., cp * 1.2, wq);
+  // the knot: dark resinous heart, a darker ring of stain round it
+  col = mix(col, dark * .7, knot * .9) * (1. - .25 * kw * (1. - knot));
   col = mix(col, vec3f(.025, .018, .012), crack * .9);
   let ec = mix(dark * 1.3, top * .75, ss(.15, .7, ring)) * (1. - .7 * rad);
   col = mix(col, ec, endg);

@@ -381,7 +381,11 @@ fn fog(c: vec3f, wp: vec3f) -> vec3f {
   let v = wp - g.cam.xyz; let d = length(v); let rd = v / d;
   let T = exp(-d * .0028);
   let o = c * T + skyBase(vec3f(rd.x, .04, rd.z)) * .6 * (1. - T);
-  return mix(o, skyBase(rd), ss(195., 235., d)) + inScatter(rd, d);
+  // moonlit air (g.sun.w: LOOK.haze): the low moon lights the air over the canyon, so the further the rock the more
+  // of a faint blue-grey veil lies over it; the walls, rims and ruins stand out in layers against it, and the sky
+  // behind them is a little lighter still
+  let hz = g.sun.w * (SKYA * g.mc.w * 1.4 + SKY0 * 1.5) * (.75 + .5 * pow(sat(dot(rd, MOON)), 3.));
+  return mix(o, skyBase(rd), ss(195., 235., d)) + hz * (1. - exp(-d * .03)) + inScatter(rd, d);
 }
 fn qrot(q: vec4f, v: vec3f) -> vec3f { return v + 2. * cross(q.xyz, cross(q.xyz, v) + q.w * v); }
 `;
@@ -484,7 +488,7 @@ fn prop(id: i32, op: vec3f, on: vec3f, mc: f32, h: f32, pfw: f32, sd: f32, cv: f
     case 24 { let wv = .5 + .5 * sin(op.x * 900.) * sin(op.z * 900.); m.a = vec3f(.36, .33, .25) * (.9 + .1 * wv) * (1. - .25 * ss(.02, .0, abs(fract(op.x / .9) - .5) - .47)); m.bp = 0.; }   // canvas groundsheet, seamed
     case 40 { m.a = vec3f(.42, .05, .03); m.gl = .5; m.bp = .1; }              // lantern: red paint
     case 41 { m.a = vec3f(.04); m.gl = .4; m.bp = 0.;                           // lantern: clear glass globe, faintly lit from inside
-      m.e = LANTC * g.lant.w * (.0033 + .0057 * ss(.06, -.03, op.y)); }
+      m.e = LANTC * g.lant.w * (.012 + .022 * ss(.06, -.03, op.y) + .1 * exp(-(op.y + .01) * (op.y + .01) / .0009)); } // brightest round the flame
     case 42 { m.a = vec3f(.30, .30, .31); m.gl = .6; m.mt = .8; m.bp = .05; } // lantern: tin and wire
     case 25 { m.a = vec3f(.19, .21, .12) * (1. - .3 * ss(.03, .0, abs(fract(op.z / .16) - .5) - .45)); m.bp = .3; m.n = vec3f(sin(op.z * 40.), 0., cos(op.x * 31.)) * .06; } // sleeping bag: olive drab, quilted
     case 26 { let px = step(.5, fract(op.x / .09)); let pz = step(.5, fract(op.z / .09));                   // sleeping bag lining: red plaid flannel
@@ -668,6 +672,12 @@ fn weather(m: ptr<function, PM>, id: i32, op: vec3f, on: vec3f, pfw: f32, cv: f3
   if (metal > .5) { c += alb * metal * plD(i.wp - vec3f(R.x, 0., R.z) * .6 + vec3f(0., -.5, 0.), vec3f(0., 1., 0.), pv) * .5 * ss(.05, -.35, R.y) * vec3f(.62, .46, .32); }
   if (metal > .5) { let lf = g.fire.xyz + vec3f(0., .2, 0.) - i.wp; let dd = length(lf); c += Fr * FIREC * g.fire.w * pow(sat(dot(R, lf / dd)), 30.) * 1.2 / (1. + dd * dd * .04) * pv.x; }
   c += Fr * gloss * select(skyBase(R), vec3f(.42, .30, .22) * (g.mc.rgb * .32 + SKYA * g.mc.w * .6 + SKY0) * (1. - .4 * R.y), R.y < 0.) * (.3 + .7 * ao) * 2.;
+  // the lantern lit by its own flame: the top of the fount, the burner, the inside of the guard and air tubes, the
+  // underside of the top chamber and the bail all catch the light from the globe a hand's width away (the reflector's
+  // back stays dark: it faces away from the flame)
+  if (mat == 2) { let pid = i32(round(i.ao * 127.)); let tf = g.lant.xyz - i.wp; let df = length(tf);
+    let refl = pid == 42; // the tin (guard wires, reflector: thin and back to back) stays unlit: lit, it strobes in stripes // the reflector (two faces back to back): left dark
+    if (df < .26 && pid >= 40 && pid <= 42 && !refl) { c += alb * LANTC * g.lant.w * .012 * sat(dot(N, tf / df) * .75 + .25) / (df * df + .006) * ss(.26, .18, df); } }
   // the lantern's flame, seen through its glass
   if (mat == 2 && i32(round(i.ao * 127.)) == 41) {
     // the flame seen through the glass: a small teardrop above the wick, yellow core, orange edge, and a soft glow round it
@@ -793,7 +803,7 @@ fn stars(rd: vec3f, sc: f32, dens: f32, bright: f32, px: f32) -> vec3f {
   let rd = normalize(i.wp - g.cam.xyz);
   let t = g.cam.w;
   let px = 2. * g.up.w / g.res.y;   // the angle one pixel covers
-  var c = skyBase(rd);
+  var c = skyBase(rd) + g.sun.w * (SKYA * g.mc.w * 1.4 + SKY0 * 1.5) * (.75 + .5 * pow(sat(dot(rd, MOON)), 3.)) * (1. - .55 * ss(0., .6, rd.y)); // the moonlit air (fog())
   let up = sat(rd.y);
   let mu = dot(rd, MOON);
   let ml = g.mc.w;

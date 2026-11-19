@@ -58,7 +58,7 @@ const UB = new Float32Array(100), UBS = new Float32Array(100), UBL = new Float32
 const ubo = device.createBuffer({ size: 400, usage: BU.UNIFORM | BU.COPY_DST }), uboS = device.createBuffer({ size: 400, usage: BU.UNIFORM | BU.COPY_DST }), uboL = device.createBuffer({ size: 400, usage: BU.UNIFORM | BU.COPY_DST });
 // the night look, in one place: moonlight, sky fill in the shadows, blue of night vision, contrast in the darks,
 // overall brightness (1 = as designed). The dev build has sliders for them (T).
-const LOOK = { moon: 1.15, fill: 0.73, blue: 1, contrast: 0.88, bright: 0.42 }; // set by the owner by eye
+const LOOK = { moon: 1.15, fill: 0.73, blue: 1, contrast: 0.88, bright: 0.42, haze: 1.4 }; // set by the owner by eye
 
 const VF = SS.VERTEX | SS.FRAGMENT;
 const bgl0 = device.createBindGroupLayout({ entries: [
@@ -512,7 +512,7 @@ function render() {
   m[36] = rx; m[37] = 0; m[38] = rz; m[39] = TANH * asp;
   m[40] = ux; m[41] = uy; m[42] = uz; m[43] = TANH;
   m[44] = fx; m[45] = fy; m[46] = fz; m[47] = NEAR;
-  m[56] = LOOK.bright; m[57] = F[DT]; m[58] = det; m[59] = F[FADE];
+  m[51] = LOOK.haze; m[56] = LOOK.bright; m[57] = F[DT]; m[58] = det; m[59] = F[FADE];
   eclipse(m); m[68] *= LOOK.moon; m[69] *= LOOK.moon; m[70] *= LOOK.moon;
   m[76] = LOOK.fill; m[77] = LOOK.blue; m[78] = LOOK.contrast; m[79] = F[LIFT] * F[LIFT] * (3 - 2 * F[LIFT]); // tn.w: the lantern lifted
   const t = F[TIME];
