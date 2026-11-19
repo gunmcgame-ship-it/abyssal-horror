@@ -41,6 +41,9 @@ const tex = (w, h, format, usage, o = {}) => device.createTexture({ size: [w, h,
 const sRep = device.createSampler({ addressModeU: 'repeat', addressModeV: 'repeat', magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', maxAnisotropy: LV > 1 ? 1 : 8 });
 const sClamp = device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
 const sCmp = device.createSampler({ compare: 'less-equal', magFilter: 'linear', minFilter: 'linear' });
+// the paper atlas (paperart.js): every sheet of paper drawn once, with real type
+const sPaper = device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', maxAnisotropy: LV > 1 ? 1 : 8 });
+const tPaper = makePaperAtlas();
 const tShadow = tex(SHADOW, SHADOW, DEPTH, TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING);
 const tDummy = tex(1, 1, DEPTH, TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING);
 // the lantern's forward shadow map (High only), re-rendered every frame from the flame
@@ -63,11 +66,13 @@ const bgl0 = device.createBindGroupLayout({ entries: [
   { binding: 1, visibility: VF, sampler: {} }, { binding: 2, visibility: VF, sampler: {} }, { binding: 3, visibility: VF, sampler: { type: 'comparison' } },
   { binding: 4, visibility: VF, texture: { sampleType: 'depth' } }, { binding: 5, visibility: VF, texture: { sampleType: 'depth' } },
   { binding: 6, visibility: VF, texture: {} },
-  { binding: 7, visibility: VF, texture: { viewDimension: '3d' } }, { binding: 8, visibility: VF, texture: {} }] });
+  { binding: 7, visibility: VF, texture: { viewDimension: '3d' } }, { binding: 8, visibility: VF, texture: {} },
+  { binding: 9, visibility: VF, texture: {} }, { binding: 10, visibility: VF, sampler: {} }] });
 const mkBG0 = (u, sh, ls = tDummy) => device.createBindGroup({ layout: bgl0, entries: [
   { binding: 0, resource: { buffer: u } }, { binding: 1, resource: sRep }, { binding: 2, resource: sClamp }, { binding: 3, resource: sCmp },
   { binding: 4, resource: sh.createView() }, { binding: 5, resource: ls.createView() }, { binding: 6, resource: tDetail.createView() },
-  { binding: 7, resource: tVol.createView() }, { binding: 8, resource: tMap.createView() }] });
+  { binding: 7, resource: tVol.createView() }, { binding: 8, resource: tMap.createView() },
+  { binding: 9, resource: tPaper.createView() }, { binding: 10, resource: sPaper }] });
 const bg0 = mkBG0(ubo, tShadow, tLShadow), bg0s = mkBG0(uboS, tDummy), bg0l = mkBG0(uboL, tDummy);
 const pl0 = device.createPipelineLayout({ bindGroupLayouts: [bgl0] });
 
@@ -274,23 +279,42 @@ const CBOX = [
   [-0.15, 8.86, 0.24, 0.27, 0],                                                 // crate in the tent
   [3.4, -0.9, 0.31, 0.63, 0.25], [2.3, 2.4, 0.34, 0.2, 0.4], [-3.0, -2.55, 0.32, 0.42, 0],
   [5.83, 1.22, 0.1, 0.24, 0], [2.75, 5.3, 0.16, 0.39, 0.72], [-2.47, 5.98, 0.18, 0.14, 0],
-], CCIR = [[0, 0, 0.78], [-1.6, 1.1, 0.34], [-3.6, 3.9, 0.45], [-2.15, 6.05, 0.17]];
+  [PICNIC[0], PICNIC[1], 0.88, 0.94, 0], [SIGN[0], SIGN[1], 1.15, 0.1, SIGN[2]],   // picnic table, park sign
+], CCIR = [[0, 0, 0.78], [-1.6, 1.1, 0.34], [-3.6, 3.9, 0.45], [-2.15, 6.05, 0.17], [CAMERA[0], CAMERA[1], 0.42]];
+// push a point (qx, qz) out of a box (centre cx, cz, half sizes, yaw): the push lands in BPX, BPZ
+let BPX = 0, BPZ = 0;
+function boxPush(qx, qz, cx, cz, hx, hz, yw) {
+  const c = cos(yw), sn = sin(yw), lx = (qx - cx) * c - (qz - cz) * sn, lz = (qx - cx) * sn + (qz - cz) * c;
+  const px = clamp(lx, -hx, hx), pz = clamp(lz, -hz, hz), dx = lx - px, dz = lz - pz, d = hypot(dx, dz);
+  let ox = 0, oz = 0;
+  if (d > 1e-4) { if (d < PR) { ox = dx / d * (PR - d); oz = dz / d * (PR - d); } }
+  else { const ex = hx - abs(lx), ez = hz - abs(lz); if (ex < ez) ox = (ex + PR) * Math.sign(lx || 1); else oz = (ez + PR) * Math.sign(lz || 1); }
+  BPX = ox * c + oz * sn; BPZ = -ox * sn + oz * c;
+}
 D = Wd.gy = T.smp = null; // with gy goes the generator's working memory (about 200 MB)
 
 await say('Pitching camp…', 0.94, 1200);
 // mesh ids: 0-3 rocks, 4 barrel cactus, 5 hedgehog cactus, 6-7 prickly pear, 8 juniper trunk, 9 pinyon trunk,
 // 10 the camp, 11 the lantern, 12 the folding chair, 13 your hand on the lantern, 14-20 rock chunks + pebbles, 21-22 unused,
-// 23-25 far LOD of the large rock chunks
+// 23-25 far LOD of the large rock chunks, 26-29 the ruins' building stones, 30 the rest of the ruins, 31-33 the supper
+// stages (drawn once RSTAGE reaches 1, 2, 3), 34 the traces of later visitors (ruins.js), 35-38 the building stones in
+// low detail (used beyond 22 m), 39-47 single objects placed as instances (ruins.js: logs, lintel, board, old table and
+// bench (stage 1), stove, park sign, trail marker)
 const unused = () => { const m = new Mesh(); m.tri(m.v(0, 0, 0), m.v(0.01, 0, 0), m.v(0, 0.01, 0)); return m; };
-const meshes = [meshChunk(1, 3), meshChunk(7, 3), meshChunk(13, 3), meshChunk(22, 3), meshBarrel(), meshHedgehog(), meshPear(0), meshPear(1), Wd.trunks[0].m, Wd.trunks[1].m,
-  meshCamp(), meshLantern(), meshChair(), meshHand(),
-  meshChunk(3), meshChunk(11), meshChunk(29), meshChunk(5, 3), meshChunk(17, 3), meshChunk(41, 3), meshChunk(9, 1), unused(), unused(), meshChunk(5, 2, 1), meshChunk(17, 2, 1), meshChunk(41, 2, 1)].map((m) => m.build());
+// made things get their ambient occlusion baked in (bakeAO: contact shadows, the inside of the truck bed, under tables)
+const AO = (m, o) => { const t0 = performance.now(), r = bakeAO(m, o); if (DEV) console.log('AO', m.p.length / 3, Math.round(performance.now() - t0) + ' ms'); return r; };
+const meshes = [meshChunk(1, 3), meshChunk(7, 3), meshChunk(13, 3), meshChunk(22, 3), AO(meshBarrel(), { ground: 0, res: 0.015, maxD: 0.25 }), AO(meshHedgehog(), { ground: 0, res: 0.015, maxD: 0.25 }), AO(meshPear(0), { ground: 0, res: 0.015, maxD: 0.3 }), AO(meshPear(1), { ground: 0, res: 0.015, maxD: 0.3 }), Wd.trunks[0].m, Wd.trunks[1].m,
+  AO(meshCamp(), { ground: -0.01 }), meshLantern(), AO(meshChair(), { ground: 0, res: 0.02 }), meshHand(),
+  meshChunk(3), meshChunk(11), meshChunk(29), meshChunk(5, 3), meshChunk(17, 3), meshChunk(41, 3), meshChunk(9, 1), unused(), unused(), meshChunk(5, 2, 1), meshChunk(17, 2, 1), meshChunk(41, 2, 1),
+  meshBlock(1), meshBlock(2), meshBlock(3), meshBlock(4), Wd.ruinM, Wd.stgM[0], Wd.stgM[1], Wd.stgM[2], Wd.trM,
+  meshBlock(1, 1), meshBlock(2, 1), meshBlock(3, 1), meshBlock(4, 1),
+  meshLog(false), meshLog(true), meshBeam(), meshBoard(), AO(meshOldTable(), { ground: 0, res: 0.02 }), AO(meshBench(), { ground: 0, res: 0.02 }), AO(meshStove(), { ground: 0, res: 0.02 }), AO(meshSign(), { ground: 0, res: 0.02 }), AO(meshMarker(), { ground: 0, res: 0.02 })].map((m) => m.build());
 let nV = 0, nI = 0;
 for (const m of meshes) { m.v0 = nV; m.i0 = nI; nV += m.nv; nI += m.ib.length; }
 const allV = new Uint8Array(nV * 16), allI = new Uint32Array(nI);
 for (const m of meshes) { allV.set(new Uint8Array(m.vb), m.v0 * 16); allI.set(m.ib, m.i0); }
 const vbMesh = buf(allV, BU.VERTEX), ibMesh = buf(allI, BU.INDEX);
-const vbTerrain = buf(new Uint8Array(T.vb), BU.VERTEX), ibTerrain = buf(T.ib, BU.INDEX);
+const vbTerrain = buf(new Uint8Array(T.vb), BU.VERTEX), ibTerrain = buf(T.ib, BU.INDEX); const nTerrIdx = T.ib.length;
 const nSolid = Wd.solids.data.length / 12;
 const solidData = new Float32Array((nSolid + 1) * 12); solidData.set(Wd.solids.data); solidData.set([0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0], nSolid * 12);
 const ibSolids = buf(solidData, BU.VERTEX);
@@ -314,13 +338,25 @@ Q.writeTexture({ texture: tMap }, Wd.gm, { bytesPerRow: 2048 }, [512, 512]);
     r = e.beginRenderPass({ colorAttachments: [colorAtt(tDetail.createView({ baseMipLevel: i, mipLevelCount: 1 }), true)] });
     r.setPipeline(pMip8); r.setBindGroup(0, blitBG(tDetail.createView({ baseMipLevel: i - 1, mipLevelCount: 1 }))); r.draw(3); r.end();
   }
-  r = e.beginRenderPass({ colorAttachments: [], depthStencilAttachment: { view: tShadow.createView(), depthClearValue: 1, depthLoadOp: 'clear', depthStoreOp: 'store' } });
+  Q.submit([e.finish()]);
+}
+// the supper stages in the ruins (0 nothing, 1 tables, 2 places set, 3 the meal): M5 moves it on; the moon's shadows are
+// baked again when it changes
+let RSTAGE = 0;
+const solidOn = (i) => (i === W_TABLE || i === W_BENCH ? RSTAGE >= 1 : i < RUIN_STAGE || i > RUIN_STAGE + 2 || i - RUIN_STAGE < RSTAGE);
+let ruinD = 0; // the camera's distance from the ruins, this frame
+const solidMesh = (i) => (i >= RUIN_STONE && i < RUIN_STONE + 4 && ruinD > 22 ? meshes[i + 9] : meshes[i]);
+const ruinSkip = (i, d) => ((i >= RUIN_STONE && i < TRACE_MESH) || (i >= W_LOG && i <= W_STOVE)) && d > 95;
+const setRuinStage = (k) => { RSTAGE = clamp(k | 0, 0, 3); bakeMoonShadow(); };
+function bakeMoonShadow() {
+  const e = device.createCommandEncoder();
+  const r = e.beginRenderPass({ colorAttachments: [], depthStencilAttachment: { view: tShadow.createView(), depthClearValue: 1, depthLoadOp: 'clear', depthStoreOp: 'store' } });
   r.setBindGroup(0, bg0s);
   r.setPipeline(pTerrSh);
   r.setVertexBuffer(0, vbTerrain); r.setVertexBuffer(1, ibSolids); r.setIndexBuffer(ibTerrain, 'uint32');
-  r.drawIndexed(T.ib.length, 1, 0, 0, nSolid);
+  r.drawIndexed(nTerrIdx, 1, 0, 0, nSolid);
   r.setPipeline(pSolidSh); r.setVertexBuffer(0, vbMesh); r.setIndexBuffer(ibMesh, 'uint32');
-  for (let i = 0; i < 14; i++) { const g = Wd.solids.ranges[i]; if (g[1]) r.drawIndexed(meshes[i].ib.length, g[1], meshes[i].i0, meshes[i].v0, g[0]); }
+  for (let i = 0; i < SOLN; i++) { const g = Wd.solids.ranges[i]; if (g[1] && solidOn(i)) r.drawIndexed(meshes[i].ib.length, g[1], meshes[i].i0, meshes[i].v0, g[0]); }
   // small rocks, cacti and tree trunks only on High: too much for a phone's driver
   if (!LV) for (let i = 0; i < NCHUNK; i++) { r.setVertexBuffer(1, ibChunk[i]); r.drawIndexed(meshes[14 + i].ib.length, Wd.chunks[i].n, meshes[14 + i].i0, meshes[14 + i].v0, 0); }
   if (!LV) for (let i = 0; i < 6; i++) if (Wd.props[i].n) { r.setVertexBuffer(1, ibProp[i]); r.drawIndexed(meshes[4 + i].ib.length, Wd.props[i].n, meshes[4 + i].i0, meshes[4 + i].v0, 0); }
@@ -328,6 +364,7 @@ Q.writeTexture({ texture: tMap }, Wd.gm, { bytesPerRow: 2048 }, [512, 512]);
   r.end();
   Q.submit([e.finish()]);
 }
+bakeMoonShadow();
 // the GPU has its own copies now: let go of the generator's (about 300 MB)
 for (const o of [Wd.big, Wd.bigF, Wd.small, ...Wd.chunks, ...Wd.props]) o.buf = o.data = 0;
 Wd.obs = Wd.volD = Wd.gm = T.vb = T.ib = T.wp = T.wn = 0;
@@ -539,7 +576,10 @@ function render() {
     r.setPipeline(pTerrSh); r.setVertexBuffer(0, vbTerrain); r.setVertexBuffer(1, ibSolids); r.setIndexBuffer(ibTerrain, 'uint32');
     drawNear(r, T.start, 1, 0, lx, lz, 60);
     r.setPipeline(pSolidSh); r.setVertexBuffer(0, vbMesh); r.setIndexBuffer(ibMesh, 'uint32');
-    for (let i = 0; i < 14; i++) { if (i === 11 || i === 13) continue; const g = Wd.solids.ranges[i]; if (g[1]) r.drawIndexed(meshes[i].ib.length, g[1], meshes[i].i0, meshes[i].v0, g[0]); }
+    // the lantern's shadows reach the ruins only from near them; it draws the same stones the view does (a coarser
+    // stand-in would shadow the real one)
+    const lrd = hypot(lx - RUINC[0], lz - RUINC[1]) - 40;
+    for (let i = 0; i < SOLN; i++) { if (i === 11 || i === 13) continue; const g = Wd.solids.ranges[i]; if (g[1] && solidOn(i) && !ruinSkip(i, lrd + 95)) { const M = solidMesh(i); r.drawIndexed(M.ib.length, g[1], M.i0, M.v0, g[0]); } }
     for (let i = 0; i < NCHUNK; i++) { r.setVertexBuffer(1, ibChunk[i]); drawNear(r, Wd.chunks[i].start, meshes[14 + i], 0, lx, lz, 40); }
     for (let i = 0; i < 6; i++) { r.setVertexBuffer(1, ibProp[i]); drawNear(r, Wd.props[i].start, meshes[4 + i], 0, lx, lz, 40); }
     r.setPipeline(pLeafSh); r.setVertexBuffer(0, ibBig); drawNear(r, Wd.big.start, 0, 6, lx, lz, 20);
@@ -552,7 +592,8 @@ function render() {
   r.setPipeline(pTerrain); r.setVertexBuffer(0, vbTerrain); r.setVertexBuffer(1, ibSolids); r.setIndexBuffer(ibTerrain, 'uint32');
   drawCells(r, T.start, T.lo, T.hi, 1.5, 1, 0, 0, 240);
   r.setPipeline(pSolid); r.setVertexBuffer(0, vbMesh); r.setIndexBuffer(ibMesh, 'uint32');
-  for (let i = 0; i < 14; i++) { const g = Wd.solids.ranges[i]; if (g[1]) r.drawIndexed(meshes[i].ib.length, g[1], meshes[i].i0, meshes[i].v0, g[0]); }
+  ruinD = hypot(F[CX] - RUINC[0], F[CZ] - RUINC[1]);
+  for (let i = 0; i < SOLN; i++) { const g = Wd.solids.ranges[i]; if (g[1] && solidOn(i) && !ruinSkip(i, ruinD)) { const M = solidMesh(i); r.drawIndexed(M.ib.length, g[1], M.i0, M.v0, g[0]); } }
   r.setVertexBuffer(1, ibLant); r.drawIndexed(LANTM.ib.length, 1, LANTM.i0, LANTM.v0, 0);
   if (F[LHOLD] > 0.5 && !FLYCAM) r.drawIndexed(HANDM.ib.length, 1, HANDM.i0, HANDM.v0, 0);
   for (let i = 0; i < NCHUNK; i++) {
@@ -633,16 +674,11 @@ function unblock(fy) {
     // camp things
     const qx = x - CAMP[0], qz = z - CAMP[2];
     if (qx * qx + qz * qz < 400) {
-      for (const [cx, cz, hx, hz, yw] of CBOX) {
-        const c = cos(yw), sn = sin(yw), lx = (qx - cx) * c - (qz - cz) * sn, lz = (qx - cx) * sn + (qz - cz) * c;
-        const px = clamp(lx, -hx, hx), pz = clamp(lz, -hz, hz), dx = lx - px, dz = lz - pz, d = hypot(dx, dz);
-        let ox = 0, oz = 0;
-        if (d > 1e-4) { if (d < PR) { ox = dx / d * (PR - d); oz = dz / d * (PR - d); } }
-        else { const ex = hx - abs(lx), ez = hz - abs(lz); if (ex < ez) ox = (ex + PR) * Math.sign(lx || 1); else oz = (ez + PR) * Math.sign(lz || 1); }
-        if (ox || oz) { x += ox * c + oz * sn; z += -ox * sn + oz * c; }
-      }
+      for (const [cx, cz, hx, hz, yw] of CBOX) { boxPush(qx, qz, cx, cz, hx, hz, yw); x += BPX; z += BPZ; }
       for (const [cx, cz, r0] of CCIR) { const dx = x - CAMP[0] - cx, dz = z - CAMP[2] - cz, r = r0 + PR, d = hypot(dx, dz); if (d < r && d > 1e-4) { x += dx / d * (r - d); z += dz / d * (r - d); } }
     }
+    // the ruins: their walls, chimneys and stoves, and the tables once they are there
+    if (abs(x - RUINC[0]) < 32 && abs(z - RUINC[1]) < 32) for (const b of Wd.rbox) if (b[5] <= RSTAGE) { boxPush(x, z, b[0], b[1], b[2], b[3], b[4]); x += BPX; z += BPZ; }
     F[WX] = x; F[WZ] = z;
   }
 }

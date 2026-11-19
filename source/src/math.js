@@ -1,7 +1,7 @@
 // ============================================================================
 // math + procedural helpers (load-time only unless noted)
 // ============================================================================
-const { sin, cos, sqrt, min, max, abs, floor, PI, pow, atan2, hypot, exp, round } = Math;
+const { sin, cos, sqrt, min, max, abs, floor, ceil, PI, pow, atan2, hypot, exp, round } = Math;
 const TAU = PI * 2;
 let _seed = 20261110;
 const rnd = () => {
@@ -185,7 +185,7 @@ class Mesh {
     for (let k = 0; k < n; k++) {
       let nx = N[k * 3], ny = N[k * 3 + 1], nz = N[k * 3 + 2];
       if (nrmFn) { const q = nrmFn(P[k * 3], P[k * 3 + 1], P[k * 3 + 2], nx, ny, nz); nx = q[0]; ny = q[1]; nz = q[2]; }
-      const l = hypot(nx, ny, nz) || 1;
+      const l = (hypot(nx, ny, nz) || 1) / (this.ao ? 0.4 + 0.58 * this.ao[k] : 1);
       f[k * 4] = P[k * 3]; f[k * 4 + 1] = P[k * 3 + 1]; f[k * 4 + 2] = P[k * 3 + 2];
       s[k * 16 + 12] = round(nx / l * 127); s[k * 16 + 13] = round(ny / l * 127); s[k * 16 + 14] = round(nz / l * 127); s[k * 16 + 15] = round(clamp(this.aux[k], -1, 1) * 127);
     }
@@ -193,6 +193,55 @@ class Mesh {
   }
 }
 
+// ambient occlusion baked into a mesh's vertices (m.ao): the mesh is voxelised at res, then from each vertex a fan of
+// rays over its hemisphere looks for the mesh, or the ground (a height, or a function of x, z), within maxD; the
+// nearer a hit, the more it darkens. Thin things (paper, cloth) see their own other side only past the first voxels.
+function bakeAO(m, { res = 0.03, maxD = 0.5, rays = 16, ground = null } = {}) {
+  const P = m.p, I = m.i, nv = P.length / 3; if (!nv) return m;
+  let x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9;
+  for (let k = 0; k < P.length; k += 3) { x0 = min(x0, P[k]); x1 = max(x1, P[k]); y0 = min(y0, P[k + 1]); y1 = max(y1, P[k + 1]); z0 = min(z0, P[k + 2]); z1 = max(z1, P[k + 2]); }
+  x0 -= maxD; y0 -= maxD; z0 -= maxD; x1 += maxD; y1 += maxD; z1 += maxD;
+  while (((x1 - x0) / res + 2) * ((y1 - y0) / res + 2) * ((z1 - z0) / res + 2) > 48e6) res *= 1.25;
+  const nx = ceil((x1 - x0) / res) + 2, ny = ceil((y1 - y0) / res) + 2, nz = ceil((z1 - z0) / res) + 2, G = new Uint8Array(nx * ny * nz);
+  const at = (x, y, z) => { const i = ((x - x0) / res) | 0, j = ((y - y0) / res) | 0, k = ((z - z0) / res) | 0; return i + nx * (j + ny * k); };
+  for (let t = 0; t < I.length; t += 3) {
+    const a = I[t] * 3, b = I[t + 1] * 3, c = I[t + 2] * 3;
+    const e = max(hypot(P[b] - P[a], P[b + 1] - P[a + 1], P[b + 2] - P[a + 2]), hypot(P[c] - P[a], P[c + 1] - P[a + 1], P[c + 2] - P[a + 2]), hypot(P[c] - P[b], P[c + 1] - P[b + 1], P[c + 2] - P[b + 2]));
+    const n = max(1, ceil(e / (res * 0.5)));
+    for (let u = 0; u <= n; u++) for (let v = 0; v <= n - u; v++) { const s = u / n, r = v / n, q = 1 - s - r; G[at(P[a] * q + P[b] * s + P[c] * r, P[a + 1] * q + P[b + 1] * s + P[c + 1] * r, P[a + 2] * q + P[b + 2] * s + P[c + 2] * r)] = 1; }
+  }
+  const N = new Float32Array(nv * 3);
+  for (let t = 0; t < I.length; t += 3) {
+    const a = I[t] * 3, b = I[t + 1] * 3, c = I[t + 2] * 3, ux = P[b] - P[a], uy = P[b + 1] - P[a + 1], uz = P[b + 2] - P[a + 2], vx = P[c] - P[a], vy = P[c + 1] - P[a + 1], vz = P[c + 2] - P[a + 2];
+    const fx = uy * vz - uz * vy, fy = uz * vx - ux * vz, fz = ux * vy - uy * vx; for (const k of [a, b, c]) { N[k] += fx; N[k + 1] += fy; N[k + 2] += fz; }
+  }
+  // the ray fan: a cosine-weighted spiral over the hemisphere round +z
+  const D = []; for (let r = 0; r < rays; r++) { const u = (r + 0.5) / rays, ph = r * 2.39996, s = sqrt(u); D.push([s * cos(ph), s * sin(ph), sqrt(1 - u)]); }
+  const gf = typeof ground === 'function' ? ground : ground === null ? null : () => ground;
+  const ao = new Float32Array(nv), memo = new Map(), st = res * 0.9;
+  for (let v = 0; v < nv; v++) {
+    const px = P[v * 3], py = P[v * 3 + 1], pz = P[v * 3 + 2]; let ax = N[v * 3], ay = N[v * 3 + 1], az = N[v * 3 + 2]; const l = hypot(ax, ay, az) || 1; ax /= l; ay /= l; az /= l;
+    const key = Math.round(px * 500) + ',' + Math.round(py * 500) + ',' + Math.round(pz * 500) + ',' + Math.round(ax * 20) + ',' + Math.round(ay * 20) + ',' + Math.round(az * 20);
+    const hit = memo.get(key); if (hit !== undefined) { ao[v] = hit; continue; }
+    const hx = abs(ax) < 0.9 ? 1 : 0, hy = hx ? 0 : 1; let tx = hy * az, ty = -hx * az, tz = hx * ay - hy * ax; const tl = hypot(tx, ty, tz) || 1; tx /= tl; ty /= tl; tz /= tl;
+    const bx = ay * tz - az * ty, by = az * tx - ax * tz, bz = ax * ty - ay * tx;
+    let best = 0;
+    for (const sg of [1, -1]) {
+      const ox = px + ax * sg * res * 1.6, oy = py + ay * sg * res * 1.6, oz = pz + az * sg * res * 1.6; let occ = 0;
+      for (const [dx, dy, dz] of D) {
+        const rx = tx * dx + bx * dy + ax * sg * dz, ry = ty * dx + by * dy + ay * sg * dz, rz = tz * dx + bz * dy + az * sg * dz;
+        for (let s = st; s < maxD; s += st) {
+          const x = ox + rx * s, y = oy + ry * s, z = oz + rz * s;
+          if (x < x0 || y < y0 || z < z0 || x >= x1 || y >= y1 || z >= z1) break;
+          if (G[at(x, y, z)] || (gf && y < gf(x, z))) { occ += 1 - (s / maxD) ** 2; break; }
+        }
+      }
+      best = max(best, 1 - occ / rays); if (best > 0.97) break;
+    }
+    ao[v] = best; memo.set(key, best);
+  }
+  m.ao = ao; return m;
+}
 // icosphere with shared vertices
 function icosphere(sub, fn) {
   const m = new Mesh(), t = (1 + sqrt(5)) / 2;

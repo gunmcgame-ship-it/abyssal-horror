@@ -35,6 +35,7 @@
         if (bench) { hud = false; info.textContent = ''; dynT = -Infinity; }
       }
     } else if (/Digit[1-6]/.test(e.code)) stop();
+    else if (e.code === 'KeyR') setRuinStage((RSTAGE + 1) % 4); // R: the ruins' supper stages, in turn
   });
   // T: the night-look sliders (LOOK in main.js), live; the line under them is the setting to copy
   { const p = document.createElement('div'); p.style.cssText = 'position:fixed;left:12px;top:12px;z-index:9;background:rgba(0,0,0,.72);color:#ddd;font:13px monospace;padding:10px 12px;border-radius:6px;display:none;line-height:1.9';
@@ -104,7 +105,7 @@
     flyTo: (t) => { FLYCAM = true; flying = false; F[FLT] = t; flyAt(); },
     // dev.probe(x, z): what the walking sees there: ground height, rock distance at knee/waist/head, nearby obstacles
     probe: (x, z) => { const g = groundAt(x, z), c = clamp(((x + 192) / 4) | 0, 0, OBC - 1) + OBC * clamp(((z + 192) / 4) | 0, 0, OBC - 1); return { g, rock: [0.5, 1, 1.6].map((h) => +sdP(x, g + h, z).toFixed(3)), obs: obCell[c].slice() }; },
-    lshadow: (on) => (LSHOFF = !on), lpow: (k) => (LPOW = k),
+    lshadow: (on) => (LSHOFF = !on), stage: (k) => setRuinStage(k), atlas: async (name = 'atlas.png') => (await fetch('/save?name=' + name, { method: 'POST', body: await drawPaperAtlas().convertToBlob({ type: 'image/png' }) })).text(), ruins: () => Wd.ruinH.map((h) => ({ x: h.x, z: h.z, st: h.st, fx: +h.fx.toFixed(3), fz: +h.fz.toFixed(3), hw: +h.hw.toFixed(2), hd: +h.hd.toFixed(2) })), nStone: () => Wd.nStone, lift: (v) => (kLift = v), dog: async () => (await fetch('/save?name=dog.png', { method: 'POST', body: await pDog(300, 380, 31).convertToBlob({ type: 'image/png' }) })).text(), near: (id, x, z, n = 3) => { const pl = id > 3 && id < 10, D = pl ? Wd.props[id - 4].data : Wd.solids.data, [s0, c] = pl ? [0, D.length / 12] : Wd.solids.ranges[id], o = []; for (let i = s0; i < s0 + c; i++) o.push([+D[i * 12].toFixed(2), +D[i * 12 + 2].toFixed(2), +hypot(D[i * 12] - x, D[i * 12 + 2] - z).toFixed(1)]); return o.sort((p, q) => p[2] - q[2]).slice(0, n); }, lpow: (k) => (LPOW = k),
     // dev.walkTo(x, z, yaw): stand there, walking
     walkTo: (x, z, yaw = 0, pit = 0) => { FLYCAM = false; F[WAKE] = 1e9; F[FADE] = 1; F[LHOLD] = 1; placeAt(x, z, yaw); F[PIT] = pit; },
     // dev.wake(): play the opening again
