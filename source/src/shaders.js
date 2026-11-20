@@ -354,18 +354,44 @@ fn campAO(p: vec3f) -> f32 { let q = p - CAMPV; if (dot(q.xz, q.xz) > 600.) { re
 // adds its bounce to the flame, so the light fans forward; behind and to the sides only the shielded spill is left.
 // Straight down the lantern's own fount shades the ground (the dark disc under every hanging lantern). The forward fan
 // also has a shadow map (g.lm, tLS), so rocks, plants and the camp throw moving shadows as the lantern swings.
-fn lantShadow(p: vec3f) -> f32 {
+// Soft where it should be: the flame and its globe are a few centimetres across, so a shadow is crisp only where the
+// thing touches what it shadows and opens into a soft grey further off (a leg's shadow is sharp at its foot and a
+// blur a few metres away). Without that a lantern held by the eye throws hard black copies of things that seem to
+// hang beside them. So: find how far the blockers are (a few depth reads round the point), work out the penumbra a
+// 5 cm light gives at that distance, and filter over that width (contact-hardening soft shadows).
+const LSD = array<vec2f, 16>(vec2f(-.94, -.40), vec2f(.95, -.77), vec2f(-.09, -.93), vec2f(.34, .29), vec2f(-.92, .46), vec2f(-.82, -.88),
+  vec2f(-.38, .28), vec2f(.97, .76), vec2f(.44, -.53), vec2f(-.24, -.42), vec2f(.80, .24), vec2f(-.73, .96), vec2f(-.53, .07),
+  vec2f(.05, .52), vec2f(.40, .93), vec2f(.18, -.19));
+fn lantShadow(p0: vec3f) -> f32 {
   if (g.ld.w < .5) { return 1.; }
+  // 2 cm toward the flame first: a thin thing (a tripod leg, a pole) never shadows itself in stripes
+  let tl = g.lant.xyz - p0; let p = p0 + tl * (.02 / max(length(tl), .02));
   let c = g.lm * vec4f(p, 1.);
   if (c.w <= .05) { return 1.; }
   let u = c.xy / c.w;
   if (abs(u.x) > .98 || abs(u.y) > .98) { return 1.; }
-  let uv = vec2f(u.x * .5 + .5, .5 - u.y * .5); let z = c.z / c.w - .0006;
-  if (z >= 1.) { return 1.; } let e = 1.3 / 1024.;
-  var a = textureSampleCompareLevel(tLS, sS, uv, z) * 2.;
-  a += textureSampleCompareLevel(tLS, sS, uv + vec2f(e, e), z) + textureSampleCompareLevel(tLS, sS, uv + vec2f(-e, e), z);
-  a += textureSampleCompareLevel(tLS, sS, uv + vec2f(e, -e), z) + textureSampleCompareLevel(tLS, sS, uv + vec2f(-e, -e), z);
-  return a / 6.;
+  let uv = vec2f(u.x * .5 + .5, .5 - u.y * .5); let zr = c.z / c.w; let z = zr - .0006;
+  if (z >= 1.) { return 1.; }
+  // depth 0..1 back to metres from the flame (perspective, near .15, far 60: see main.js)
+  let A = 60. / 59.85; let B = -60. * .15 / 59.85;
+  let dR = B / (zr - A);
+  // blockers: what lies between the flame and this point, in a small neighbourhood
+  var sb = 0.; var nb = 0.;
+  for (var k = 0; k < 16; k += 2) {
+    let tc = vec2i(clamp(uv * 1024. + LSD[k] * 6., vec2f(0.), vec2f(1023.)));
+    let d = textureLoad(tLS, tc, 0);
+    if (d < z) { sb += B / (d - A); nb += 1.; }
+  }
+  if (nb < .5) { return 1.; }
+  let dB = sb / nb;
+  let pen = .05 * max(dR - dB, 0.) / max(dB, .05);   // the penumbra's width here, in metres
+  let tw = dR * 3.464 / 1024.;                        // one shadow-map texel's width here (120 degrees wide)
+  let r = clamp(pen / tw, 1.3, 18.) / 1024.;
+  // turn the pattern a little from pixel to pixel so the wide blur does not show its taps as rings
+  let an = fract(sin(dot(p0.xz, vec2f(12.9898, 78.233))) * 43758.55) * 6.2832; let cs = cos(an); let sn = sin(an);
+  var a = 0.;
+  for (var k = 0; k < 16; k++) { let o = LSD[k]; a += textureSampleCompareLevel(tLS, sS, uv + vec2f(cs * o.x - sn * o.y, sn * o.x + cs * o.y) * r, z); }
+  return a / 16.;
 }
 fn lantF(p: vec3f) -> f32 {
   let v = p - g.lant.xyz; let d = length(v);

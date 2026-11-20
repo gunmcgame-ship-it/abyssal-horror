@@ -117,6 +117,8 @@
     // dev.look({ bright: 2 }): change the night look from the console (same keys as the sliders)
     look: (o) => Object.assign(LOOK, o),
     freeze: (t = 100) => (FREEZE = t), // dev.freeze(-1) lets the clock run again
+    // dev.lanternAt('hold') pins the lantern where it is now (light, aim, shadows); dev.lanternAt() lets it go
+    lanternAt: (h) => { if (h !== 'hold') { LANTAT[3] = 0; return; } LANTAT[0] = UB[64]; LANTAT[1] = UB[65] - 0.01; LANTAT[2] = UB[66]; LANTAT[4] = UB[96]; LANTAT[5] = UB[97]; LANTAT[6] = UB[98]; LANTAT[3] = 1; return Array.from(LANTAT.slice(0, 7)); },
     skip: (k = 0) => (PSKIP = k), // leave groups of the scene out until dev.skip(0) (bits as in dev.prof)
     // dev.meshes(): vertex and triangle counts of every mesh, with its instance count (solids) for finding vertex load
     meshes: () => meshes.map((m, i) => [i, m.nv, m.ib.length / 3, (Wd.solids.ranges[i] || [0, 0])[1]]),

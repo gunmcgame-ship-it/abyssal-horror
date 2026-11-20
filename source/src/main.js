@@ -526,7 +526,8 @@ function drawNear(r, start, indexed, verts, px, pz, R) {
 let LSHOFF = false, LPOW = 1; // dev: turn the lantern shadows off, scale the lantern (0 = out) to compare
 // dev profiling: PROF times every pass (pairs of timestamps); PSKIP leaves out groups of the scene to see what they
 // cost (1 terrain, 2 solids, 4 rock chunks, 8 cacti and trunks, 16 plants, 32 sky and stars, 64 fire, 128 lantern shadows)
-let FREEZE = -1; // dev: hold the clock at this time (flicker, swing drift, flames), for comparing renders
+let FREEZE = -1; const LANTAT = new Float64Array(8); // dev.lanternAt(x, y, z) pins the lantern (light and shadows) for a look from elsewhere
+ // dev: hold the clock at this time (flicker, swing drift, flames), for comparing renders
 let PROF = false, PSKIP = 0, profQS = null, profRes = null, profRd = [], profTW = [], profN = 0, profK = 0;
 const profSum = new Float64Array(16);
 let pslot = null; // this frame's profiling readback (no closure per frame: the game allocates nothing per frame)
@@ -577,6 +578,7 @@ function render() {
   // standing on the tent floor by the flap until you pick it up (the opening)
   const lh = F[LHOLD] * F[LHOLD] * (3 - 2 * F[LHOLD]);
   if (lh < 1) { lx = WK_LANT[0] + (lx - WK_LANT[0]) * lh; ly = WK_LANT[1] + (ly - WK_LANT[1]) * lh; lz = WK_LANT[2] + (lz - WK_LANT[2]) * lh; }
+  if (LANTAT[3] > 0) { lx = LANTAT[0]; ly = LANTAT[1]; lz = LANTAT[2]; } // dev: the lantern pinned in place
   m[64] = lx; m[65] = ly + 0.01; m[66] = lz;
   m[67] = LANTP * LPOW * (1 + 0.05 * sin(t * 17) + 0.04 * sin(t * 23 + 1) + 0.03 * sin(t * 7.3)) * (1 - 0.55 * gt * gt * (3 - 2 * gt));
   const swl = sw * lh, yl = yaw * lh, ss2 = sin(swl / 2), cs2 = cos(swl / 2), qy = sin(-yl / 2), qw = cos(-yl / 2), qx = rx * ss2, qz = rz * ss2;
@@ -584,7 +586,9 @@ function render() {
   Q.writeBuffer(ibLant, 0, LANT);
   // the reflector's aim: your facing, turned a little with the swing. Carried low it hangs from the bail and only half
   // follows your gaze up or down (tipped a little toward the ground); raised, you turn it to what you look at
-  { const gp = Math.asin(clamp(fy, -1, 1)), tip = clamp((0.13 - 0.5 * gp) * (1 - lu) + (0.12 - gp) * lu, -1.2, 1.2), ay = yaw + swl * 0.7, ch = cos(tip), dx = sin(ay) * ch, dy = -sin(tip), dz = -cos(ay) * ch;
+  { const gp = Math.asin(clamp(fy, -1, 1)), tip = clamp((0.13 - 0.5 * gp) * (1 - lu) + (0.12 - gp) * lu, -1.2, 1.2), ch = cos(tip);
+    let ay = yaw + swl * 0.7, dx = sin(ay) * ch, dy = -sin(tip), dz = -cos(ay) * ch;
+    if (LANTAT[3] > 0) { dx = LANTAT[4]; dy = LANTAT[5]; dz = LANTAT[6]; ay = Math.atan2(dx, -dz); }
     m[96] = dx; m[97] = dy; m[98] = dz; m[99] = LSH && !LSHOFF && lh > 0.5 ? 1 : 0;
     if (LSH) { // perspective from the flame along the aim, 120 degrees wide, 0.15 .. 14 m, standard depth 0..1
       const rxl = cos(ay), rzl = sin(ay); // right (level); up = right x forward
