@@ -1,3 +1,9 @@
+> **Work in progress: this fork is being turned into *Ground Observer, 1957*,** a slow first-person walk through a
+> fictional desert canyon on the night of the 7 November 1957 lunar eclipse, with a kerosene lantern as your only
+> light. The plan, the current status and the notes for picking the work up are in [`PLAN.md`](PLAN.md); the work is
+> on the `m2-walking` branch. Everything below is still the original Abyssal Garden README by Noniv, and is rewritten
+> in the last milestone.
+
 # Abyssal Garden
 
 **A dreamy underwater world you can swim through, right in your browser.**
