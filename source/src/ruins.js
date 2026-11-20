@@ -359,7 +359,7 @@ function buildSettlement(RH, gy, solid, tuft, rbox) {
     for (let i = 0, nT = st === 2 ? 2 : 3 + (rnd() * 3 | 0); i < nT; i++) {
       const lz = rr(-hd + 0.7, hd - 0.7), side = rnd() < 0.5 ? 1 : -1;
       const sw = side > 0 ? lz + hd - t / 2 : hd - t / 2 - lz, top = prof(side > 0 ? 1 : 3)(sw);
-      const a = W(side * (hw + 0.05), lz), b = W(-side * rr(-0.3, 1.8), lz + rr(-1.4, 1.4));
+      const a = W(side * (hw + 0.05), lz), b = W(-side * (st < 2 ? -rr(1.15, 1.7) : rr(-0.3, 1.8)), lz + rr(-1.4, 1.4)); // where the table stands, logs stay along their own wall
       const up = top > 0.7 && rnd() < 0.75 && st < 2, broken = rnd() < 0.45, sc = rr(0.85, 1.1);
       const r = 0.125 * sc, ya = up ? y0 + top + r * 0.8 : gy(a[0], a[1]) + r * 0.55, yb2 = gy(b[0], b[1]) + r * 0.55; // lying ones half sunk in the sand
       const dx = b[0] - a[0], dy = yb2 - ya, dz = b[1] - a[1];

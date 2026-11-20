@@ -534,7 +534,7 @@ function meshTruck() {
   // in the bed: a tarp tied over gear, the spare tyre, a gas can
   P(m, 37); loft(m, [[0.75, 0, 0.86, 0.5, 0.05, 3], [0.85, 0, 0.98, 0.56, 0.18, 3], [1.2, 0.05, 1.05, 0.56, 0.24, 3], [1.6, -0.03, 1.02, 0.55, 0.2, 3], [1.85, 0, 0.94, 0.5, 0.11, 3], [1.92, 0, 0.86, 0.4, 0.04, 3]], 16);
   P(m, 18); for (const z of [0.95, 1.6]) cyl(m, [-0.6, 1.12, z], [0.6, 1.12, z], 0.009, 4, false);
-  P(m, 4); { const n0 = m.p.length / 3; cyl(m, [0.33, 0, 0], [0.47, 0, 0], 0.33, 18); for (let k = n0 * 3; k < m.p.length; k += 3) { const x = m.p[k] - 0.4, y = m.p[k + 1]; m.p[k] = 0.45 + x * 0.94 + y * 0.34; m.p[k + 1] = 1.18 - x * 0.34 + y * 0.94; m.p[k + 2] += 2.1; } }
+  P(m, 4); { const n0 = m.p.length / 3; cyl(m, [0.33, 0, 0], [0.47, 0, 0], 0.33, 18); for (let k = n0 * 3; k < m.p.length; k += 3) { const x = m.p[k] - 0.4, y = m.p[k + 1]; m.p[k] = 0.45 + x * 0.94 + y * 0.34; m.p[k + 1] = 1.18 - x * 0.34 + y * 0.94; m.p[k + 2] += 1.72; } } // inside the bed (it ends at z 2.3)
   P(m, 11); box(m, -0.55, 0.86, 2.0, -0.38, 1.3, 2.28);
   // canvas water bag hanging from the front bumper
   P(m, 17); loft(m, [[-2.67, 0.42, 0.3, 0.02, 0.03, 2], [-2.66, 0.42, 0.22, 0.13, 0.17, 3], [-2.6, 0.42, 0.22, 0.14, 0.18, 3], [-2.585, 0.42, 0.3, 0.02, 0.03, 2]], 14);
@@ -663,7 +663,8 @@ function meshTable() {
   P(m, 31); box(m, -0.106, 0.75, 0.2, -0.1, 0.97, 0.58); box(m, -0.02, 0.99, 0.34, 0.02, 1.01, 0.44);
   P(m, 32); box(m, -0.111, 0.89, 0.23, -0.106, 0.95, 0.55);
   P(m, 34); for (let y = 0.77; y < 0.87; y += 0.018) box(m, -0.112, y, 0.24, -0.106, y + 0.008, 0.54);
-  P(m, 3); cyl(m, [0.06, 0.99, 0.54], [0.02, 1.7, 0.58], 0.004, 4, false); for (const z of [0.28, 0.48]) cyl(m, [-0.111, 0.92, z], [-0.135, 0.92, z], 0.016, 10);
+  P(m, 42); cyl(m, [0.06, 0.99, 0.54], [0.044, 1.27, 0.556], 0.0045, 8, false); cyl(m, [0.044, 1.27, 0.556], [0.02, 1.7, 0.58], 0.003, 8, false); // telescoping aerial, dull steel (chrome strobed as a glowing hairline)
+  P(m, 3); for (const z of [0.28, 0.48]) cyl(m, [-0.111, 0.92, z], [-0.135, 0.92, z], 0.016, 10);
   // camp stove: green enamel box, lid up behind with wind wings, two burners, the fuel tank in front
   P(m, 35); box(m, -0.13, 0.73, -0.6, 0.13, 0.84, -0.18); box(m, 0.13, 0.84, -0.6, 0.145, 1.1, -0.18);
   for (const z of [-0.6, -0.18]) box(m, -0.13, 0.84, z - 0.005, 0.13, 1.0, z + 0.005);

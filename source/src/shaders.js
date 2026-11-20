@@ -557,10 +557,12 @@ fn prop(id: i32, op: vec3f, on: vec3f, mc: f32, h: f32, pfw: f32, sd: f32, cv: f
       let fo = .5 + .5 * sin((op.z * 40. + op.x * 40.) + vn2d(vec2f(op.z * 6., op.y * 3.)) * 3.);
       m.a = vec3f(.07, .065, .055) * (.6 + .6 * fo); m.gl = .85; m.mt = .1; m.bp = 0.; }
     case 73 {   // licence plate: black, a yellow rim, embossed yellow characters (a coarse glyph pattern), dented
-      let q = vec2f(fract((op.x + .155) / .31), fract(op.y / .16));
-      let rim = step(q.x, .04) + step(.96, q.x) + step(fract((op.y - .2) / .14), .06) + step(.94, fract((op.y - .2) / .14));
-      let cx = floor((op.x + .13) / .037); let ch = step(.18, fract((op.x + .13) / .037)) * step(fract((op.x + .13) / .037), .82) * step(.3, fract((op.y + .02) / .14)) * step(fract((op.y + .02) / .14), .8) * step(abs(op.x), .125);
-      let gl = step(.35, hs(cx * 3.1 + floor(fract((op.y + .02) / .14) * 5.) * 7.3 + floor(fract((op.x + .13) / .037) * 3.) * 1.7));
+      // in the plate's own frame (front plate y .2 .. .34, rear plate y .56 .. .72): u across, v up
+      let rear = op.y > .45; let v = (op.y - select(.2, .56, rear)) / select(.14, .16, rear); let u = (op.x + .155) / .31;
+      let rim = step(u, .04) + step(.96, u) + step(v, .08) + step(.92, v);
+      let cf = fract((op.x + .13) / .037); let cx = floor((op.x + .13) / .037); let cr = (v - .26) / .48;
+      let ch = step(.18, cf) * step(cf, .82) * step(0., cr) * step(cr, 1.) * step(abs(op.x), .125);
+      let gl = step(.35, hs(cx * 3.1 + floor(cr * 5.) * 7.3 + floor(cf * 3.) * 1.7 + select(0., 5.7, rear)));
       m.a = mix(vec3f(.025, .024, .022), vec3f(.55, .42, .08), min(1., rim + ch * gl)); m.gl = .35; m.bp = 0.; }
     case 71 { let st = vn2d(vec2f((op.x + op.z) * 60., op.y * 6.)); m.a = vec3f(.12, .095, .07) * (.7 + .5 * st); m.gl = .01; m.bp = .1; }   // weathered stick wood                         // glochid tufts
     case 65 { m.a = vec3f(.15, .03, .09); m.gl = .1; m.bp = .2; }             // prickly pear fruit
