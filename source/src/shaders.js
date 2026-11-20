@@ -416,7 +416,7 @@ fn qrot(q: vec4f, v: vec3f) -> vec3f { return v + 2. * cross(q.xyz, cross(q.xyz,
 // mat (instance): 0 terrain, 1 rock, 2 painted part list (the part id is in each vertex: see prop())
 const W_SOLID = S_B + /*wgsl*/`
 struct VI { @location(0) p: vec3f, @location(1) n: vec4f, @location(2) a: vec4f, @location(3) b: vec4f, @location(4) c: vec4f };
-struct VO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) n: vec3f, @location(2) op: vec3f, @location(3) on: vec3f,
+struct VO { @builtin(position) @invariant cp: vec4f, @location(0) wp: vec3f, @location(1) n: vec3f, @location(2) op: vec3f, @location(3) on: vec3f, // invariant: the stones' depth pre-pass must land on exactly the same depths
   @location(4) @interpolate(flat) m: vec4f, @location(5) @interpolate(flat) q: vec4f, @location(6) ao: f32, @location(7) va: f32 };
 @vertex fn vs(i: VI) -> VO {
   var o: VO;
@@ -675,6 +675,8 @@ fn weather(m: ptr<function, PM>, id: i32, op: vec3f, on: vec3f, pfw: f32, cv: f3
   let dust = vec3f(.47, .32, .21) * (.85 + .3 * n2);
   (*m).a = mix((*m).a, dust, dk); (*m).gl *= 1. - .85 * dk; (*m).mt *= 1. - dk;
 }
+// the depth pre-pass writes no colour (its target's write mask is 0); the pass still needs a matching target
+@fragment fn fz() -> @location(0) vec4f { return vec4f(0.); }
 @fragment fn fs(i: VO, @builtin(front_facing) ff: bool) -> @location(0) vec4f {
   let mat = i32(i.m.x + .5); let fl_ = select(-1., 1., ff);
   let on = normalize(i.on) * fl_; let n0 = normalize(i.n) * fl_;

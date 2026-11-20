@@ -250,7 +250,7 @@ function qToX(dx, dy, dz, roll) {
 // lintels where both ends still bear on stone, a hearth and chimney in the standing ones, an iron stove in the others;
 // fallen roof logs, boards, tumbled stone, broken crockery. The supper stages' small things go into stg[0..2].
 // rbox gets the collision boxes (x, z, half sizes, yaw, the stage they appear at).
-function buildSettlement(RH, gy, solid, tuft, rbox) {
+function buildSettlement(RH, gy, solid, tuft, rbox, cnt) {
   const ruin = new Mesh(), stg = [new Mesh(), new Mesh(), new Mesh()];
   stg[0].tri(stg[0].v(0, -99, 0), stg[0].v(0.01, -99, 0), stg[0].v(0, -99, 0.01)); // (stage 1's things are instances)
   rseed(910);
@@ -290,6 +290,7 @@ function buildSettlement(RH, gy, solid, tuft, rbox) {
     return [len, ux, uz];
   };
   for (const H of RH) {
+    H.c0 = cnt.slice(); // this house's building stones: instances c0[v] .. c1[v] of shape v (main.js draws house by house)
     const W = (lx, lz) => [H.x + H.rx * lx - H.fx * lz, H.z + H.rz * lx - H.fz * lz];
     const y0 = gy(H.x, H.z); let gmin = y0;
     for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const p = W(a * (H.hw + 0.3), b * (H.hd + 0.3)); gmin = min(gmin, gy(p[0], p[1])); }
@@ -402,6 +403,7 @@ function buildSettlement(RH, gy, solid, tuft, rbox) {
       const lf = tf(-0.05, 0.03); put(stg[2], meshLoaf(), lf[0], y + 0.79, lf[1], ty + 0.3);
       if (potAt) put(stg[2], meshPot(), potAt[0], potAt[1], potAt[2], rnd() * TAU);
     }
+    H.c1 = cnt.slice();
   }
   return { ruin, stg, nStone };
 }

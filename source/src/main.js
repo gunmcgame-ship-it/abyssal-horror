@@ -113,6 +113,14 @@ await say('Compiling shaders…', 0.05, 300);
 const mSolid = mod(W_SOLID), mLeaf = mod(W_LEAF), mSky = mod(W_SKY), mFire = mod(W_FIRE);
 const pTerrain = scenePipe(mSolid, 'vs', 'fs', [vbSolid, ibSolid], { cull: 'back' });
 const pSolid = scenePipe(mSolid, 'vs', 'fs', [vbSolid, ibSolid]);
+// the ruins' building stones: a depth-only pass first (the walls are thousands of stones lying into one another, and
+// each hidden face would otherwise run the whole rock shader), then shaded only where they are what you see
+const pSolidZ = device.createRenderPipeline({ layout: pl0, vertex: { module: mSolid, entryPoint: 'vs', buffers: [vbSolid, ibSolid] },
+  fragment: { module: mSolid, entryPoint: 'fz', targets: [{ format: HDR, writeMask: 0 }] },
+  primitive: { topology: 'triangle-list', cullMode: 'none' }, depthStencil: { format: DEPTH, depthWriteEnabled: true, depthCompare: 'greater' }, multisample: { count: AA } });
+const pSolidEq = device.createRenderPipeline({ layout: pl0, vertex: { module: mSolid, entryPoint: 'vs', buffers: [vbSolid, ibSolid] },
+  fragment: { module: mSolid, entryPoint: 'fs', targets: [{ format: HDR }] },
+  primitive: { topology: 'triangle-list', cullMode: 'none' }, depthStencil: { format: DEPTH, depthWriteEnabled: false, depthCompare: 'greater-equal' }, multisample: { count: AA } });
 const pLeaf = scenePipe(mLeaf, 'vs', 'fs', [ibLeaf], { strip: true, constants: { ROWS: 9 } });
 const pLeaf5 = scenePipe(mLeaf, 'vs', 'fs', [ibLeaf], { strip: true, constants: { ROWS: 5 } });
 const pLeafS = scenePipe(mLeaf, 'vs', 'fs', [ibLeaf], { strip: true, constants: { ROWS: 3, FAR: 70 } });
@@ -302,7 +310,7 @@ D = Wd.gy = T.smp = null; // with gy goes the generator's working memory (about 
 
 await say('Pitching camp…', 0.94, 1200);
 // mesh ids: 0-3 rocks, 4 barrel cactus, 5 hedgehog cactus, 6-7 prickly pear, 8 juniper trunk, 9 pinyon trunk,
-// 10 the camp, 11 the lantern, 12 the folding chair, 13 your hand on the lantern, 14-20 rock chunks + pebbles, 21-22 unused,
+// 10 the camp, 11 the lantern, 12 the folding chair, 13 your hand on the lantern, 14-20 rock chunks + pebbles, 21-22 the prickly pears seen from past 30 m,
 // 23-25 far LOD of the large rock chunks, 26-29 the ruins' building stones, 30 the rest of the ruins, 31-33 the supper
 // stages (drawn once RSTAGE reaches 1, 2, 3), 34 the traces of later visitors (ruins.js), 35-38 the building stones in
 // low detail (used beyond 22 m), 39-47 single objects placed as instances (ruins.js: logs, lintel, board, old table and
@@ -312,7 +320,7 @@ const unused = () => { const m = new Mesh(); m.tri(m.v(0, 0, 0), m.v(0.01, 0, 0)
 const AO = (m, o) => { const t0 = performance.now(), r = bakeAO(m, o); if (DEV) console.log('AO', m.p.length / 3, Math.round(performance.now() - t0) + ' ms'); return r; };
 const meshes = [meshChunk(1, 3), meshChunk(7, 3), meshChunk(13, 3), meshChunk(22, 3), AO(meshBarrel(), { ground: 0, res: 0.015, maxD: 0.25 }), AO(meshHedgehog(), { ground: 0, res: 0.015, maxD: 0.25 }), AO(meshPear(0), { ground: 0, res: 0.015, maxD: 0.3 }), AO(meshPear(1), { ground: 0, res: 0.015, maxD: 0.3 }), Wd.trunks[0].m, Wd.trunks[1].m,
   AO(meshCamp(), { ground: -0.01 }), meshLantern(), AO(meshChair(), { ground: 0, res: 0.02 }), meshHand(),
-  meshChunk(3), meshChunk(11), meshChunk(29), meshChunk(5, 3), meshChunk(17, 3), meshChunk(41, 3), meshChunk(9, 1), unused(), unused(), meshChunk(5, 2, 1), meshChunk(17, 2, 1), meshChunk(41, 2, 1),
+  meshChunk(3), meshChunk(11), meshChunk(29), meshChunk(5, 3), meshChunk(17, 3), meshChunk(41, 3), meshChunk(9, 1), AO(meshPear(0, true), { ground: 0, res: 0.015, maxD: 0.3 }), AO(meshPear(1, true), { ground: 0, res: 0.015, maxD: 0.3 }), meshChunk(5, 2, 1), meshChunk(17, 2, 1), meshChunk(41, 2, 1),
   meshBlock(1), meshBlock(2), meshBlock(3), meshBlock(4), Wd.ruinM, Wd.stgM[0], Wd.stgM[1], Wd.stgM[2], Wd.trM,
   meshBlock(1, 1), meshBlock(2, 1), meshBlock(3, 1), meshBlock(4, 1),
   meshLog(false), meshLog(true), meshBeam(), meshBoard(), AO(meshOldTable(), { ground: 0, res: 0.02 }), AO(meshBench(), { ground: 0, res: 0.02 }), AO(meshStove(), { ground: 0, res: 0.02 }), AO(meshSign(), { ground: 0, res: 0.02 }), AO(meshMarker(), { ground: 0, res: 0.02 })].map((m) => m.build());
@@ -353,6 +361,19 @@ let RSTAGE = 0;
 const solidOn = (i) => (i === W_TABLE || i === W_BENCH ? RSTAGE >= 1 : i < RUIN_STAGE || i > RUIN_STAGE + 2 || i - RUIN_STAGE < RSTAGE);
 let ruinD = 0; // the camera's distance from the ruins, this frame
 const solidMesh = (i) => (i >= RUIN_STONE && i < RUIN_STONE + 4 && ruinD > 22 ? meshes[i + 9] : meshes[i]);
+// the building stones, house by house: full detail only for the homes within RUINLOD of (x, z), the coarse stones for
+// the rest, and with cull a home wholly behind the camera is not drawn at all (each is a few metres across)
+const RUINLOD = 16;
+function drawStones(r, i, x, z, cull) {
+  const g = Wd.solids.ranges[i], v = i - RUIN_STONE, fx = F[FX], fz = F[FZ], fl = Math.hypot(fx, fz) || 1;
+  for (let h = 0; h < Wd.ruinH.length; h++) {
+    const H = Wd.ruinH[h], n = H.c1[v] - H.c0[v]; if (!n) continue;
+    const dx = H.x - x, dz = H.z - z;
+    if (cull && (dx * fx + dz * fz) / fl < -7) continue;
+    const M = Math.hypot(dx, dz) < RUINLOD && !(PSKIP & 512) ? meshes[i] : meshes[i + 9];
+    r.drawIndexed(M.ib.length, n, M.i0, M.v0, g[0] + H.c0[v]);
+  }
+}
 const ruinSkip = (i, d) => ((i >= RUIN_STONE && i < TRACE_MESH) || (i >= W_LOG && i <= W_STOVE)) && d > 95;
 const setRuinStage = (k) => { RSTAGE = clamp(k | 0, 0, 3); bakeMoonShadow(); };
 function bakeMoonShadow() {
@@ -602,7 +623,7 @@ function render() {
     // the lantern's shadows reach the ruins only from near them; it draws the same stones the view does (a coarser
     // stand-in would shadow the real one)
     const lrd = hypot(lx - RUINC[0], lz - RUINC[1]) - 40;
-    for (let i = 0; i < SOLN; i++) { if (i === 11 || i === 13) continue; const g = Wd.solids.ranges[i]; if (g[1] && solidOn(i) && !ruinSkip(i, lrd + 95)) { const M = solidMesh(i); r.drawIndexed(M.ib.length, g[1], M.i0, M.v0, g[0]); } }
+    for (let i = 0; i < SOLN; i++) { if (i === 11 || i === 13) continue; const g = Wd.solids.ranges[i]; if (g[1] && solidOn(i) && !ruinSkip(i, lrd + 95)) { if (i >= RUIN_STONE && i < RUIN_STONE + 4) { drawStones(r, i, lx, lz, false); continue; } const M = solidMesh(i); r.drawIndexed(M.ib.length, g[1], M.i0, M.v0, g[0]); } }
     for (let i = 0; i < NCHUNK; i++) { r.setVertexBuffer(1, ibChunk[i]); drawNear(r, Wd.chunks[i].start, meshes[14 + i], 0, lx, lz, 40); }
     for (let i = 0; i < 6; i++) { r.setVertexBuffer(1, ibProp[i]); drawNear(r, Wd.props[i].start, meshes[4 + i], 0, lx, lz, 40); }
     r.setPipeline(pLeafSh); r.setVertexBuffer(0, ibBig); drawNear(r, Wd.big.start, 0, 6, lx, lz, 20);
@@ -613,11 +634,16 @@ function render() {
   if (pslot) { profK = 1; passScene.timestampWrites = ptw(); }
   let r = e.beginRenderPass(passScene);
   r.setBindGroup(0, bg0);
+  ruinD = hypot(F[CX] - RUINC[0], F[CZ] - RUINC[1]);
+  const stonesZ = !(PSKIP & 2) && !(PSKIP & 256) && !ruinSkip(RUIN_STONE, ruinD) && !(PSKIP & 1024);
+  if (stonesZ) { // the stones' depth first (see pSolidZ)
+    r.setPipeline(pSolidZ); r.setVertexBuffer(0, vbMesh); r.setVertexBuffer(1, ibSolids); r.setIndexBuffer(ibMesh, 'uint32');
+    for (let i = RUIN_STONE; i < RUIN_STONE + 4; i++) if (Wd.solids.ranges[i][1]) drawStones(r, i, F[CX], F[CZ], true);
+  }
   r.setPipeline(pTerrain); r.setVertexBuffer(0, vbTerrain); r.setVertexBuffer(1, ibSolids); r.setIndexBuffer(ibTerrain, 'uint32');
   if (!(PSKIP & 1)) drawCells(r, T.start, T.lo, T.hi, 1.5, 1, 0, 0, 240);
   r.setPipeline(pSolid); r.setVertexBuffer(0, vbMesh); r.setIndexBuffer(ibMesh, 'uint32');
-  ruinD = hypot(F[CX] - RUINC[0], F[CZ] - RUINC[1]);
-  for (let i = 0; i < SOLN; i++) { const g = Wd.solids.ranges[i]; if (!(PSKIP & 2) && g[1] && solidOn(i) && !ruinSkip(i, ruinD)) { const M = solidMesh(i); r.drawIndexed(M.ib.length, g[1], M.i0, M.v0, g[0]); } }
+  for (let i = 0; i < SOLN; i++) { const g = Wd.solids.ranges[i]; if (!(PSKIP & 2) && g[1] && solidOn(i) && !ruinSkip(i, ruinD)) { if (i >= RUIN_STONE && i < RUIN_STONE + 4) { if (!(PSKIP & 256)) { if (stonesZ) r.setPipeline(pSolidEq); drawStones(r, i, F[CX], F[CZ], true); if (stonesZ) r.setPipeline(pSolid); } continue; } const M = solidMesh(i); r.drawIndexed(M.ib.length, g[1], M.i0, M.v0, g[0]); } }
   r.setVertexBuffer(1, ibLant); r.drawIndexed(LANTM.ib.length, 1, LANTM.i0, LANTM.v0, 0);
   if (F[LHOLD] > 0.5 && !FLYCAM) r.drawIndexed(HANDM.ib.length, 1, HANDM.i0, HANDM.v0, 0);
   for (let i = 0; i < NCHUNK * !(PSKIP & 4); i++) {
@@ -626,7 +652,11 @@ function render() {
     if (big) drawCells(r, c.start, c.lo, c.hi, 3, meshes[20 + i], 0, 40, 150);
   }
   // cacti, then the tree trunks (seen from further away)
-  for (let i = 0; i < 6 * !(PSKIP & 8); i++) { r.setVertexBuffer(1, ibProp[i]); drawCells(r, Wd.props[i].start, Wd.props[i].lo, Wd.props[i].hi, 3, meshes[4 + i], 0, 0, i > 3 ? 160 : 110); }
+  for (let i = 0; i < 6 * !(PSKIP & 8); i++) {
+    const pear = i === 2 || i === 3; r.setVertexBuffer(1, ibProp[i]);
+    drawCells(r, Wd.props[i].start, Wd.props[i].lo, Wd.props[i].hi, 3, meshes[4 + i], 0, 0, pear ? 30 : i > 3 ? 160 : 110);
+    if (pear) drawCells(r, Wd.props[i].start, Wd.props[i].lo, Wd.props[i].hi, 3, meshes[19 + i], 0, 30, 110); // prickly pears past 30 m: the far version (meshes 21, 22)
+  }
   // plants: 9-row blades up close, 5 rows mid-range, a decimated set far away
   if (!(PSKIP & 16)) {
     r.setPipeline(pLeaf); r.setVertexBuffer(0, ibBig); drawCells(r, Wd.big.start, Wd.big.lo, Wd.big.hi, 5, false, 18, 0, 24);

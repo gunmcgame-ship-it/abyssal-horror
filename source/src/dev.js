@@ -117,8 +117,10 @@
     // dev.look({ bright: 2 }): change the night look from the console (same keys as the sliders)
     look: (o) => Object.assign(LOOK, o),
     freeze: (t = 100) => (FREEZE = t), // dev.freeze(-1) lets the clock run again
+    skip: (k = 0) => (PSKIP = k), // leave groups of the scene out until dev.skip(0) (bits as in dev.prof)
     // dev.meshes(): vertex and triangle counts of every mesh, with its instance count (solids) for finding vertex load
     meshes: () => meshes.map((m, i) => [i, m.nv, m.ib.length / 3, (Wd.solids.ranges[i] || [0, 0])[1]]),
+    groups: () => ({ props: Wd.props.map((p) => p.n), chunks: Wd.chunks.map((p) => p.n), big: Wd.big.n, bigF: Wd.bigF.n, small: Wd.small.n }),
     // dev.prof(frames, skip): GPU ms per pass, averaged over that many frames (with groups of the scene left out: PSKIP)
     prof: async (n = 120, skip = 0) => {
       if (!hasTS) return 'no timestamp-query'; if (!profQS) profInit();

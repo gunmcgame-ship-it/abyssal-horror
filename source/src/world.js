@@ -76,7 +76,9 @@ function makeWorld(D, T, flyPts, POSES) {
   // things you can't walk through, for the walking (x, z, radius): rocks, cacti, tree trunks, fallen blocks
   const obs = [];
   const OBR = [0.55, 0.55, 0.55, 0.55, 0.22, 0.2, 0.32, 0.32, 0.22, 0.24];
+  const ruinCnt = [0, 0, 0, 0]; // building stones placed so far, per shape (each house records its own range: H.c0, H.c1)
   const solid = (mesh, x, y, z, sc, q, mat, seed, ts = 1, bob = 0) => {
+    if (mesh >= RUIN_STONE && mesh < RUIN_STONE + 4) ruinCnt[mesh - RUIN_STONE]++;
     (mesh > 3 && mesh < 10 ? props[mesh - 4][cellOf(x, z)] : (solids[mesh] ||= [])).push(x, y, z, sc, q[0], q[1], q[2], q[3], mat, seed, ts, bob);
     if (mesh < 10 && (mesh > 3 || sc > 0.45)) obs.push(x, z, OBR[mesh] * sc);
   };
@@ -202,7 +204,7 @@ function makeWorld(D, T, flyPts, POSES) {
   }
 
   // --- the 1870s settlement and the traces of later visitors (ruins.js): world-coordinate meshes, one instance each
-  const rbox = [], S = buildSettlement(RH, gy, solid, tuft, rbox), trM = buildTraces(gy, solid, (x, z, r) => obs.push(x, z, r));
+  const rbox = [], S = buildSettlement(RH, gy, solid, tuft, rbox, ruinCnt), trM = buildTraces(gy, solid, (x, z, r) => obs.push(x, z, r));
   for (const id of [RUIN_MESH, RUIN_STAGE, RUIN_STAGE + 1, RUIN_STAGE + 2, TRACE_MESH]) solid(id, 0, 0, 0, 1, [0, 0, 0, 1], 2, 0, 1, 0);
   for (const m of [S.ruin, ...S.stg, trM]) bakeAO(m, { ground: gy, res: 0.025, maxD: 0.35 });
 
@@ -422,9 +424,11 @@ function meshHedgehog() {
 }
 // prickly pear: flat obovate pads (wider toward the top, thin rounded rims) growing from the edges of older pads, areoles
 // in loose diagonal rows over both faces, a few red-purple fruits on top
-function meshPear(seed) {
-  rseed(420 + seed); const m = new Mesh(), fruit = tag(icosphere(1), 65);
-  const pad = icosphere(3, (x, y, z) => { const wy = 1 + 0.22 * y, th = 0.6 + 0.4 * sqrt(max(0, 1 - x * x - y * y)); return [x * wy, y, z * th]; });
+// lod: the far version (drawn past 30 m): the same plant from the same random numbers, its pads a coarser sphere and
+// no areoles (3.5 mm bumps with 1 mm spines: well under a pixel out there), about a seventh of the vertices
+function meshPear(seed, lod = false) {
+  rseed(420 + seed); const m = new Mesh(), fruit = tag(icosphere(1), 65), junk = new Mesh();
+  const pad = icosphere(lod ? 2 : 3, (x, y, z) => { const wy = 1 + 0.22 * y, th = 0.6 + 0.4 * sqrt(max(0, 1 - x * x - y * y)); return [x * wy, y, z * th]; });
   const grow = (x, y, z, yaw, lean, depth) => {
     const s = rr(0.8, 1.1), h = 0.17 * s, A = 0.13 * s, C = 0.035 * s, c = cos(lean), sn = sin(lean), cy = cos(yaw), sy = sin(yaw);
     // tip a pad-local point (round its own x axis), then turn and move it so the pad's base sits at x, y, z
@@ -435,7 +439,7 @@ function meshPear(seed) {
       const u = rr(-0.85, 0.85), v = rr(-0.85, 0.85); if (u * u + v * v > 0.8) continue;
       const f = rnd() < 0.5 ? 1 : -1, wy = 1 + 0.22 * v, th = 0.6 + 0.4 * sqrt(max(0, 1 - u * u - v * v)), zz = sqrt(max(0, 1 - u * u - v * v)) * th * f;
       const p = xf(u * wy * A, v * h + h, zz * C * 1.02), q = xf(u * wy * A + u * 0.3 * f * 0, v * h + h, zz * C + f * 0.02);
-      areole(m, p, [q[0] - p[0], q[1] - p[1], q[2] - p[2]], 1 + (rnd() < 0.6) + (rnd() < 0.3), 0.025);
+      areole(lod ? junk : m, p, [q[0] - p[0], q[1] - p[1], q[2] - p[2]], 1 + (rnd() < 0.6) + (rnd() < 0.3), 0.025); // (the far one still draws the random numbers)
     }
     const tx = x + sin(lean) * 2 * h * sin(yaw), ty = y + cos(lean) * 2 * h, tz = z + sin(lean) * 2 * h * cos(yaw);
     if (depth) for (let i = 1 + (rnd() < 0.6); i > 0; i--) grow(tx + rr(-0.06, 0.06), ty - 0.04, tz + rr(-0.06, 0.06), yaw + rr(-1, 1), lean + rr(-0.5, 0.5), depth - 1);
