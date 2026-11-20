@@ -11,6 +11,8 @@ Desktop Chrome first. Phone support must not be broken on purpose, but is not te
 
 ## 0. Where the project stands (updated 2026-11-20) and how to pick it up
 
+**Paused on 2026-11-20.** The owner shelved the project for a while. Everything below is the state it was left in.
+
 ### Status by milestone
 - **Branch:** all the work is on `m2-walking`. `main` still sits at the planning commits, and nothing past `main` has
   been pushed to GitHub (`origin`). `m1-desert-night` is an older branch, already contained in `m2-walking`.
@@ -80,7 +82,9 @@ over 16.7 ms, at 2560x1440) is for M6. The game allocates nothing per frame (no 
    (`source/src/dev.js`) takes shots, profiles (`dev.freeze(100); dev.res(pix); dev.prof(90, skipBits)`), switches parts
    of the scene off for side-by-side comparisons (`dev.skip(bits)`), teleports (`dev.walkTo(x, z, yaw, pitch)`), sets
    the eclipse clock (`dev.clock(minutes)`) and more.
-6. **Ask the owner what comes next.** The open choices: keep working down the art critic's list (M3 polish), the
+6. **What the original is up to:** `git fetch upstream` then `git log --oneline main..upstream/main` lists Noniv's
+   new commits on Abyssal Garden since this fork. Worth a look for fixes and speed-ups to bring over.
+7. **Ask the owner what comes next.** The open choices: keep working down the art critic's list (M3 polish), the
    trailer interior (needs the owner's go-ahead), or start M4 sound. Stop at the end of each milestone for review.
 
 Gotchas that cost time before:
@@ -248,8 +252,8 @@ Left over from earlier milestones and noticed along the way:
   dev-only now), a touch hint about swimming, and not Space (lift the lantern) or the right mouse button (zoom).
 - `README.md` still describes the underwater original (a short note at its top points here), and
   `source/package.json` still carries the old name and description.
-- The menu's GitHub and Support links and `.github/FUNDING.yml` point to the upstream author (Noniv). Ask the owner
-  what credit and links they want.
+- The menu's GitHub and Support links and `.github/FUNDING.yml` point to the upstream author (Noniv). Keep them
+  (owner, 2026-11-20): they credit upstream, and the owner uses them to follow the original project's progress.
 
 ## 4b. Open questions (owner has not decided)
 - What the ridge figure looks like. Owner is researching. Build the placeholder (plain tall dark silhouette) in M5, in one easy-to-swap place. Do not invent a final design.
