@@ -90,7 +90,7 @@
   window.dev = { view: (...a) => { FLYCAM = true; lookAt(...a); }, play: () => ui(false), pose: (i) => { FLYCAM = true; lookAt(...POSES[i]); },
     // dev.bench() starts the benchmark flight; dev.state() says how far it got (and the report once it is done)
     bench: () => { ui(false); FLYCAM = true; flying = bench = true; F[FLT] = 0; last = F[LAST]; nFrame = nGpu = 0; hud = false; info.textContent = ''; dynT = -Infinity; },
-    res: (p) => { pix = p; W = 0; resize(); return W + 'x' + H; }, // hold the render size at p pixels (a benchmark keeps it there)
+    res: (p) => { pix = p; W = 0; resize(); dynT = -Infinity; return W + 'x' + H; }, // hold the render size at p pixels (stops the tuner)
     // dev.shot('name.png'): the next frame, read back at render size and sent to the local dev server (which saves it)
     shot: async (name) => {
       ctx.configure({ device, format: FMT, alphaMode: 'opaque', usage: TU.RENDER_ATTACHMENT | TU.COPY_SRC });
@@ -116,5 +116,18 @@
     playTime: (s) => (F[PLAY] = s),
     // dev.look({ bright: 2 }): change the night look from the console (same keys as the sliders)
     look: (o) => Object.assign(LOOK, o),
+    freeze: (t = 100) => (FREEZE = t), // dev.freeze(-1) lets the clock run again
+    // dev.meshes(): vertex and triangle counts of every mesh, with its instance count (solids) for finding vertex load
+    meshes: () => meshes.map((m, i) => [i, m.nv, m.ib.length / 3, (Wd.solids.ranges[i] || [0, 0])[1]]),
+    // dev.prof(frames, skip): GPU ms per pass, averaged over that many frames (with groups of the scene left out: PSKIP)
+    prof: async (n = 120, skip = 0) => {
+      if (!hasTS) return 'no timestamp-query'; if (!profQS) profInit();
+      PSKIP = skip; profSum.fill(0); profN = 0; PROF = true;
+      const t0 = performance.now(); while (profN < n && performance.now() - t0 < 15000) await new Promise((r) => setTimeout(r, 50));
+      if (!profN) { PROF = false; PSKIP = 0; return 'no frames (window hidden?)'; }
+      PROF = false; PSKIP = 0; const a = Array.from(profSum.slice(0, 15), (v) => v / profN), f = (v) => +v.toFixed(3);
+      const bl = a.slice(2, 13).reduce((x, y) => x + y, 0);
+      return { size: W + 'x' + H, lshadow: f(a[0]), scene: f(a[1]), bloom: f(bl), adapt: f(a[13]), post: f(a[14]), total: f(a.reduce((x, y) => x + y, 0)) };
+    },
     state: () => ({ pos: [F[PX], F[PY], F[PZ]].map((v) => +v.toFixed(2)), cam: [F[CX], F[CY], F[CZ]].map((v) => +v.toFixed(2)), flycam: FLYCAM, flying, t: F[FLT], frames: nFrame, gpu: F[GPU], size: W + 'x' + H, report: info.textContent }) };
 }

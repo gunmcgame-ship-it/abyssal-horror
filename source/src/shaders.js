@@ -244,6 +244,24 @@ fn skyBase(rd: vec3f) -> vec3f {
 }
 `;
 
+// The camp's big things as rounded boxes for the fire's and lantern's soft shadows (see campVis in S_B): centre + yaw,
+// half size + rounding, in camp metres. Keep in step with meshCamp() in world.js. The shader gets each box with its
+// rotation already worked out (cos, sin) and its bounding radius, so a pixel can tell which boxes could matter to it.
+const CAMPBOX = [
+  [[8.0, 0.75, -5.22, 0.0], [0.9, 0.4, 1.5, 0.08]], // pickup: hood, fenders, lower cab,
+  [[8.0, 1.54, -4.35, 0.0], [0.78, 0.3, 0.66, 0.06]], // pickup: cab,
+  [[8.0, 0.8, -2.7, 0.0], [0.74, 0.48, 0.88, 0.04]], // pickup: bed,
+  [[8.0, 1.52, 2.96, 0.0], [0.75, 0.62, 2.7, 0.42]], // trailer,
+  [[2.3, 0.2, 2.4, 0.4], [0.32, 0.2, 0.18, 0.02]], // cooler,
+  [[-3.0, 0.17, -2.55, 0.0], [0.3, 0.17, 0.4, 0.05]], // firewood,
+  [[5.83, 0.24, 1.22, 0.0], [0.08, 0.23, 0.22, 0.01]], // jerry can,
+  [[2.75, 0.15, 5.3, 0.72], [0.15, 0.13, 0.38, 0.05]], // duffel bag,
+  [[3.4, 0.71, -0.9, 0.25], [0.3, 0.02, 0.62, 0.01]], // camp table top,
+  [[3.4, 0.82, -0.9, 0.25], [0.13, 0.1, 0.6, 0.02]], // stove and radio on it,
+  [[-2.35, 0.14, 6.0, 0.3], [0.25, 0.14, 0.2, 0.02]], // tackle box and bucket
+];
+const f4 = (v) => v.map((x) => (+x).toFixed(6)).join(', ');
+const CB_WGSL = CAMPBOX.map(([a, b]) => `vec4f(${f4(a.slice(0, 3))}, ${Math.hypot(b[0], b[1], b[2]).toFixed(6)}), vec4f(${f4(b)}), vec4f(${f4([Math.cos(a[3]), Math.sin(a[3]), 0, 0])})`).join(',\n  ');
 const S_B = S_G + /*wgsl*/`
 @group(0) @binding(0) var<uniform> g: G;
 @group(0) @binding(1) var sR: sampler;
@@ -287,28 +305,20 @@ fn att(p: vec3f, l: vec4f, r: f32) -> f32 {
 // The camp's big things as rounded boxes (camp coordinates, metres from the fire: centre + yaw, half size + rounding),
 // so the fire and the lantern cast soft shadows past them and the ground darkens a little under them.
 // Keep in step with meshCamp() in world.js. The tent is a hollow shell with its door open toward the fire.
-const NCB = 11;
-var<private> CB: array<vec4f, 22> = array<vec4f, 22>(
-  vec4f(8., .75, -5.22, 0.), vec4f(.9, .4, 1.5, .08),      // pickup: hood, fenders, lower cab
-  vec4f(8., 1.54, -4.35, 0.), vec4f(.78, .3, .66, .06),    // pickup: cab
-  vec4f(8., .8, -2.7, 0.), vec4f(.74, .48, .88, .04),      // pickup: bed
-  vec4f(8., 1.52, 2.96, 0.), vec4f(.75, .62, 2.7, .42),     // trailer
-  vec4f(2.3, .2, 2.4, .4), vec4f(.32, .2, .18, .02),        // cooler
-  vec4f(-3.0, .17, -2.55, 0.), vec4f(.3, .17, .4, .05),     // firewood
-  vec4f(5.83, .24, 1.22, 0.), vec4f(.08, .23, .22, .01),    // jerry can
-  vec4f(2.75, .15, 5.3, .72), vec4f(.15, .13, .38, .05),    // duffel bag
-  vec4f(3.4, .71, -.9, .25), vec4f(.3, .02, .62, .01),      // camp table top
-  vec4f(3.4, .82, -.9, .25), vec4f(.13, .1, .6, .02),       // stove and radio on it
-  vec4f(-2.35, .14, 6.0, .3), vec4f(.25, .14, .2, .02));    // tackle box and bucket
+const NCB = ${CAMPBOX.length};
+// per box: centre + bounding radius, half size + rounding, (cos, sin) of its yaw
+var<private> CB: array<vec4f, ${CAMPBOX.length * 3}> = array<vec4f, ${CAMPBOX.length * 3}>(
+  ${CB_WGSL});
 const CAMPV = vec3f(${CAMP});
 fn sdb(p: vec3f, i: i32) -> f32 {
-  let a = CB[i * 2]; let b = CB[i * 2 + 1]; let q0 = p - a.xyz; let c = cos(a.w); let s = sin(a.w);
+  let a = CB[i * 3]; let b = CB[i * 3 + 1]; let r = CB[i * 3 + 2]; let q0 = p - a.xyz; let c = r.x; let s = r.y;
   let q = abs(vec3f(c * q0.x - s * q0.z, q0.y, s * q0.x + c * q0.z)) - b.xyz + b.w;
   return length(max(q, vec3f(0.))) + min(max(q.x, max(q.y, q.z)), 0.) - b.w;
 }
-fn campBoxes(p: vec3f) -> f32 { var d = 1e3; for (var i = 0; i < NCB; i++) { d = min(d, sdb(p, i)); } return d; }
+// the nearest of the boxes in the set m (one bit per box)
+fn campBoxesM(p: vec3f, m: u32) -> f32 { var d = 1e3; for (var i = 0; i < NCB; i++) { if ((m & (1u << u32(i))) != 0u) { d = min(d, sdb(p, i)); } } return d; }
 fn campSD(p: vec3f) -> f32 {
-  let d = campBoxes(p);
+  let d = campBoxesM(p, 0xffffffffu);
   // tent: canvas shell, door gap toward the fire
   let tq = p - vec3f(1., 1.17, 7.5); let tb = abs(tq) - vec3f(1.5, 1.17, 1.8);
   let shell = abs(length(max(tb, vec3f(0.))) + min(max(tb.x, max(tb.y, tb.z)), 0.)) - .03;
@@ -320,15 +330,26 @@ fn campVis(p: vec3f, l: vec3f, r: f32) -> f32 {
   let q = p - CAMPV; let lq = l - CAMPV;
   if (dot(q.xz, q.xz) > 600. || distance(p, l) > r) { return 1.; }
   let dl = lq - q; let L = length(dl); let rd = dl / L;
+  // Only boxes that come near the way to the light can matter. A box whose bounding sphere stays M away from the whole
+  // segment is at least M away at every step: M is at least the longest step (so it never shortens one) and at least
+  // L / 8 (so 8 h / t never drops below 1, where the shadow starts). Leaving such boxes out changes nothing at all,
+  // and when none is near, the light is simply seen, without marching.
+  let cap = max(L * .1, .08); let M = max(L * .125, cap) + .01;
+  var m = 0u;
+  for (var i = 0; i < NCB; i++) { let c = CB[i * 3]; let w = c.xyz - q; let tt = clamp(dot(w, rd), 0., L); if (length(w - rd * tt) - c.w < M) { m |= 1u << u32(i); } }
+  if (m == 0u) { return 1.; }
   var t = .05; var v = 1.;
   for (var k = 0; k < 14; k++) {
-    let h = campBoxes(q + rd * t); v = min(v, 8. * h / t); t += clamp(h, .03, max(L * .1, .08));
+    let h = campBoxesM(q + rd * t, m); v = min(v, 8. * h / t); t += clamp(h, .03, cap);
     if (t > L - .15 || v < .02) { break; }
   }
   return ss(0., 1., v);
 }
 // contact darkening on and near the camp things
-fn campAO(p: vec3f) -> f32 { let q = p - CAMPV; if (dot(q.xz, q.xz) > 600.) { return 1.; } return .4 + .6 * ss(0., .7, campBoxes(q)); } // not the tent: its walls are cloth, and a box is a poor fit for its roof
+fn campAO(p: vec3f) -> f32 { let q = p - CAMPV; if (dot(q.xz, q.xz) > 600.) { return 1.; }
+  // only boxes within .7 m darken (their bounding sphere says which could be)
+  var m = 0u; for (var i = 0; i < NCB; i++) { let c = CB[i * 3]; if (length(c.xyz - q) - c.w < .7) { m |= 1u << u32(i); } }
+  if (m == 0u) { return 1.; } return .4 + .6 * ss(0., .7, campBoxesM(q, m)); } // not the tent: its walls are cloth, and a box is a poor fit for its roof
 // The lantern with its clip-on tin reflector (g.ld.xyz: where the reflector throws the light). Ahead the reflector
 // adds its bounce to the flame, so the light fans forward; behind and to the sides only the shielded spill is left.
 // Straight down the lantern's own fount shades the ground (the dark disc under every hanging lantern). The forward fan

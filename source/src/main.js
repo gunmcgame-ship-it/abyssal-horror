@@ -503,6 +503,18 @@ function drawNear(r, start, indexed, verts, px, pz, R) {
   }
 }
 let LSHOFF = false, LPOW = 1; // dev: turn the lantern shadows off, scale the lantern (0 = out) to compare
+// dev profiling: PROF times every pass (pairs of timestamps); PSKIP leaves out groups of the scene to see what they
+// cost (1 terrain, 2 solids, 4 rock chunks, 8 cacti and trunks, 16 plants, 32 sky and stars, 64 fire, 128 lantern shadows)
+let FREEZE = -1; // dev: hold the clock at this time (flicker, swing drift, flames), for comparing renders
+let PROF = false, PSKIP = 0, profQS = null, profRes = null, profRd = [], profTW = [], profN = 0, profK = 0;
+const profSum = new Float64Array(16);
+function profInit() {
+  profQS = device.createQuerySet({ type: 'timestamp', count: 32 }); profRes = device.createBuffer({ size: 256, usage: BU.QUERY_RESOLVE | BU.COPY_SRC });
+  for (let i = 0; i < 16; i++) profTW.push({ querySet: profQS, beginningOfPassWriteIndex: 2 * i, endOfPassWriteIndex: 2 * i + 1 });
+  for (let i = 0; i < 4; i++) { const b = device.createBuffer({ size: 256, usage: BU.MAP_READ | BU.COPY_DST }); const o = { b, busy: false, n: 0 };
+    o.done = () => { const a = new BigInt64Array(b.getMappedRange()); for (let k = 0; k < o.n; k++) { const d = Number(a[2 * k + 1] - a[2 * k]) / 1e6; if (d >= 0 && d < 1e3) profSum[k] += d; } profN++; b.unmap(); o.busy = false; };
+    profRd.push(o); }
+}
 const passLS = { colorAttachments: [], depthStencilAttachment: { view: tLShadow.createView(), depthClearValue: 1, depthLoadOp: 'clear', depthStoreOp: 'store' } };
 function render() {
   // camera basis (right vector is horizontal)
@@ -573,11 +585,14 @@ function render() {
   let slot = null;
   if (hasTS) { for (let i = 0; i < qRead.length; i++) if (!qRead[i].busy) { slot = qRead[i]; break; } }
   passPost.timestampWrites = slot ? tsEnd : undefined;
+  let pslot = null; profK = 0;
+  if (PROF) { for (let i = 0; i < profRd.length; i++) if (!profRd[i].busy) { pslot = profRd[i]; break; } if (pslot) slot = null; }
+  const ptw = () => (pslot ? profTW[profK++] : undefined);
   // the lantern's shadow map: everything within reach of its light, seen from the flame
-  const lsOn = LSH && UB[99] > 0.5;
+  const lsOn = LSH && UB[99] > 0.5 && !(PSKIP & 128);
   passScene.timestampWrites = slot && !lsOn ? tsBegin : undefined;
   if (lsOn) {
-    passLS.timestampWrites = slot ? tsBegin : undefined;
+    passLS.timestampWrites = pslot ? ptw() : slot ? tsBegin : undefined;
     const r = e.beginRenderPass(passLS), lx = UB[64], lz = UB[66];
     r.setBindGroup(0, bg0l);
     r.setPipeline(pTerrSh); r.setVertexBuffer(0, vbTerrain); r.setVertexBuffer(1, ibSolids); r.setIndexBuffer(ibTerrain, 'uint32');
@@ -594,44 +609,52 @@ function render() {
     r.end();
   }
   // scene
+  if (pslot) { profK = 1; passScene.timestampWrites = ptw(); }
   let r = e.beginRenderPass(passScene);
   r.setBindGroup(0, bg0);
   r.setPipeline(pTerrain); r.setVertexBuffer(0, vbTerrain); r.setVertexBuffer(1, ibSolids); r.setIndexBuffer(ibTerrain, 'uint32');
-  drawCells(r, T.start, T.lo, T.hi, 1.5, 1, 0, 0, 240);
+  if (!(PSKIP & 1)) drawCells(r, T.start, T.lo, T.hi, 1.5, 1, 0, 0, 240);
   r.setPipeline(pSolid); r.setVertexBuffer(0, vbMesh); r.setIndexBuffer(ibMesh, 'uint32');
   ruinD = hypot(F[CX] - RUINC[0], F[CZ] - RUINC[1]);
-  for (let i = 0; i < SOLN; i++) { const g = Wd.solids.ranges[i]; if (g[1] && solidOn(i) && !ruinSkip(i, ruinD)) { const M = solidMesh(i); r.drawIndexed(M.ib.length, g[1], M.i0, M.v0, g[0]); } }
+  for (let i = 0; i < SOLN; i++) { const g = Wd.solids.ranges[i]; if (!(PSKIP & 2) && g[1] && solidOn(i) && !ruinSkip(i, ruinD)) { const M = solidMesh(i); r.drawIndexed(M.ib.length, g[1], M.i0, M.v0, g[0]); } }
   r.setVertexBuffer(1, ibLant); r.drawIndexed(LANTM.ib.length, 1, LANTM.i0, LANTM.v0, 0);
   if (F[LHOLD] > 0.5 && !FLYCAM) r.drawIndexed(HANDM.ib.length, 1, HANDM.i0, HANDM.v0, 0);
-  for (let i = 0; i < NCHUNK; i++) {
+  for (let i = 0; i < NCHUNK * !(PSKIP & 4); i++) {
     const c = Wd.chunks[i], big = i > 2 && i < 6; r.setVertexBuffer(1, ibChunk[i]);
     drawCells(r, c.start, c.lo, c.hi, 3, meshes[14 + i], 0, 0, i > 5 ? 30 : big ? 40 : 96);
     if (big) drawCells(r, c.start, c.lo, c.hi, 3, meshes[20 + i], 0, 40, 150);
   }
   // cacti, then the tree trunks (seen from further away)
-  for (let i = 0; i < 6; i++) { r.setVertexBuffer(1, ibProp[i]); drawCells(r, Wd.props[i].start, Wd.props[i].lo, Wd.props[i].hi, 3, meshes[4 + i], 0, 0, i > 3 ? 160 : 110); }
+  for (let i = 0; i < 6 * !(PSKIP & 8); i++) { r.setVertexBuffer(1, ibProp[i]); drawCells(r, Wd.props[i].start, Wd.props[i].lo, Wd.props[i].hi, 3, meshes[4 + i], 0, 0, i > 3 ? 160 : 110); }
   // plants: 9-row blades up close, 5 rows mid-range, a decimated set far away
-  r.setPipeline(pLeaf); r.setVertexBuffer(0, ibBig); drawCells(r, Wd.big.start, Wd.big.lo, Wd.big.hi, 5, false, 18, 0, 24);
-  r.setPipeline(pLeaf5); drawCells(r, Wd.big.start, Wd.big.lo, Wd.big.hi, 5, false, 10, 24, 58);
-  r.setPipeline(pLeafF); r.setVertexBuffer(0, ibBigF); drawCells(r, Wd.bigF.start, Wd.bigF.lo, Wd.bigF.hi, 5, false, 6, 58, 150);
-  r.setPipeline(pLeafS); r.setVertexBuffer(0, ibSmall); drawCells(r, Wd.small.start, Wd.small.lo, Wd.small.hi, 1.5, false, 6, 0, 70);
-  r.setPipeline(pSky); r.draw(4);
-  r.setPipeline(pStars); r.setVertexBuffer(0, ibStars); r.draw(4, nStars);
-  r.setPipeline(pFire); r.setVertexBuffer(0, ibFireB); r.draw(4, nFire);
+  if (!(PSKIP & 16)) {
+    r.setPipeline(pLeaf); r.setVertexBuffer(0, ibBig); drawCells(r, Wd.big.start, Wd.big.lo, Wd.big.hi, 5, false, 18, 0, 24);
+    r.setPipeline(pLeaf5); drawCells(r, Wd.big.start, Wd.big.lo, Wd.big.hi, 5, false, 10, 24, 58);
+    r.setPipeline(pLeafF); r.setVertexBuffer(0, ibBigF); drawCells(r, Wd.bigF.start, Wd.bigF.lo, Wd.bigF.hi, 5, false, 6, 58, 150);
+    r.setPipeline(pLeafS); r.setVertexBuffer(0, ibSmall); drawCells(r, Wd.small.start, Wd.small.lo, Wd.small.hi, 1.5, false, 6, 0, 70);
+  }
+  if (!(PSKIP & 32)) { r.setPipeline(pSky); r.draw(4); r.setPipeline(pStars); r.setVertexBuffer(0, ibStars); r.draw(4, nStars); }
+  if (!(PSKIP & 64)) { r.setPipeline(pFire); r.setVertexBuffer(0, ibFireB); r.draw(4, nFire); }
   r.end();
   // bloom
   for (let i = 0; i < bloomPass.length; i++) {
+    if (pslot) bloomPass[i].timestampWrites = ptw();
     r = e.beginRenderPass(bloomPass[i]); r.setPipeline(i === 0 ? pDown0 : i < NB ? pDown : pUp); r.setBindGroup(0, bloomBG[i]); r.draw(3); r.end();
   }
   // the eye adjusting, then the composite
+  if (pslot) passAdapt.timestampWrites = ptw();
   r = e.beginRenderPass(passAdapt); r.setPipeline(pAdapt); r.setBindGroup(0, bgAdapt); r.draw(3); r.end();
   passPost.colorAttachments[0].view = ctx.getCurrentTexture().createView();
+  if (pslot) passPost.timestampWrites = ptw();
   r = e.beginRenderPass(passPost); r.setPipeline(pPost); r.setBindGroup(0, bgPost); r.draw(3); r.end();
   e.copyTextureToTexture({ texture: tAd }, { texture: tAdP }, [1, 1]);
   if (slot) { e.resolveQuerySet(qs, 0, 2, qResolve, 0); e.copyBufferToBuffer(qResolve, 0, slot.b, 0, 16); }
+  if (pslot) { e.resolveQuerySet(profQS, 0, profK * 2, profRes, 0); e.copyBufferToBuffer(profRes, 0, pslot.b, 0, 256); pslot.n = profK; }
+  else if (PROF) { passScene.timestampWrites = passAdapt.timestampWrites = passPost.timestampWrites = undefined; for (const b of bloomPass) b.timestampWrites = undefined; }
   submitList[0] = e.finish();
   Q.submit(submitList);
   if (slot) { slot.busy = true; slot.b.mapAsync(GPUMapMode.READ).then(slot.done); }
+  if (pslot) { pslot.busy = true; pslot.b.mapAsync(GPUMapMode.READ).then(pslot.done); }
 }
 
 // CS[j] = distance to the rock (metres, < 0 in water) at the camera + CE[3j..3j+2]: the camera, then ±0.375 m on
@@ -793,7 +816,7 @@ function frame(now) {
     if (was !== pix + det) keep('abyssal', [LV, pix < top ? pix | 0 : '', det]); // nothing kept at full resolution
     dynN = dynT = dynG = dynGN = 0; resize();
   }
-  F[TIME] += dt; F[DT] = dt;
+  if (FREEZE < 0) F[TIME] += dt; else F[TIME] = FREEZE; F[DT] = dt;
   if (!menu) { F[ECT] += dt * ECLX / 60; F[PLAY] += dt; wakeLater(); }
   // focus zoom: hold the right mouse button to ease in to about 2x, release to ease back out
   F[ZOOM] += ((kZoom && !menu ? 1 : 0) - F[ZOOM]) * (1 - exp(-dt * 2.8)); TANH = TANH0 / (1 + F[ZOOM] * F[ZOOM] * (3 - 2 * F[ZOOM]));
