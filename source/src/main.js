@@ -58,7 +58,14 @@ const UB = new Float32Array(100), UBS = new Float32Array(100), UBL = new Float32
 const ubo = device.createBuffer({ size: 400, usage: BU.UNIFORM | BU.COPY_DST }), uboS = device.createBuffer({ size: 400, usage: BU.UNIFORM | BU.COPY_DST }), uboL = device.createBuffer({ size: 400, usage: BU.UNIFORM | BU.COPY_DST });
 // the night look, in one place: moonlight, sky fill in the shadows, blue of night vision, contrast in the darks,
 // overall brightness (1 = as designed). The dev build has sliders for them (T).
-const LOOK = { moon: 1.15, fill: 0.73, blue: 1, contrast: 0.88, bright: 0.42, haze: 1.4 }; // set by the owner by eye
+// the night look. Two presets, N switches between them (the choice is remembered in this browser):
+//   OWN   set by the owner by eye: very dark, the lantern pool the only world there is
+//   MOON  after the art critic: more moonlight and shadow fill, the canyon's shapes read against the sky, the air
+//         holding more moonlit haze, so the dark beyond the lantern has depth instead of being black
+const LOOK_OWN = { moon: 1.15, fill: 0.73, blue: 1, contrast: 0.88, bright: 0.42, haze: 1.4 };
+const LOOK_MOON = { moon: 1.5, fill: 1.45, blue: 1, contrast: 0.74, bright: 0.58, haze: 2.1 };
+let lookOwn = false; try { lookOwn = localStorage.getItem('look') === 'own'; } catch (e) {}
+const LOOK = Object.assign({}, lookOwn ? LOOK_OWN : LOOK_MOON);
 
 const VF = SS.VERTEX | SS.FRAGMENT;
 const bgl0 = device.createBindGroupLayout({ entries: [
@@ -824,6 +831,7 @@ function frame(now) {
 }
 
 // ---------------------------------------------------------------- input
+let lookMsg = 0;
 const key = (e, v) => {
   switch (e.code) {
     case 'KeyW': kf = v; break; case 'KeyS': kb = v; break; case 'KeyA': kl = v; break; case 'KeyD': kr = v; break;
@@ -831,6 +839,11 @@ const key = (e, v) => {
     default: if (v && !e.repeat) {
       if (e.code === 'KeyH' && DEV) { hud = !hud; hTot = 0; hPer = 1e9; info.textContent = ''; }
       else if (e.code === 'KeyM') mute();
+      else if (e.code === 'KeyN') {   // the night look: the owner's own, or the moonlit one
+        lookOwn = !lookOwn; Object.assign(LOOK, lookOwn ? LOOK_OWN : LOOK_MOON);
+        try { localStorage.setItem('look', lookOwn ? 'own' : 'moon'); } catch (er) {}
+        if (!hud) { info.textContent = lookOwn ? 'Night look: default (dark)' : 'Night look: moonlit'; clearTimeout(lookMsg); lookMsg = setTimeout(() => { if (!hud) info.textContent = ''; }, 2000); }
+      }
       else if (e.code === 'Escape') ui(true);
       // dev build: 1-6 jump to the viewpoints (walking there, or as the free camera), G toggles the free camera
       else if (DEV && e.code >= 'Digit1' && e.code <= 'Digit6') { const p = POSES[e.code.charCodeAt(5) - 49]; if (FLYCAM) lookAt(...p); else { F[WAKE] = 1e9; F[FADE] = 1; F[LHOLD] = 1; placeAt(p[0], p[2], atan2(p[3] - p[0], -(p[5] - p[2]))); } }
