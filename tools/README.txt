@@ -1,3 +1,8 @@
+BACKUP COPY of C:\Users\Bacon\abyssal_tools (taken 2026-11-20, when the project was paused). The scripts expect to
+run from that folder (reload.sh and the commands below use its absolute paths). If it's gone, copy this folder back
+there. Not included: the Chrome profile folders (chrome, chrome_headless: browser data, made fresh on first launch)
+and the renders (shots_*, tel_*, diff_*: about 1.3 GB).
+
 Render + art-critic tooling for abyssal_horror ("Ground Observer, 1957")
 
 1. Build:   cd C:\Users\Bacon\abyssal_horror\source && node build.mjs --dev      (writes ..\dev.html)

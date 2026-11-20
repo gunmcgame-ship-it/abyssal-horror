@@ -73,7 +73,8 @@ over 16.7 ms, at 2560x1440) is for M6. The game allocates nothing per frame (no 
    `C:\Users\Bacon\abyssal_tools` (its `README.txt` has the exact commands). `server.mjs` serves this folder on
    port 8791 (8765 is taken by another app). `cdp.mjs` runs JavaScript in the test tab. `shots.mjs final.json` takes
    the 17 fixed critic shots with the free camera. `walkshots.mjs` takes shots in walking mode, lantern in hand.
-   `reload.sh` reloads the test tab after a rebuild.
+   `reload.sh` reloads the test tab after a rebuild. A backup copy of these scripts is in `tools/` in this repo
+   (without the renders and Chrome profiles): copy it back to `C:\Users\Bacon\abyssal_tools` if that folder is gone.
 4. **Use the headless test Chrome** (command in the tools README). Never bring a test window to the front: the owner
    types on the main monitor and it steals their focus, and a minimized window stops rendering. When the owner wants
    to try a build, open `http://127.0.0.1:8791/index.html` in their normal Chrome.
