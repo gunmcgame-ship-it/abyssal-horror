@@ -213,7 +213,7 @@ function makeWorld(D, T, flyPts, POSES) {
   // campfire: flame cards (x, y, z, half width | seed, 0, height) and embers (seed, 1)
   const fire = [];
   rseed(12);
-  for (let i = 0; i < 10; i++) { const a = rnd() * TAU, r = rr(0, 0.26); fire.push(CAMP[0] + cos(a) * r, CAMP[1] + 0.04, CAMP[2] + sin(a) * r, rr(0.22, 0.34), rnd(), 0, rr(0.75, 1.3), 0); }
+  for (let i = 0; i < 14; i++) { const a = rnd() * TAU, r = rr(0.02, 0.24); fire.push(CAMP[0] + cos(a) * r, CAMP[1] + 0.06, CAMP[2] + sin(a) * r, rr(0.11, 0.19), rnd(), 0, rr(0.42, 0.95) * (1.1 - r), 0); }
   for (let i = 0; i < 36; i++) fire.push(CAMP[0] + rr(-0.2, 0.2), CAMP[1] + 0.15, CAMP[2] + rr(-0.2, 0.2), 0, rnd(), 1, 0, 0);
 
   // --- pack leaves (36 bytes: 8 floats + 4 unorm8), sorted by culling cell
@@ -347,6 +347,19 @@ const put = (a, b, x, y, z, yaw = 0, s = 1) => {
   for (const i of b.i) a.i.push(i + n0);
 };
 // a lumpy stone of radius ~1
+// a fire-ring stone: broken, not rolled. A blob cut by a few random planes gives flat fractured faces and blunt edges,
+// with a little noise over it; squat, as stones are picked to sit steady. Part 45 (soot on the side toward the fire).
+const fireStone = (seed) => {
+  rseed(520 + seed); const k = rr(0.55, 0.75), cuts = [];
+  for (let i = 0; i < 6; i++) { const a = rnd() * TAU, b = rr(-0.9, 0.9), c = sqrt(1 - b * b); cuts.push([c * cos(a), b, c * sin(a), rr(0.62, 0.85)]); }
+  cuts.push([0, -1, 0, 0.55]); // a flat bed to sit on
+  return tag(icosphere(3, (x, y, z) => {
+    let r = 0.95 + 0.12 * fbm(x * 2.5 + seed, y * 2.5, z * 2.5, 3);
+    for (const [a, b, c, d] of cuts) { const q = x * a + y * b + z * c; if (q > 0.05) r = min(r, d / q); }
+    r *= 1 + 0.025 * fbm(x * 9 + seed, y * 9, z * 9, 2);
+    return [x * r, y * r * k, z * r];
+  }), 45);
+};
 const stone = (seed) => { rseed(300 + seed); const k = rr(0.6, 0.85); return tag(icosphere(1, (x, y, z) => { const r = 0.8 + 0.35 * fbm(x * 2 + seed, y * 2, z * 2, 2); return [x * r, y * r * k, z * r]; }), 13); };
 
 // ---------------------------------------------------------------- plants
@@ -611,7 +624,7 @@ function meshTent() {
 function meshFire() {
   rseed(440);
   const m = new Mesh();
-  for (let i = 0; i < 12; i++) { const a = i / 12 * TAU + rr(-0.1, 0.1), r = rr(0.58, 0.68); put(m, stone(i), cos(a) * r, 0.04, sin(a) * r, rnd() * TAU, rr(0.13, 0.2)); }
+  for (let i = 0; i < 12; i++) { const a = i / 12 * TAU + rr(-0.1, 0.1), r = rr(0.58, 0.66), sc = rr(0.14, 0.2); put(m, fireStone(i), cos(a) * r, 0.03, sin(a) * r, rnd() * TAU, [sc * rr(0.9, 1.25), sc, sc * rr(0.85, 1.1)]); }
   P(m, 16); lathe(m, [[0, 0.012], [0.55, 0.008], [0.6, 0]], 20);
   P(m, 15); lathe(m, [[0, 0.07], [0.2, 0.06], [0.34, 0.03], [0.4, 0.01]], 20);
   for (let i = 0; i < 6; i++) {
@@ -619,11 +632,15 @@ function meshFire() {
     P(m, 15); cyl(m, [c * 0.06, y + 0.03, s * 0.06], [c * 0.3, y, s * 0.3], r, 8);
     P(m, 14); cyl(m, [c * 0.3, y, s * 0.3], [c * (0.3 + l), y - 0.04, s * (0.3 + l)], r, 8);
   }
-  P(m, 20);
-  const px = 0.62, pz = 0.18, py = 0.16;
-  lathe(m, [[0, 0], [0.07, 0], [0.078, 0.05], [0.062, 0.16], [0.035, 0.2], [0.03, 0.21], [0.012, 0.225], [0, 0.23]], 18, px, py, pz);
-  cyl(m, [px - 0.06, py + 0.06, pz], [px - 0.13, py + 0.15, pz], 0.012, 6);
-  m.sweep([[px + 0.055, py + 0.18, pz], [px + 0.1, py + 0.13, pz], [px + 0.09, py + 0.04, pz], [px + 0.065, py + 0.03, pz]], 0.015, 0.008, null, false);
+  // the coffee pot: a blue speckled enamel percolator, straight sides tapering up, a domed lid with a glass knob, a long
+  // spout from low on the body and a strap handle
+  P(m, 46);
+  const px = 0.62, pz = 0.18, py = 0.17;
+  lathe(m, [[0, 0.004], [0.066, 0.004], [0.072, 0], [0.076, 0.004], [0.077, 0.012], [0.071, 0.08], [0.062, 0.165], [0.066, 0.17], [0.065, 0.177], [0.058, 0.178],
+    [0.054, 0.182], [0.044, 0.196], [0.026, 0.204], [0.018, 0.205]], 28, px, py, pz);
+  P(m, 50); lathe(m, [[0.018, 0.204], [0.02, 0.212], [0.019, 0.226], [0.013, 0.232], [0, 0.233]], 14, px, py, pz); // glass knob
+  P(m, 46); m.sweep([[px - 0.064, py + 0.035, pz], [px - 0.09, py + 0.09, pz], [px - 0.122, py + 0.155, pz]], 0.024, 0.011);
+  P(m, 34); m.sweep([[px + 0.06, py + 0.162, pz], [px + 0.108, py + 0.152, pz], [px + 0.112, py + 0.09, pz], [px + 0.096, py + 0.05, pz], [px + 0.071, py + 0.04, pz]], 0.016, 0.007, null, false);
   return m;
 }
 // folding camp chair: wooden X legs, arms, khaki canvas seat and back; faces -z

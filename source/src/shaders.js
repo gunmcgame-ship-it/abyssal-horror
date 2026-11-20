@@ -227,7 +227,8 @@ const LANTC = vec3f(1., .64, .34);
 fn sat(x: f32) -> f32 { return clamp(x, 0., 1.); }
 fn ss(a: f32, b: f32, x: f32) -> f32 { let t = clamp((x - a) / (b - a), 0., 1.); return t * t * (3. - 2. * t); }
 fn ign(p: vec2f) -> f32 { return fract(52.9829189 * fract(dot(p, vec2f(.06711056, .00583715)))); }
-fn hs(x: f32) -> f32 { return fract(sin(x * 127.1) * 43758.5453); }
+// (the argument is wrapped: sin() of a big argument loses precision and the hash collapses to a few values)
+fn hs(x: f32) -> f32 { return fract(sin((x % 4096.) * 127.1) * 43758.5453); }
 fn fin(c: vec3f) -> vec4f { return vec4f(min(max(c, vec3f(0.)), vec3f(60.)), 1.); }
 // the breeze: 0.35 calm .. 1 in a gust, gusts travel across the canyon
 fn gust(t: f32, p: vec2f) -> f32 { let s = t - dot(p, vec2f(.05, .02)); return .35 + .65 * pow(.5 + .5 * sin(s * .37) * sin(s * .23 + 1.3), 2.); }
@@ -474,14 +475,43 @@ fn prop(id: i32, op: vec3f, on: vec3f, mc: f32, h: f32, pfw: f32, sd: f32, cv: f
     case 11 { m.a = vec3f(.07, .14, .09) * (.85 + .3 * mc); m.gl = .35; m.bp = .05; }             // green steel
     case 12 { m.a = vec3f(.30, .02, .015); m.gl = .5; m.bp = 0.; }              // red tail light
     case 13 { m.a = vec3f(.33, .22, .16) * (.6 + .6 * h); m.bp = 1.4; }        // stone
-    case 14 { let ck = vn2d(op.xz * 90. + op.y * 70.); let cr = 1. - ss(0., .06, abs(fract(ck * 4.) - .5) - .38); m.a = vec3f(.03, .027, .025) * (.7 + .5 * ck) + vec3f(.12) * ss(.7, .9, vn2d(op.xz * 30.)) * .5; m.a *= 1. - .7 * cr; m.gl = .08 * (1. - cr); m.bp = .2; m.n = vec3f(ck - .5, 0., cr - .5) * .3; }   // charcoal: checked into blocks, a silvery sheen
+    case 14 {   // charcoal: alligator-checked into blocks (cells of two noises), a silvery sheen on the blocks, the cracks
+      // glowing orange where the log is still in the fire, grey ash caught on the tops
+      let q = op.xz * 34. + vec2f(op.y * 23., -op.y * 17.);
+      let c1 = abs(vn2d(q) - .5); let c2 = abs(vn2d(q * vec2f(.45, 1.9) + 11.) - .5);
+      let cr = max(ss(.05, .0, c1), ss(.035, .0, c2)) * ss(.003, .0012, pfw);
+      let r = length(op.xz);
+      m.a = vec3f(.035, .031, .028) * (.75 + .5 * vn2d(q * .3)) * (1. - .75 * cr);
+      m.a = mix(m.a, vec3f(.22, .21, .2), ss(.75, .95, on.y) * ss(.68, .8, vn2d((op.xz * 140.) % 97.)) * .5);
+      m.gl = .12 * (1. - cr); m.bp = .25; m.n = vec3f(c1 - .25, 0., c2 - .25) * .25;
+      m.e = vec3f(1., .25, .04) * cr * ss(.42, .18, r) * g.fire.w * .06 * (.6 + .4 * sin(g.cam.w * 1.7 + op.x * 23. + op.z * 19.)); }
     case 15 { m.a = vec3f(.03, .02, .015); m.bp = 1.2;                          // embers in the fire bed
       m.e = vec3f(1., .22, .03) * g.fire.w * .05 * ss(.35, .8, mc + .25 * sin(g.cam.w * 2. + op.x * 9.)); }
-    case 16 { m.a = vec3f(.30, .29, .28); m.bp = .6; }                         // ash
+    case 16 { let r = length(op.xz); let n = vn2d(op.xz * 18.) * .6 + vn2d(op.xz * 61.) * .4;   // ash and scorch
+      m.a = mix(vec3f(.30, .29, .28) * (.8 + .3 * n), vec3f(.035, .03, .027), ss(.25, .45, r + (n - .5) * .2)); m.bp = .6; }
     case 17 { m.a = vec3f(.42, .36, .24) * (.85 + .3 * mc); m.gl = .03; m.bp = .08; }  // khaki canvas
     case 18 { m.a = vec3f(.55, .48, .35); m.bp = .5; }                         // rope
     case 19 { m.a = vec3f(.13, .14, .08) * (1. - .45 * ss(.012, .0, abs(abs(op.z - 1.225) / .2 - abs(op.y - .235) / .21)) * step(.83, abs(op.x - 5.835) / .085)); m.gl = .3; m.bp = .1; } // olive drab steel, X-stamped can sides
-    case 20 { m.a = vec3f(.10, .20, .42); m.gl = .7; m.bp = .05; }             // blue enamel
+    case 20 { m.a = vec3f(.04, .08, .2); m.gl = .5; m.bp = .05; }             // blue enamel (the mug)
+    case 45 {   // fire-ring sandstone: red-brown and grey, speckled; soot black on the faces toward the fire and on the
+      // inner tops, a dusting of ash on what faces up
+      let r = length(op.xz); let inw = dot(on.xz, -op.xz / max(r, 1e-3));
+      let k = hs(floor(atan2(op.z, op.x) / 6.2832 * 12. + 6.5) + 3.);
+      var b = mix(vec3f(.11, .05, .028), vec3f(.085, .08, .072), step(.62, k)) * (.6 + .55 * h) * (.85 + .3 * mc);
+      b *= 1. - .3 * ss(.62, .78, vn2d((op.xz * 150. + op.y * 110.) % 97.)) * ss(.002, .0008, pfw);
+      let sootK = sat(ss(.7, .5, r) * ss(-.5, .35, inw + on.y * .5) + ss(.08, .2, op.y) * ss(.75, .55, r) * .6) * (.55 + .45 * ss(.35, .65, vn2d(op.xz * 9. + op.y * 7.)));
+      m.a = mix(b, vec3f(.025, .02, .018), sootK * (.7 + .3 * vn2d(op.xz * 45. + op.y * 20.)));
+      m.a = mix(m.a, vec3f(.3, .29, .28), ss(.7, .95, on.y) * ss(.5, .75, vn2d(op.xz * 28.)) * .45);
+      m.gl = .04 + .08 * sootK; m.bp = 1.2; }
+    case 46 {   // blue graniteware enamel: a deep blue mottled with white specks; soot low on the side toward the fire
+      // (the noise coordinates are wrapped: hs() hashes with sin(), which goes degenerate for big arguments)
+      let sp = ss(.76, .84, vn2d((op.xz * 520. + op.y * 380.) % 97.)) * .7 + ss(.8, .86, vn2d((op.zy * 260. - op.x * 300.) % 89.)) * .3;
+      let fd = ss(.0015, .0005, pfw);
+      m.a = mix(vec3f(.025, .055, .14) * (.85 + .3 * vn2d(op.xz * 60. + op.y * 40.)), vec3f(.62, .64, .66), sp * fd * .75);
+      let r = length(op.xz); let sootK = ss(1., .6, r) * (ss(.3, -.2, dot(on.xz, op.xz / max(r, .01))) * .7 + ss(.25, .17, op.y) * .6);
+      m.a = mix(m.a, vec3f(.02, .018, .016), sat(sootK) * ss(.3, .7, vn2d(op.xz * 40. + op.y * 30.) + .3));
+      m.a *= 1. - .85 * ss(25., 70., cv);   // the enamel chipped off the rims and seams: black iron
+      m.gl = .12 * (1. - .7 * sat(sootK)); m.bp = .03; }
     case 21 { m.a = vec3f(.04, .04, .045); m.gl = .2; m.bp = .3; }             // chassis
     case 22 { m.a = vec3f(.35, .35, .33); m.gl = .6; m.mt = .2; m.bp = 0.; }     // headlight glass
     case 23 { m.a = vec3f(.56, .55, .51); m.gl = .3; m.bp = 0.; }             // white paint, aged
@@ -916,7 +946,7 @@ fn vn2(p: vec2f) -> f32 {
   let heat = m * (1. - y * .6);
   var col = mix(vec3f(1., .16, .02), vec3f(1., .5, .12), ss(.15, .55, heat));
   col = mix(col, vec3f(1., .85, .55), ss(.6, .95, heat));
-  return vec4f(col * heat * 3., 0.);
+  return vec4f(col * heat * 2.1, 0.);
 }
 `;
 
