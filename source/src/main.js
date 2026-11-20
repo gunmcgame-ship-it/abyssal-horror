@@ -508,6 +508,8 @@ let LSHOFF = false, LPOW = 1; // dev: turn the lantern shadows off, scale the la
 let FREEZE = -1; // dev: hold the clock at this time (flicker, swing drift, flames), for comparing renders
 let PROF = false, PSKIP = 0, profQS = null, profRes = null, profRd = [], profTW = [], profN = 0, profK = 0;
 const profSum = new Float64Array(16);
+let pslot = null; // this frame's profiling readback (no closure per frame: the game allocates nothing per frame)
+function ptw() { return pslot ? profTW[profK++] : undefined; }
 function profInit() {
   profQS = device.createQuerySet({ type: 'timestamp', count: 32 }); profRes = device.createBuffer({ size: 256, usage: BU.QUERY_RESOLVE | BU.COPY_SRC });
   for (let i = 0; i < 16; i++) profTW.push({ querySet: profQS, beginningOfPassWriteIndex: 2 * i, endOfPassWriteIndex: 2 * i + 1 });
@@ -585,9 +587,8 @@ function render() {
   let slot = null;
   if (hasTS) { for (let i = 0; i < qRead.length; i++) if (!qRead[i].busy) { slot = qRead[i]; break; } }
   passPost.timestampWrites = slot ? tsEnd : undefined;
-  let pslot = null; profK = 0;
+  pslot = null; profK = 0;
   if (PROF) { for (let i = 0; i < profRd.length; i++) if (!profRd[i].busy) { pslot = profRd[i]; break; } if (pslot) slot = null; }
-  const ptw = () => (pslot ? profTW[profK++] : undefined);
   // the lantern's shadow map: everything within reach of its light, seen from the flame
   const lsOn = LSH && UB[99] > 0.5 && !(PSKIP & 128);
   passScene.timestampWrites = slot && !lsOn ? tsBegin : undefined;
