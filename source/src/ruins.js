@@ -378,7 +378,16 @@ function buildSettlement(RH, gy, solid, tuft, rbox) {
     for (let i = 0; i < 3; i++) { const p = W(rr(-hw + 0.4, hw - 0.4), rr(-hd + 0.4, hd - 0.4)); tuft(p[0], gy(p[0], p[1]), p[1]); }
     // the supper, in stages: 1 the table and benches, 2 places set, 3 the meal on them and the pot on the fire
     if (st < 2) {
-      const tl = [rr(-0.3, 0.3), rr(-0.5, 0.2)], tp = W(...tl), ty = atan2(-H.rz, H.rx) + rr(-0.15, 0.15), y = gy(tp[0], tp[1]), c = cos(ty), s = sin(ty);
+      // the table goes on the flattest floor in the house (drifted sand and fallen rubble slope inside the broken ones):
+      // of a few spots, the one where the ground under the table and benches varies least
+      const ty = atan2(-H.rz, H.rx) + rr(-0.15, 0.15), c = cos(ty), s = sin(ty);
+      let tp = W(0, -0.15), best = 1e9;
+      for (let k = 0; k < 24; k++) {
+        const q = W(rr(-hw + 0.9, hw - 0.9) * 0.9, rr(-hd + 0.95, hd - 0.95) * 0.9); let lo = 1e9, hi = -1e9;
+        for (const [x, z] of [[-0.45, -0.85], [0.45, -0.85], [-0.45, 0.85], [0.45, 0.85], [0, 0]]) { const h = gy(q[0] + x * c + z * s, q[1] - x * s + z * c); lo = min(lo, h); hi = max(hi, h); }
+        const sc = hi - lo + 0.02 * hypot(q[0] - W(0, -0.15)[0], q[1] - W(0, -0.15)[1]); if (sc < best) { best = sc; tp = q; }
+      }
+      const y = gy(tp[0], tp[1]);
       const tf = (x, z) => [tp[0] + x * c + z * s, tp[1] - x * s + z * c];
       solid(W_TABLE, tp[0], y, tp[1], 1, qAxis(0, 1, 0, ty), 2, rnd(), 1, 0);
       for (const zz of [-0.56, 0.56]) { const b = tf(rr(-0.05, 0.05), zz); solid(W_BENCH, b[0], gy(b[0], b[1]), b[1], 1, qAxis(0, 1, 0, ty + rr(-0.06, 0.06)), 2, rnd(), 1, 0); }
