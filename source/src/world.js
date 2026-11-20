@@ -475,7 +475,7 @@ function sdfMesh(f, part, x0, y0, z0, x1, y1, z1, res) {
 const latheX = (m, prof, seg, cx, cy, cz, s, ribs = 0, ra = 0) => { const n0 = m.p.length / 3; lathe(m, prof, seg, 0, 0, 0, ribs, ra); for (let k = n0 * 3; k < m.p.length; k += 3) { const x = m.p[k], y = m.p[k + 1], z = m.p[k + 2]; m.p[k] = cx + y * s; m.p[k + 1] = cy + x; m.p[k + 2] = cz + z; } };
 const latheZ = (m, prof, seg, cx, cy, cz, s) => { const n0 = m.p.length / 3; lathe(m, prof, seg, 0, 0, 0); for (let k = n0 * 3; k < m.p.length; k += 3) { const x = m.p[k], y = m.p[k + 1], z = m.p[k + 2]; m.p[k] = cx + x; m.p[k + 1] = cy + z; m.p[k + 2] = cz + y * s; } };
 // a flat quad grid on a plane: corner o, edges u and v, lifted along n by off
-const panel = (m, o, u, v, nu = 2, nv = 2) => { const g = []; for (let i = 0; i <= nu; i++) { const r = []; for (let j = 0; j <= nv; j++) r.push(m.v(o[0] + u[0] * i / nu + v[0] * j / nv, o[1] + u[1] * i / nu + v[1] * j / nv, o[2] + u[2] * i / nu + v[2] * j / nv)); g.push(r); } for (let i = 0; i < nu; i++) for (let j = 0; j < nv; j++) { m.quad(g[i][j], g[i + 1][j], g[i + 1][j + 1], g[i][j + 1]); m.quad(g[i][j], g[i][j + 1], g[i + 1][j + 1], g[i + 1][j]); } };
+const panel = (m, o, u, v, nu = 2, nv = 2) => { const g = []; for (let i = 0; i <= nu; i++) { const r = []; for (let j = 0; j <= nv; j++) r.push(m.v(o[0] + u[0] * i / nu + v[0] * j / nv, o[1] + u[1] * i / nu + v[1] * j / nv, o[2] + u[2] * i / nu + v[2] * j / nv)); g.push(r); } for (let i = 0; i < nu; i++) for (let j = 0; j < nv; j++) { m.quad(g[i][j], g[i][j + 1], g[i + 1][j + 1], g[i + 1][j]); m.quad(g[i][j], g[i + 1][j], g[i + 1][j + 1], g[i][j + 1]); } };
 
 // ---------------------------------------------------------------- the camp
 // 1950s half-ton pickup, nose to -z, ground at y = 0, two-tone cream cab roof over turquoise. The body is one distance
@@ -595,7 +595,7 @@ function meshTrailer() {
     P(m, 4); latheX(m, [[0.18, -0.09], [0.26, -0.095], [0.31, -0.085], [0.33, -0.05], [0.335, 0], [0.33, 0.05], [0.31, 0.085], [0.26, 0.095], [0.18, 0.09]], 40, cx, 0.335, cz, s, 44, 0.008);
     P(m, 5); latheX(m, [[0.22, 0.097], [0.27, 0.099]], 32, cx, 0.335, cz, s);
     P(m, 3); latheX(m, [[0.18, 0.09], [0.1, 0.1], [0.04, 0.115], [0, 0.118]], 20, cx, 0.335, cz, s);
-    P(m, 7); { const g = []; for (let i = 0; i <= 12; i++) { const a = PI * i / 12, r = []; for (let j = 0; j <= 1; j++) r.push(m.v(s * (1.03 + 0.02 * j), 0.335 + cos(a) * 0.43, cz + sin(a - PI / 2) * 0.47)); g.push(r); } for (let i = 0; i < 12; i++) { m.quad(g[i][0], g[i + 1][0], g[i + 1][1], g[i][1]); m.quad(g[i][0], g[i][1], g[i + 1][1], g[i + 1][0]); } }
+    P(m, 7); { const g = []; for (let i = 0; i <= 12; i++) { const a = PI * i / 12, r = []; for (let j = 0; j <= 1; j++) r.push(m.v(s * (1.03 + 0.02 * j), 0.335 + cos(a) * 0.43, cz + sin(a - PI / 2) * 0.47)); g.push(r); } for (let i = 0; i < 12; i++) { m.quad(g[i][0], g[i][1], g[i + 1][1], g[i + 1][0]); m.quad(g[i][0], g[i + 1][0], g[i + 1][1], g[i][1]); } }
   }
   P(m, 21); for (const s of [-1, 1]) m.sweep([[s * 0.7, 0.42, 0.6], [0, 0.48, -1.25]], 0.08, 0.1); // tongue
   cyl(m, [0, 0.48, -1.2], [0, 0.48, -1.32], 0.05, 8); cyl(m, [0, 0.0, -0.8], [0, 0.55, -0.8], 0.035, 8); // coupler and jack
@@ -670,7 +670,7 @@ function meshChair() {
   }
   P(m, 38);
   const g = []; for (let i = 0; i <= 6; i++) { const r = []; for (let j = 0; j <= 4; j++) { const u = i / 6, v = j / 4; r.push(m.v(-0.26 + 0.52 * u, 0.455 - 0.05 * sin(PI * u) * sin(PI * v), -0.24 + 0.45 * v)); } g.push(r); }
-  for (let i = 0; i < 6; i++) for (let j = 0; j < 4; j++) { m.quad(g[i][j], g[i + 1][j], g[i + 1][j + 1], g[i][j + 1]); m.quad(g[i][j], g[i][j + 1], g[i + 1][j + 1], g[i + 1][j]); }
+  for (let i = 0; i < 6; i++) for (let j = 0; j < 4; j++) { m.quad(g[i][j], g[i][j + 1], g[i + 1][j + 1], g[i + 1][j]); m.quad(g[i][j], g[i + 1][j], g[i + 1][j + 1], g[i][j + 1]); }
   box(m, -0.27, 0.66, 0.25, 0.27, 0.9, 0.27);
   return m;
 }
@@ -730,7 +730,7 @@ function meshTentInside() {
     [0.1, 0.96, 0.09, 0.39, 0.08, 3], [0.4, 0.95, 0.06, 0.37, 0.05, 3], [0.55, 0.95, 0.04, 0.37, 0.03, 3]], 18);
   // the top turned back at the head, plaid lining up
   P(m, 26); const g = []; for (let i = 0; i <= 5; i++) { const r = []; for (let j = 0; j <= 4; j++) { const u = i / 5, v = j / 4; r.push(m.v(0.58 + 0.76 * v + 0.02 * sin(u * 9), 0.1 + 0.05 * sin(PI * u) + 0.02 * sin(v * 11 + u * 5), 0.45 + 0.5 * u)); } g.push(r); }
-  for (let i = 0; i < 5; i++) for (let j = 0; j < 4; j++) { m.quad(g[i][j], g[i + 1][j], g[i + 1][j + 1], g[i][j + 1]); m.quad(g[i][j], g[i][j + 1], g[i + 1][j + 1], g[i + 1][j]); }
+  for (let i = 0; i < 5; i++) for (let j = 0; j < 4; j++) { m.quad(g[i][j], g[i][j + 1], g[i + 1][j + 1], g[i + 1][j]); m.quad(g[i][j], g[i + 1][j], g[i + 1][j + 1], g[i][j + 1]); }
   P(m, 27); loft(m, [[1.0, 0.95, 0.06, 0.2, 0.02, 2.5], [1.06, 0.95, 0.1, 0.27, 0.07, 2.5], [1.32, 0.95, 0.11, 0.28, 0.08, 2.5], [1.38, 0.95, 0.07, 0.22, 0.03, 2.5]], 14);
   // crate and tape recorder (lid open against the wall, two reels of brown tape)
   P(m, 103); box(m, -1.38, 0, 1.1, -0.92, 0.36, 1.62);

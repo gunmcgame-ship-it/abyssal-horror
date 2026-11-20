@@ -636,14 +636,18 @@ function render() {
   r.setBindGroup(0, bg0);
   ruinD = hypot(F[CX] - RUINC[0], F[CZ] - RUINC[1]);
   const stonesZ = !(PSKIP & 2) && !(PSKIP & 256) && !ruinSkip(RUIN_STONE, ruinD) && !(PSKIP & 1024);
-  if (stonesZ) { // the stones' depth first (see pSolidZ)
+  // the camp is one big mesh in front of the ground wherever it stands: its depth first too
+  const campZ = !(PSKIP & 2) && !(PSKIP & 2048) && solidOn(10);
+  if (stonesZ || campZ) { // depth first (see pSolidZ)
     r.setPipeline(pSolidZ); r.setVertexBuffer(0, vbMesh); r.setVertexBuffer(1, ibSolids); r.setIndexBuffer(ibMesh, 'uint32');
-    for (let i = RUIN_STONE; i < RUIN_STONE + 4; i++) if (Wd.solids.ranges[i][1]) drawStones(r, i, F[CX], F[CZ], true);
+    if (stonesZ) for (let i = RUIN_STONE; i < RUIN_STONE + 4; i++) if (Wd.solids.ranges[i][1]) drawStones(r, i, F[CX], F[CZ], true);
+    if (campZ) { const g = Wd.solids.ranges[10], M = meshes[10]; r.drawIndexed(M.ib.length, g[1], M.i0, M.v0, g[0]); }
   }
   r.setPipeline(pTerrain); r.setVertexBuffer(0, vbTerrain); r.setVertexBuffer(1, ibSolids); r.setIndexBuffer(ibTerrain, 'uint32');
   if (!(PSKIP & 1)) drawCells(r, T.start, T.lo, T.hi, 1.5, 1, 0, 0, 240);
   r.setPipeline(pSolid); r.setVertexBuffer(0, vbMesh); r.setIndexBuffer(ibMesh, 'uint32');
-  for (let i = 0; i < SOLN; i++) { const g = Wd.solids.ranges[i]; if (!(PSKIP & 2) && g[1] && solidOn(i) && !ruinSkip(i, ruinD)) { if (i >= RUIN_STONE && i < RUIN_STONE + 4) { if (!(PSKIP & 256)) { if (stonesZ) r.setPipeline(pSolidEq); drawStones(r, i, F[CX], F[CZ], true); if (stonesZ) r.setPipeline(pSolid); } continue; } const M = solidMesh(i); r.drawIndexed(M.ib.length, g[1], M.i0, M.v0, g[0]); } }
+  for (let i = 0; i < SOLN; i++) { const g = Wd.solids.ranges[i]; if (!(PSKIP & 2) && g[1] && solidOn(i) && !ruinSkip(i, ruinD)) { if (i === 10 && campZ) { r.setPipeline(pSolidEq); const M = meshes[10]; r.drawIndexed(M.ib.length, g[1], M.i0, M.v0, g[0]); r.setPipeline(pSolid); continue; }
+    if (i >= RUIN_STONE && i < RUIN_STONE + 4) { if (!(PSKIP & 256)) { if (stonesZ) r.setPipeline(pSolidEq); drawStones(r, i, F[CX], F[CZ], true); if (stonesZ) r.setPipeline(pSolid); } continue; } const M = solidMesh(i); r.drawIndexed(M.ib.length, g[1], M.i0, M.v0, g[0]); } }
   r.setVertexBuffer(1, ibLant); r.drawIndexed(LANTM.ib.length, 1, LANTM.i0, LANTM.v0, 0);
   if (F[LHOLD] > 0.5 && !FLYCAM) r.drawIndexed(HANDM.ib.length, 1, HANDM.i0, HANDM.v0, 0);
   for (let i = 0; i < NCHUNK * !(PSKIP & 4); i++) {
