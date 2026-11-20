@@ -436,7 +436,7 @@ fn prop(id: i32, op: vec3f, on: vec3f, mc: f32, h: f32, pfw: f32, sd: f32, cv: f
       let inG = ss(r + aa * .5, r - aa * .5, d);           // in the groove
       let wall = ss(r * .55, r, d) * inG;                  // its rounded side, sloping down to the floor
       let chip = ss(.62, .7, vn2d(q * 160.)) * ss(.4, .8, vn2d(q * 22. + 5.));
-      let paint = vec3f(.62, .56, .40) * (.8 + .3 * vn2d(q * 420.));
+      let paint = vec3f(.46, .41, .29) * (.8 + .3 * vn2d((q * 420.) % 97.)) * (1. - .35 * ss(.4, .8, vn2d(q * 35. + 3.)));   // dulled, dust in the grooves
       m.a = mix(m.a, mix(paint, m.a * .55, max(chip, ss(.55, .95, d / r))), inG) * (1. - .55 * wall);
       m.n += vec3f(-g * wall * 1.4, 0.);
       m.gl = mix(m.gl, .06, inG * (1. - chip));
@@ -462,12 +462,12 @@ fn prop(id: i32, op: vec3f, on: vec3f, mc: f32, h: f32, pfw: f32, sd: f32, cv: f
     case 8 {   // white canvas: sewn panels with felled seams, uneven threads, folds and sag, water marks, red dust low
       let sw = op.x + op.z; let md = ss(.012, .004, pfw);
       let sd0 = abs(fract(sw / .92) - .5); let seam = ss(.02, .0, sd0 - .47);
-      let st = step(.5, fract(op.y * 110.)) * ss(.012, .0, abs(sd0 - .462));
+      let st = mix(.5, step(.5, fract(op.y * 160.)), ss(.004, .0015, pfw)) * ss(.0045, .0, abs(sd0 - .462));   // stitches: a few mm, merging into the seam's line from afar
       let wv = (sin(op.x * 1700.) * sin(op.y * 1700.) + sin(op.z * 1700.) * sin(op.y * 1650.)) * .5 * ss(.0008, .0003, pfw);
       let slub = (vn2d(vec2f(op.y * 260. + sw * 37., sw * 4. + op.y * 3.)) - .5) * md;
       let stain = ss(.55, .78, vn2d(vec2f(sw * 1.3, op.y * 2.1))) * .16 + ss(.62, .8, vn2d(vec2f(sw * 6., op.y * 5.))) * .1;
       let dirt = ss(.55, .0, op.y) * .4;
-      m.a = vec3f(.62, .59, .51) * (.93 + .1 * mc) * (1. - .22 * seam - .25 * st) * (1. + .05 * wv + .02 * slub) * (1. - stain) * mix(vec3f(1.), vec3f(.78, .6, .42), dirt); m.gl = .02; m.bp = 0.; m.tl = .5;
+      m.a = vec3f(.62, .59, .51) * (.93 + .1 * mc) * (1. - .22 * seam - .2 * st) * (1. + .05 * wv + .02 * slub) * (1. - stain) * mix(vec3f(1.), vec3f(.78, .6, .42), dirt); m.gl = .02; m.bp = 0.; m.tl = .5;
       let w1 = vn2d(vec2f(sw * 3., op.y * 4.)) * 2. - 1.; let w2 = vn2d(vec2f(sw * 7. + 3., op.y * 9.)) * 2. - 1.; let w3 = vn2d(vec2f(sw * 19., op.y * 23.)) * 2. - 1.;
       m.n = vec3f(w1 * .1 + w2 * .05 + w3 * .025 * md + slub * .05, 0., w2 * .08 - w1 * .04) + vec3f(sign(fract(sw / .92) - .5), 0., 0.) * seam * .25; }
     case 9 { let gr = vn2d(vec2f((op.x + op.z) * 9., op.y * 140. + (op.x - op.z) * 140.)); m.a = vec3f(.30, .20, .11) * (.8 + .35 * gr); m.gl = .15; m.bp = .02; }   // wood, with a grain
