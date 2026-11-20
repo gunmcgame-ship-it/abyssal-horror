@@ -791,14 +791,20 @@ function meshLantern() {
   P(m, 42); for (const y of [-0.06, 0.0]) cyl(m, [0, y, 0.058], [0, y, 0.086], 0.002, 4, false);
   return m;
 }
-// your gloved hand round the top of the lantern's bail (same origin as the lantern), drawn only while you hold it:
-// a leather work glove, the wrist and the cuff of a dark wool shirt, going back toward you
-function meshHand() {
+// your gloved hand round the top of the lantern's bail (same origin as the lantern: +x right, +y up, +z back toward you),
+// drawn only while you hold it: a leather work glove, then the arm in a dark wool sleeve running back to your shoulder,
+// so it leaves the screen at its edge like an arm instead of ending in the air. Carried low the shoulder is behind,
+// a little left and a little below the hand; with the lantern raised (raised = true) it is below and behind.
+function meshHand(raised = false) {
   const m = new Mesh();
   P(m, 43);
   put(m, tag(icosphere(1, (x, y, z) => [x * 0.048, y * 0.034, z * 0.04]), 43), 0, 0.235, 0.012);
   for (let i = 0; i < 4; i++) cyl(m, [-0.03 + i * 0.02, 0.212, -0.018], [-0.03 + i * 0.02, 0.244, -0.034], 0.0105, 6);
-  cyl(m, [0.004, 0.245, 0.03], [0.012, 0.29, 0.1], 0.03, 10);
-  P(m, 44); cyl(m, [0.011, 0.285, 0.09], [0.02, 0.32, 0.17], 0.04, 12);
+  const wr = [0.006, 0.255, 0.07];                                       // the wrist, at the glove's cuff
+  const sh = raised ? [-0.12, -0.6, 0.62] : [-0.24, 0.06, 0.86];        // the shoulder
+  const el = raised ? [0.04, -0.12, 0.3] : [-0.04, 0.12, 0.44];         // the elbow, bent out and down a little
+  cyl(m, [0.004, 0.245, 0.03], wr, 0.03, 10);                           // the glove's gauntlet
+  P(m, 44); cyl(m, wr, el, 0.04, 12); cyl(m, el, sh, 0.05, 12);         // forearm and upper arm in the sleeve
+  put(m, tag(icosphere(1, (x, y, z) => [x * 0.042, y * 0.042, z * 0.042]), 44), el[0], el[1], el[2]); // round the elbow
   return m;
 }

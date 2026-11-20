@@ -323,7 +323,7 @@ const meshes = [meshChunk(1, 3), meshChunk(7, 3), meshChunk(13, 3), meshChunk(22
   meshChunk(3), meshChunk(11), meshChunk(29), meshChunk(5, 3), meshChunk(17, 3), meshChunk(41, 3), meshChunk(9, 1), AO(meshPear(0, true), { ground: 0, res: 0.015, maxD: 0.3 }), AO(meshPear(1, true), { ground: 0, res: 0.015, maxD: 0.3 }), meshChunk(5, 2, 1), meshChunk(17, 2, 1), meshChunk(41, 2, 1),
   meshBlock(1), meshBlock(2), meshBlock(3), meshBlock(4), Wd.ruinM, Wd.stgM[0], Wd.stgM[1], Wd.stgM[2], Wd.trM,
   meshBlock(1, 1), meshBlock(2, 1), meshBlock(3, 1), meshBlock(4, 1),
-  meshLog(false), meshLog(true), meshBeam(), meshBoard(), AO(meshOldTable(), { ground: 0, res: 0.02 }), AO(meshBench(), { ground: 0, res: 0.02 }), AO(meshStove(), { ground: 0, res: 0.02 }), AO(meshSign(), { ground: 0, res: 0.02 }), AO(meshMarker(), { ground: 0, res: 0.02 })].map((m) => m.build());
+  meshLog(false), meshLog(true), meshBeam(), meshBoard(), AO(meshOldTable(), { ground: 0, res: 0.02 }), AO(meshBench(), { ground: 0, res: 0.02 }), AO(meshStove(), { ground: 0, res: 0.02 }), AO(meshSign(), { ground: 0, res: 0.02 }), AO(meshMarker(), { ground: 0, res: 0.02 }), meshHand(true)].map((m) => m.build()); // 48: the hand with the lantern raised
 let nV = 0, nI = 0;
 for (const m of meshes) { m.v0 = nV; m.i0 = nI; nV += m.nv; nI += m.ib.length; }
 const allV = new Uint8Array(nV * 16), allI = new Uint32Array(nI);
@@ -339,7 +339,7 @@ const ibFireB = buf(Wd.fire, BU.VERTEX), nFire = Wd.fire.length / 8;
 // the bright stars, and the satellite in the last slot (rewritten every frame)
 const STARB = starData(), ibStars = buf(STARB, BU.VERTEX), nStars = STARB.length / 8, SATB = STARB.subarray((nStars - 1) * 8);
 // the lantern is one instance, rewritten every frame (position, scale, rotation, material 2)
-const LANT = new Float32Array([0, 0, 0, 0.78, 0, 0, 0, 1, 2, 0, 1, 0]), ibLant = buf(LANT, BU.VERTEX), LANTM = meshes[11], HANDM = meshes[13];
+const LANT = new Float32Array([0, 0, 0, 0.78, 0, 0, 0, 1, 2, 0, 1, 0]), ibLant = buf(LANT, BU.VERTEX), LANTM = meshes[11], HANDM = meshes[13], HANDUP = meshes[48];
 Q.writeTexture({ texture: tVol }, Wd.volD, { bytesPerRow: NX, rowsPerImage: NY / 2 }, [NX / 2, NY / 2, NZ / 2]);
 Q.writeTexture({ texture: tMap }, Wd.gm, { bytesPerRow: 2048 }, [512, 512]);
 
@@ -653,7 +653,7 @@ function render() {
   for (let i = 0; i < SOLN; i++) { const g = Wd.solids.ranges[i]; if (!(PSKIP & 2) && g[1] && solidOn(i) && !ruinSkip(i, ruinD)) { if (i === 10 && campZ) { r.setPipeline(pSolidEq); const M = meshes[10]; r.drawIndexed(M.ib.length, g[1], M.i0, M.v0, g[0]); r.setPipeline(pSolid); continue; }
     if (i >= RUIN_STONE && i < RUIN_STONE + 4) { if (!(PSKIP & 256)) { if (stonesZ) r.setPipeline(pSolidEq); drawStones(r, i, F[CX], F[CZ], true); if (stonesZ) r.setPipeline(pSolid); } continue; } const M = solidMesh(i); r.drawIndexed(M.ib.length, g[1], M.i0, M.v0, g[0]); } }
   r.setVertexBuffer(1, ibLant); r.drawIndexed(LANTM.ib.length, 1, LANTM.i0, LANTM.v0, 0);
-  if (F[LHOLD] > 0.5 && !FLYCAM) r.drawIndexed(HANDM.ib.length, 1, HANDM.i0, HANDM.v0, 0);
+  if (F[LHOLD] > 0.5 && !FLYCAM) { const HM = F[LIFT] > 0.5 ? HANDUP : HANDM; r.drawIndexed(HM.ib.length, 1, HM.i0, HM.v0, 0); }
   for (let i = 0; i < NCHUNK * !(PSKIP & 4); i++) {
     const c = Wd.chunks[i], big = i > 2 && i < 6; r.setVertexBuffer(1, ibChunk[i]);
     drawCells(r, c.start, c.lo, c.hi, 3, meshes[14 + i], 0, 0, i > 5 ? 30 : big ? 40 : 96);

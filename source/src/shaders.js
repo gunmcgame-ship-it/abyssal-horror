@@ -363,7 +363,7 @@ const LSD = array<vec2f, 16>(vec2f(-.94, -.40), vec2f(.95, -.77), vec2f(-.09, -.
   vec2f(-.38, .28), vec2f(.97, .76), vec2f(.44, -.53), vec2f(-.24, -.42), vec2f(.80, .24), vec2f(-.73, .96), vec2f(-.53, .07),
   vec2f(.05, .52), vec2f(.40, .93), vec2f(.18, -.19));
 fn lantShadow(p0: vec3f) -> f32 {
-  if (g.ld.w < .5) { return 1.; }
+  if (g.ld.w < .5 || distance(p0, g.lant.xyz) > 14.) { return 1.; }
   // 2 cm toward the flame first: a thin thing (a tripod leg, a pole) never shadows itself in stripes
   let tl = g.lant.xyz - p0; let p = p0 + tl * (.02 / max(length(tl), .02));
   let c = g.lm * vec4f(p, 1.);
@@ -384,14 +384,17 @@ fn lantShadow(p0: vec3f) -> f32 {
   }
   if (nb < .5) { return 1.; }
   let dB = sb / nb;
-  let pen = .05 * max(dR - dB, 0.) / max(dB, .05);   // the penumbra's width here, in metres
+  // most of the forward light comes off the tin reflector, a bright half drum ~17 cm across, not the flame alone
+  let pen = .12 * max(dR - dB, 0.) / max(dB, .05);   // the penumbra's width here, in metres
   let tw = dR * 3.464 / 1024.;                        // one shadow-map texel's width here (120 degrees wide)
-  let r = clamp(pen / tw, 1.3, 18.) / 1024.;
+  let r = clamp(pen / tw, 1.3, 40.) / 1024.;
   // turn the pattern a little from pixel to pixel so the wide blur does not show its taps as rings
   let an = fract(sin(dot(p0.xz, vec2f(12.9898, 78.233))) * 43758.55) * 6.2832; let cs = cos(an); let sn = sin(an);
   var a = 0.;
   for (var k = 0; k < 16; k++) { let o = LSD[k]; a += textureSampleCompareLevel(tLS, sS, uv + vec2f(cs * o.x - sn * o.y, sn * o.x + cs * o.y) * r, z); }
-  return a / 16.;
+  // far off, the lantern's light is a trickle beside the moon's and the fire's: its shadows there fade away, instead of
+  // a near thing throwing a huge sharp copy of itself across the ground and the canyon wall behind it
+  return mix(1., a / 16., 1. - ss(5., 14., dR));
 }
 fn lantF(p: vec3f) -> f32 {
   let v = p - g.lant.xyz; let d = length(v);
@@ -626,7 +629,7 @@ fn prop(id: i32, op: vec3f, on: vec3f, mc: f32, h: f32, pfw: f32, sd: f32, cv: f
     case 57 { m.a = vec3f(.34, .3, .21) * (.7 + .35 * vn2d(op.xy * 90. + op.z * 70.)) * (1. - .3 * ss(.6, .8, vn2d(op.xy * 25.))); m.gl = .04; m.bp = .05; }   // faded cream routed paint
     case 67 { m.a = vec3f(.08, .11, .10) * (.7 + .6 * vn2d(op.xz * 60. + op.y * 37.)); m.bp = 1.8; m.tl = .25; }
     case 68 { m.a = vec3f(.07, .10, .065) * (.7 + .6 * vn2d(op.xz * 70. + op.y * 41.)); m.bp = 1.8; m.tl = .25; }
-    case 44 { m.a = vec3f(.07, .075, .09) * (.85 + .3 * mc); m.bp = .4; }   // dark wool shirt cuff
+    case 44 { m.a = vec3f(.11, .105, .115) * (.85 + .3 * mc); m.bp = .4; m.n = vec3f(sin(op.x * 300. + op.z * 200.), 0., cos(op.y * 260.)) * .05; }   // dark wool sleeve, a little knit texture
     case 43 { m.a = vec3f(.30, .19, .10) * (.8 + .3 * mc); m.gl = .2; m.bp = .3; }   // leather work glove
     case 60 { m.a = vec3f(.11, .15, .07) * (.75 + .4 * vn2d(op.xz * 30. + op.y * 22.)) * (.8 + .3 * h); m.gl = .15; m.bp = .05; }    // cactus
     case 61 { let fb = fract(sin(dot(floor(op.xz * vec2f(55., 47.)), vec2f(12.9, 78.2))) * 43758.5);
@@ -776,7 +779,11 @@ fn weather(m: ptr<function, PM>, id: i32, op: vec3f, on: vec3f, pfw: f32, cv: f3
   // back stays dark: it faces away from the flame)
   if (mat == 2) { let pid = i32(round(i.ao * 127.)); let tf = g.lant.xyz - i.wp; let df = length(tf);
     let refl = pid == 42; // the tin (guard wires, reflector: thin and back to back) stays unlit: lit, it strobes in stripes // the reflector (two faces back to back): left dark
-    if (df < .26 && pid >= 40 && pid <= 42 && !refl) { c += alb * LANTC * g.lant.w * .012 * sat(dot(N, tf / df) * .75 + .25) / (df * df + .006) * ss(.26, .18, df); } }
+    if (df < .26 && pid >= 40 && pid <= 42 && !refl) { c += alb * LANTC * g.lant.w * .012 * sat(dot(N, tf / df) * .75 + .25) / (df * df + .006) * ss(.26, .18, df); }
+    // your glove and sleeve catch the globe's warm glow from below (they are just above and behind it)
+    // (lit from below and the side by the globe, and by the bright pool of sand under it: the sleeve's round shows)
+    if (pid == 43 || pid == 44) { let up = sat(-N.y * .5 + .5); let rim = pow(1. - sat(dot(N, V)), 2.);
+      c += alb * LANTC * g.lant.w * (.06 * sat(dot(N, tf / df) * .6 + .4) / (df * df + .03) + .3 * up + .45 * rim) * ss(1.1, .4, df); } }
   // the lantern's flame, seen through its glass
   if (mat == 2 && i32(round(i.ao * 127.)) == 41) {
     // the flame seen through the glass: a small teardrop above the wick, yellow core, orange edge, and a soft glow round it
