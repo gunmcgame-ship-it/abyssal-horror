@@ -167,10 +167,11 @@ fn woodPM(id: i32, op: vec3f, on: vec3f, h: f32, pfw: f32, sd: f32) -> PM {
   let kon = select(0., 1., hk > .45 && ql > 0. && !logw);
   let kw = kon * exp(-kdist * kdist * .08);                           // how far the knot pulls the rings round itself
   let rr = length(q) + kw * kr * 1.6;
-  let wob = (gN(al * .9, cp * 6., wq) - .5) * .006 + (gN(al * .25 + 3., cp * 1.5, wq) - .5) * .02;
+  let wob = (gN(al * .9, cp * 6., wq) - .5) * .006 + (gN(al * .25 + 3., cp * 1.5, wq) - .5) * .03 + (gN(al * 1.7 + 9., cp * 3., wq) - .5) * .008;
   let rpm = select(select(mix(38., 75., hq), 60., beam), 26., logw);  // rings per metre: slow and fast grown trees
-  let ring = fract((rr + wob) * rpm);
-  let late = ss(.62, .86, ring) * ss(1., .9, ring);   // latewood: the darker, harder band of each year
+  // growth differs year to year: the phase is pushed about by a slow noise of the radius, so rings bunch and spread
+  let rph = (rr + wob) * rpm; let ring = fract(rph + 1.4 * vn2d(vec2f(rph * .21, hp * 13.)));
+  let late = ss(.5, .85, ring) * ss(1., .86, ring) * (.55 + .45 * gN(al * 2.2 + 70., q * 18., wq));   // latewood: the darker, harder band of each year, broken by the fibre
   // fibre streaks: short, broken, a little wavy; the fine ones only show up close
   let s1 = gN(al * 1.6, q * 26., wq); let s2 = gN(al * 4. + 7., q * 90., wq); let s3 = gN(al * 9. + 13., q * 260., wq);
   let fib = s1 * .45 + mix(.5, s2, mg) * .35 + mix(.5, s3, fg * ss(.0018, .0008, pfw)) * .2;
@@ -185,9 +186,9 @@ fn woodPM(id: i32, op: vec3f, on: vec3f, h: f32, pfw: f32, sd: f32) -> PM {
   let rad = (1. - ss(0., .04, abs(vn2d(vec2f(ang * 5. + so, cr * 4.)) - .5))) * ss(.4, .6, vn2d(vec2f(ang * 2., so)));
   let wear = ss(.3, .8, on.y * .6 + gN(al * .7 + 60., cp * 8., wq) * .8 - .1);
   // sun-greyed wood keeps a warm undertone; the stained park wood is a warm brown, worn back to grey-tan on the tops
-  var top = select(vec3f(.27, .245, .21), vec3f(.23, .20, .165), logw || beam); var dark = vec3f(.085, .068, .05);
+  var top = select(vec3f(.235, .205, .17), vec3f(.23, .20, .165), logw || beam); var dark = vec3f(.085, .068, .05);
   if (brown) { top = mix(vec3f(.25, .145, .075), vec3f(.31, .265, .205), wear * .5); dark = vec3f(.085, .048, .024); }
-  var col = mix(dark, top, .45 + .55 * fib) * (1. - .32 * late * (.35 + .65 * mg));
+  var col = mix(dark, top, .45 + .55 * fib) * (1. - .42 * late * (.35 + .65 * mg));
   // every board a little different in tone and hue
   col *= (.8 + .38 * hp) * vec3f(1. + .06 * (hq - .5), 1., 1. - .1 * (hq - .5));
   col *= .88 + .24 * gN(al * .15 + 80., cp * 1.2, wq);
@@ -205,7 +206,7 @@ fn woodPM(id: i32, op: vec3f, on: vec3f, h: f32, pfw: f32, sd: f32) -> PM {
   let adz = select(.5, fract(al * 5.5 + gN(al * .5, cp * 3., wq) * 2.), beam);
   let T = normalize(cross(A, on) + vec3f(1e-4));
   m.a = col;
-  m.n = (T * ((s2 - .5) * .4 * mg + (late - .3) * .15 * mg) - on * crack * .6) * (1. - endg)
+  m.n = (T * ((s2 - .5) * .22 * mg + (late - .3) * .04 * mg) - on * crack * .6) * (1. - endg)
       + A * (adz - .5) * .25 * (1. - endg) + (T * (pl - .5) * 1.2 - on * bpl * .5) * bk;
   m.gl = .006 * (1. - crack);
   return m;
