@@ -514,6 +514,7 @@ function meshTruck() {
   put(m, sdfMesh(chrome, () => 3, -1.05, 0.3, -2.68, 1.05, 1.0, -2.28, 0.01), 0, 0, 0);
   put(m, sdfMesh(chrome, () => 3, -1.05, 0.3, 2.36, 1.05, 0.56, 2.52, 0.012), 0, 0, 0);
   P(m, 34); box(m, -0.41, 0.55, -2.37, 0.41, 0.89, -2.33);                                       // dark behind the grille
+  P(m, 1); for (let k = 0; k < 9; k++) { const y = 0.58 + k * 0.034; box(m, -0.4, y, -2.374, 0.4, y + 0.012, -2.364); }  // painted slats behind the bars
   for (const s of [-1, 1]) { P(m, 22); put(m, tag(icosphere(2), 22), s * 0.71, 0.84, -2.42, 0, [0.088, 0.088, 0.03]); }
   // glass, each pane in a black rubber surround: the split windshield on its slope, door glass, the back window
   const pane = (o, u, v, n, e) => { P(m, 34); panel(m, [o[0] - u[0] * e / hypot(...u) - v[0] * e / hypot(...v) + n[0] * 0.003, o[1] - u[1] * e / hypot(...u) - v[1] * e / hypot(...v) + n[1] * 0.003, o[2] - u[2] * e / hypot(...u) - v[2] * e / hypot(...v) + n[2] * 0.003], u.map((c, k) => c * (1 + 2 * e / hypot(...u))), v.map((c, k) => c * (1 + 2 * e / hypot(...v)))); P(m, 6); panel(m, [o[0] + n[0] * 0.006, o[1] + n[1] * 0.006, o[2] + n[2] * 0.006], u, v, 2, 2); };
@@ -549,9 +550,11 @@ function meshTruck() {
   P(m, 18); for (const z of [0.95, 1.6]) cyl(m, [-0.6, 1.12, z], [0.6, 1.12, z], 0.009, 4, false);
   P(m, 4); { const n0 = m.p.length / 3; cyl(m, [0.33, 0, 0], [0.47, 0, 0], 0.33, 18); for (let k = n0 * 3; k < m.p.length; k += 3) { const x = m.p[k] - 0.4, y = m.p[k + 1]; m.p[k] = 0.45 + x * 0.94 + y * 0.34; m.p[k + 1] = 1.18 - x * 0.34 + y * 0.94; m.p[k + 2] += 1.72; } } // inside the bed (it ends at z 2.3)
   P(m, 11); box(m, -0.55, 0.86, 2.0, -0.38, 1.3, 2.28);
-  // canvas water bag hanging from the front bumper
-  P(m, 17); loft(m, [[-2.67, 0.42, 0.3, 0.02, 0.03, 2], [-2.66, 0.42, 0.22, 0.13, 0.17, 3], [-2.6, 0.42, 0.22, 0.14, 0.18, 3], [-2.585, 0.42, 0.3, 0.02, 0.03, 2]], 14);
-  P(m, 18); cyl(m, [0.36, 0.5, -2.63], [0.42, 0.42, -2.63], 0.008, 4, false); cyl(m, [0.48, 0.5, -2.63], [0.42, 0.42, -2.63], 0.008, 4, false);
+  // a desert water bag hung from the front bumper to cool in the wind: a flat linen pillow, square-shouldered, full
+  // and sagging to the bottom, a rope bail from its top corners over the bumper, a tin spout at one shoulder
+  P(m, 59); loft(m, [[-2.652, 0.42, 0.235, 0.125, 0.125, 5], [-2.638, 0.42, 0.23, 0.16, 0.15, 5], [-2.618, 0.42, 0.225, 0.168, 0.158, 5], [-2.598, 0.42, 0.23, 0.16, 0.15, 5], [-2.585, 0.42, 0.235, 0.125, 0.125, 5]], 18);
+  P(m, 18); cyl(m, [0.4, 0.515, -2.575], [0.275, 0.37, -2.62], 0.007, 5, false); cyl(m, [0.44, 0.515, -2.575], [0.565, 0.37, -2.62], 0.007, 5, false);
+  P(m, 42); cyl(m, [0.52, 0.36, -2.618], [0.54, 0.41, -2.618], 0.016, 10); cyl(m, [0.54, 0.41, -2.618], [0.545, 0.425, -2.618], 0.011, 10);
   return m;
 }
 // 1950s travel trailer: rounded polished aluminium body, wraparound front window, nose (and hitch) to -z
@@ -570,10 +573,18 @@ function meshTrailer() {
   for (const [t0, t1] of [[-0.6, -0.25], [0.2, 0.55]]) for (const [a0, a1] of [[0.12, 0.45], [PI - 0.45, PI - 0.12]]) { P(m, 3); patch(t0 - 0.015, t1 + 0.015, a0 - 0.03, a1 + 0.03, 0.007); P(m, 72); patch(t0, t1, a0, a1, 0.012); }
   P(m, 72); patch(-0.88, -0.76, 0.15, PI - 0.15, 0.012, 2, 12); // wraparound front window
   patch(0.86, 0.92, 1.2, PI - 1.2, 0.012, 2, 3);
-  P(m, 3); patch(-0.97, 0.97, -0.03, 0.03, 0.016, 24, 1); patch(-0.97, 0.97, PI - 0.03, PI + 0.03, 0.016, 24, 1); // chrome belt line
+  // chrome belt line: a half-round bead, so a light makes a thin bright line on it rather than a broad glowing band
+  const bead = (a0, a1) => { const g = []; for (let i = 0; i <= 24; i++) { const r = []; for (let j = 0; j <= 4; j++) r.push(m.v(...sp(mix(-0.97, 0.97, i / 24), mix(a0, a1, j / 4), 0.004 + 0.014 * sin(PI * j / 4)))); g.push(r); }
+    for (let i = 0; i < 24; i++) for (let j = 0; j < 4; j++) m.quad(g[i][j], g[i + 1][j], g[i + 1][j + 1], g[i][j + 1]); };
+  P(m, 3); bead(-0.03, 0.03); bead(PI - 0.03, PI + 0.03);
   P(m, 7); patch(-0.12, 0.08, PI - 0.55, PI + 0.95, 0.02, 3, 6); // door (on the camp side)
   P(m, 21); box(m, -0.8, 0.3, 1.2, 0.8, 0.46, L - 1.2);
-  for (const s of [-1, 1]) { P(m, 42); lathe(m, [[0, 0.5], [0.15, 0.52], [0.16, 0.6], [0.16, 0.86], [0.12, 0.94], [0.03, 0.97], [0, 0.97]], 16, s * 0.19, 0, -0.75); P(m, 31); cyl(m, [s * 0.19, 0.96, -0.75], [s * 0.19, 1.03, -0.75], 0.018, 8); }
+  // two propane bottles on the tongue: straight-sided with a foot ring, a domed shoulder, an open guard collar round the brass valve
+  for (const s of [-1, 1]) {
+    P(m, 42); lathe(m, [[0, 0.5], [0.13, 0.5], [0.135, 0.53], [0.15, 0.535], [0.155, 0.56], [0.155, 0.83], [0.148, 0.87], [0.12, 0.905], [0.07, 0.925], [0, 0.93]], 24, s * 0.19, 0, -0.75);
+    lathe(m, [[0.082, 0.92], [0.092, 0.92], [0.092, 1.03], [0.082, 1.03], [0.082, 0.92]], 20, s * 0.19, 0, -0.75);
+    P(m, 31); cyl(m, [s * 0.19, 0.925, -0.75], [s * 0.19, 1.0, -0.75], 0.016, 8); cyl(m, [s * 0.19, 0.975, -0.75], [s * 0.19 + 0.045, 0.975, -0.75], 0.008, 6);
+  }
   // wheels: tyres with whitewalls and small hubcaps, half hidden under rounded skirts in the body's side
   for (const s of [-1, 1]) {
     const cz = L * 0.55, cx = s * 0.9;

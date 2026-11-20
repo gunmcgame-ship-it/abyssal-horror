@@ -457,8 +457,8 @@ fn prop(id: i32, op: vec3f, on: vec3f, mc: f32, h: f32, pfw: f32, sd: f32, cv: f
       let sz = abs(fract(pz) - .5); let sy = abs(fract(py) - .5);
       let seam = max(ss(.012, .0, sz - .488), ss(.012, .0, sy - .488));
       let dent = vn2d(op.zy * 3.5 + vec2f(pid)); let stk = ss(.55, .8, vn2d(vec2f(op.z * 9. + pid, op.y * .7)));
-      m.a = vec3f(.44, .45, .46) * (.86 + .2 * hs(pid)) * (1. - .55 * seam) * (1. - .12 * stk) * (.93 + .1 * vn2d(op.zy * 40.));
-      m.gl = .28 * (1. - .4 * stk); m.mt = .25; m.bp = 0.; m.n = vec3f(0., dent - .5, dent - .5) * .08; }
+      m.a = vec3f(.44, .45, .46) * (.94 + .07 * hs(pid)) * (1. - .45 * seam) * (1. - .12 * stk) * (.93 + .1 * vn2d(op.zy * 40.));
+      m.gl = .28 * (1. - .4 * stk); m.mt = .25; m.bp = 0.; m.n = vec3f(0., dent - .5, dent - .5) * .035; }
     case 8 {   // white canvas: sewn panels with felled seams, uneven threads, folds and sag, water marks, red dust low
       let sw = op.x + op.z; let md = ss(.012, .004, pfw);
       let sd0 = abs(fract(sw / .92) - .5); let seam = ss(.02, .0, sd0 - .47);
@@ -583,16 +583,24 @@ fn prop(id: i32, op: vec3f, on: vec3f, mc: f32, h: f32, pfw: f32, sd: f32, cv: f
       m.a = mix(m.a, vec3f(.23, .17, .10), cork); m.gl = .12; m.bp = .05; m.n = vec3f(n2 - .5, 0., n1 - .5) * .12; } // prickly pear pad
     case 64 { m.a = vec3f(.62, .58, .46); m.gl = .3; m.bp = 0.; m.tl = .4; }    // spines: pale straw, translucent
     case 69 { m.a = vec3f(.24, .15, .07); m.bp = .3; }
+    case 59 {   // the water bag: heavy natural linen, a coarse weave, darker and a little glossy where it is wet through
+      // (the lower part, seeping), a tide line above, drops darkening the seam at the bottom
+      let wv = sin(op.x * 1100.) * sin(op.y * 1100.) * ss(.0009, .0004, pfw);
+      let wet = ss(.3, .16, op.y + (vn2d(vec2f(op.x * 30., op.y * 6.)) - .5) * .05);
+      let tide = ss(.012, .0, abs(op.y - .3 - (vn2d(vec2f(op.x * 30., 1.)) - .5) * .05)) * .5;
+      m.a = vec3f(.33, .28, .2) * (.9 + .08 * wv + .12 * (mc - .5)) * (1. - .6 * wet) * (1. - .2 * tide);
+      m.gl = .03 + .2 * wet; m.bp = .15; }
     case 72 {   // trailer windows: dark glass with the curtains drawn behind, pale folds catching a little light
       let fo = .5 + .5 * sin((op.z * 40. + op.x * 40.) + vn2d(vec2f(op.z * 6., op.y * 3.)) * 3.);
       m.a = vec3f(.07, .065, .055) * (.6 + .6 * fo); m.gl = .85; m.mt = .1; m.bp = 0.; }
     case 73 {   // licence plate: black, a yellow rim, embossed yellow characters (a coarse glyph pattern), dented
-      // in the plate's own frame (front plate y .2 .. .34, rear plate y .56 .. .72): u across, v up
-      let rear = op.y > .45; let v = (op.y - select(.2, .56, rear)) / select(.14, .16, rear); let u = (op.x + .155) / .31;
+      // in the plate's own frame (front plate y .2 .. .34, rear plate y .56 .. .72): u across, v up. op is in camp
+      // metres and the truck stands 8 m along x (put(meshTruck(), 8, ...) in world.js)
+      let px = op.x - 8.; let rear = op.y > .45; let v = (op.y - select(.2, .56, rear)) / select(.14, .16, rear); let u = (px + .155) / .31;
       let rim = step(u, .04) + step(.96, u) + step(v, .08) + step(.92, v);
-      let cf = fract((op.x + .13) / .037); let cx = floor((op.x + .13) / .037); let cr = (v - .26) / .48;
-      let ch = step(.18, cf) * step(cf, .82) * step(0., cr) * step(cr, 1.) * step(abs(op.x), .125);
-      let gl = step(.35, hs(cx * 3.1 + floor(cr * 5.) * 7.3 + floor(cf * 3.) * 1.7 + select(0., 5.7, rear)));
+      let cf = fract((px + .13) / .037); let cx = floor((px + .13) / .037); let cr = (v - .26) / .48;
+      let ch = step(.18, cf) * step(cf, .82) * step(0., cr) * step(cr, 1.) * step(abs(px), .125);
+      let gl = step(.5, hs(cx * 3.1 + floor(cr * 5.) * 7.3 + floor(cf * 3.) * 1.7 + select(0., 5.7, rear)));
       m.a = mix(vec3f(.025, .024, .022), vec3f(.55, .42, .08), min(1., rim + ch * gl)); m.gl = .35; m.bp = 0.; }
     case 71 { let st = vn2d(vec2f((op.x + op.z) * 60., op.y * 6.)); m.a = vec3f(.12, .095, .07) * (.7 + .5 * st); m.gl = .01; m.bp = .1; }   // weathered stick wood                         // glochid tufts
     case 65 { m.a = vec3f(.15, .03, .09); m.gl = .1; m.bp = .2; }             // prickly pear fruit
