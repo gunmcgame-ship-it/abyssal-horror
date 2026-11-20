@@ -58,13 +58,13 @@ const UB = new Float32Array(100), UBS = new Float32Array(100), UBL = new Float32
 const ubo = device.createBuffer({ size: 400, usage: BU.UNIFORM | BU.COPY_DST }), uboS = device.createBuffer({ size: 400, usage: BU.UNIFORM | BU.COPY_DST }), uboL = device.createBuffer({ size: 400, usage: BU.UNIFORM | BU.COPY_DST });
 // the night look, in one place: moonlight, sky fill in the shadows, blue of night vision, contrast in the darks,
 // overall brightness (1 = as designed). The dev build has sliders for them (T).
-// the night look. Two presets, N switches between them (the choice is remembered in this browser):
-//   OWN   set by the owner by eye: very dark, the lantern pool the only world there is
-//   MOON  after the art critic: more moonlight and shadow fill, the canyon's shapes read against the sky, the air
-//         holding more moonlit haze, so the dark beyond the lantern has depth instead of being black
+// the night look, set by the owner by eye: very dark, a desert night with the lantern pool the world you have.
+// N switches to the same look a little brighter (nothing else changed: no extra haze or fill, which reads as fog),
+// remembered in this browser. (A moonlit, hazier look was tried after the art critic and turned down: it looked like
+// a video game's moon, not a desert night.)
 const LOOK_OWN = { moon: 1.15, fill: 0.73, blue: 1, contrast: 0.88, bright: 0.42, haze: 1.4 };
-const LOOK_MOON = { moon: 1.5, fill: 1.45, blue: 1, contrast: 0.74, bright: 0.58, haze: 2.1 };
-let lookOwn = false; try { lookOwn = localStorage.getItem('look') === 'own'; } catch (e) {}
+const LOOK_MOON = Object.assign({}, LOOK_OWN, { bright: 0.5 }); // "a little brighter"
+let lookOwn = true; try { lookOwn = localStorage.getItem('look2') !== 'bright'; } catch (e) {}
 const LOOK = Object.assign({}, lookOwn ? LOOK_OWN : LOOK_MOON);
 
 const VF = SS.VERTEX | SS.FRAGMENT;
@@ -897,10 +897,10 @@ const key = (e, v) => {
     default: if (v && !e.repeat) {
       if (e.code === 'KeyH' && DEV) { hud = !hud; hTot = 0; hPer = 1e9; info.textContent = ''; }
       else if (e.code === 'KeyM') mute();
-      else if (e.code === 'KeyN') {   // the night look: the owner's own, or the moonlit one
+      else if (e.code === 'KeyN') {   // the night look: the owner's own, or the same a little brighter
         lookOwn = !lookOwn; Object.assign(LOOK, lookOwn ? LOOK_OWN : LOOK_MOON);
-        try { localStorage.setItem('look', lookOwn ? 'own' : 'moon'); } catch (er) {}
-        if (!hud) { info.textContent = lookOwn ? 'Night look: default (dark)' : 'Night look: moonlit'; clearTimeout(lookMsg); lookMsg = setTimeout(() => { if (!hud) info.textContent = ''; }, 2000); }
+        try { localStorage.setItem('look2', lookOwn ? 'own' : 'bright'); } catch (er) {}
+        if (!hud) { info.textContent = lookOwn ? 'Night look: default' : 'Night look: a little brighter'; clearTimeout(lookMsg); lookMsg = setTimeout(() => { if (!hud) info.textContent = ''; }, 2000); }
       }
       else if (e.code === 'Escape') ui(true);
       // dev build: 1-6 jump to the viewpoints (walking there, or as the free camera), G toggles the free camera
