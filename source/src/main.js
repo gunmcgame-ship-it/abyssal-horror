@@ -310,7 +310,7 @@ D = Wd.gy = T.smp = null; // with gy goes the generator's working memory (about 
 
 await say('Pitching camp…', 0.94, 1200);
 // mesh ids: 0-3 rocks, 4 barrel cactus, 5 hedgehog cactus, 6-7 prickly pear, 8 juniper trunk, 9 pinyon trunk,
-// 10 the camp, 11 the lantern, 12 the folding chair, 13 your hand on the lantern, 14-20 rock chunks + pebbles, 21-22 the prickly pears seen from past 30 m,
+// 10 the camp, 11 the lantern, 12 the folding chair, 13 unused (was your hand on the lantern, removed), 14-20 rock chunks + pebbles, 21-22 the prickly pears seen from past 30 m,
 // 23-25 far LOD of the large rock chunks, 26-29 the ruins' building stones, 30 the rest of the ruins, 31-33 the supper
 // stages (drawn once RSTAGE reaches 1, 2, 3), 34 the traces of later visitors (ruins.js), 35-38 the building stones in
 // low detail (used beyond 22 m), 39-47 single objects placed as instances (ruins.js: logs, lintel, board, old table and
@@ -319,11 +319,11 @@ const unused = () => { const m = new Mesh(); m.tri(m.v(0, 0, 0), m.v(0.01, 0, 0)
 // made things get their ambient occlusion baked in (bakeAO: contact shadows, the inside of the truck bed, under tables)
 const AO = (m, o) => { const t0 = performance.now(), r = bakeAO(m, o); if (DEV) console.log('AO', m.p.length / 3, Math.round(performance.now() - t0) + ' ms'); return r; };
 const meshes = [meshChunk(1, 3), meshChunk(7, 3), meshChunk(13, 3), meshChunk(22, 3), AO(meshBarrel(), { ground: 0, res: 0.015, maxD: 0.25 }), AO(meshHedgehog(), { ground: 0, res: 0.015, maxD: 0.25 }), AO(meshPear(0), { ground: 0, res: 0.015, maxD: 0.3 }), AO(meshPear(1), { ground: 0, res: 0.015, maxD: 0.3 }), Wd.trunks[0].m, Wd.trunks[1].m,
-  AO(meshCamp(), { ground: -0.01 }), meshLantern(), AO(meshChair(), { ground: 0, res: 0.02 }), meshHand(),
+  AO(meshCamp(), { ground: -0.01 }), meshLantern(), AO(meshChair(), { ground: 0, res: 0.02 }), unused(),
   meshChunk(3), meshChunk(11), meshChunk(29), meshChunk(5, 3), meshChunk(17, 3), meshChunk(41, 3), meshChunk(9, 1), AO(meshPear(0, true), { ground: 0, res: 0.015, maxD: 0.3 }), AO(meshPear(1, true), { ground: 0, res: 0.015, maxD: 0.3 }), meshChunk(5, 2, 1), meshChunk(17, 2, 1), meshChunk(41, 2, 1),
   meshBlock(1), meshBlock(2), meshBlock(3), meshBlock(4), Wd.ruinM, Wd.stgM[0], Wd.stgM[1], Wd.stgM[2], Wd.trM,
   meshBlock(1, 1), meshBlock(2, 1), meshBlock(3, 1), meshBlock(4, 1),
-  meshLog(false), meshLog(true), meshBeam(), meshBoard(), AO(meshOldTable(), { ground: 0, res: 0.02 }), AO(meshBench(), { ground: 0, res: 0.02 }), AO(meshStove(), { ground: 0, res: 0.02 }), AO(meshSign(), { ground: 0, res: 0.02 }), AO(meshMarker(), { ground: 0, res: 0.02 }), meshHand(true)].map((m) => m.build()); // 48: the hand with the lantern raised
+  meshLog(false), meshLog(true), meshBeam(), meshBoard(), AO(meshOldTable(), { ground: 0, res: 0.02 }), AO(meshBench(), { ground: 0, res: 0.02 }), AO(meshStove(), { ground: 0, res: 0.02 }), AO(meshSign(), { ground: 0, res: 0.02 }), AO(meshMarker(), { ground: 0, res: 0.02 })].map((m) => m.build());
 let nV = 0, nI = 0;
 for (const m of meshes) { m.v0 = nV; m.i0 = nI; nV += m.nv; nI += m.ib.length; }
 const allV = new Uint8Array(nV * 16), allI = new Uint32Array(nI);
@@ -339,7 +339,7 @@ const ibFireB = buf(Wd.fire, BU.VERTEX), nFire = Wd.fire.length / 8;
 // the bright stars, and the satellite in the last slot (rewritten every frame)
 const STARB = starData(), ibStars = buf(STARB, BU.VERTEX), nStars = STARB.length / 8, SATB = STARB.subarray((nStars - 1) * 8);
 // the lantern is one instance, rewritten every frame (position, scale, rotation, material 2)
-const LANT = new Float32Array([0, 0, 0, 0.78, 0, 0, 0, 1, 2, 0, 1, 0]), ibLant = buf(LANT, BU.VERTEX), LANTM = meshes[11], HANDM = meshes[13], HANDUP = meshes[48];
+const LANT = new Float32Array([0, 0, 0, 0.78, 0, 0, 0, 1, 2, 0, 1, 0]), ibLant = buf(LANT, BU.VERTEX), LANTM = meshes[11];
 Q.writeTexture({ texture: tVol }, Wd.volD, { bytesPerRow: NX, rowsPerImage: NY / 2 }, [NX / 2, NY / 2, NZ / 2]);
 Q.writeTexture({ texture: tMap }, Wd.gm, { bytesPerRow: 2048 }, [512, 512]);
 
@@ -627,7 +627,7 @@ function render() {
     // the lantern's shadows reach the ruins only from near them; it draws the same stones the view does (a coarser
     // stand-in would shadow the real one)
     const lrd = hypot(lx - RUINC[0], lz - RUINC[1]) - 40;
-    for (let i = 0; i < SOLN; i++) { if (i === 11 || i === 13) continue; const g = Wd.solids.ranges[i]; if (g[1] && solidOn(i) && !ruinSkip(i, lrd + 95)) { if (i >= RUIN_STONE && i < RUIN_STONE + 4) { drawStones(r, i, lx, lz, false); continue; } const M = solidMesh(i); r.drawIndexed(M.ib.length, g[1], M.i0, M.v0, g[0]); } }
+    for (let i = 0; i < SOLN; i++) { if (i === 11) continue; const g = Wd.solids.ranges[i]; if (g[1] && solidOn(i) && !ruinSkip(i, lrd + 95)) { if (i >= RUIN_STONE && i < RUIN_STONE + 4) { drawStones(r, i, lx, lz, false); continue; } const M = solidMesh(i); r.drawIndexed(M.ib.length, g[1], M.i0, M.v0, g[0]); } }
     for (let i = 0; i < NCHUNK; i++) { r.setVertexBuffer(1, ibChunk[i]); drawNear(r, Wd.chunks[i].start, meshes[14 + i], 0, lx, lz, 40); }
     for (let i = 0; i < 6; i++) { r.setVertexBuffer(1, ibProp[i]); drawNear(r, Wd.props[i].start, meshes[4 + i], 0, lx, lz, 40); }
     r.setPipeline(pLeafSh); r.setVertexBuffer(0, ibBig); drawNear(r, Wd.big.start, 0, 6, lx, lz, 20);
@@ -653,7 +653,6 @@ function render() {
   for (let i = 0; i < SOLN; i++) { const g = Wd.solids.ranges[i]; if (!(PSKIP & 2) && g[1] && solidOn(i) && !ruinSkip(i, ruinD)) { if (i === 10 && campZ) { r.setPipeline(pSolidEq); const M = meshes[10]; r.drawIndexed(M.ib.length, g[1], M.i0, M.v0, g[0]); r.setPipeline(pSolid); continue; }
     if (i >= RUIN_STONE && i < RUIN_STONE + 4) { if (!(PSKIP & 256)) { if (stonesZ) r.setPipeline(pSolidEq); drawStones(r, i, F[CX], F[CZ], true); if (stonesZ) r.setPipeline(pSolid); } continue; } const M = solidMesh(i); r.drawIndexed(M.ib.length, g[1], M.i0, M.v0, g[0]); } }
   r.setVertexBuffer(1, ibLant); r.drawIndexed(LANTM.ib.length, 1, LANTM.i0, LANTM.v0, 0);
-  if (F[LHOLD] > 0.5 && !FLYCAM) { const HM = F[LIFT] > 0.5 ? HANDUP : HANDM; r.drawIndexed(HM.ib.length, 1, HM.i0, HM.v0, 0); }
   for (let i = 0; i < NCHUNK * !(PSKIP & 4); i++) {
     const c = Wd.chunks[i], big = i > 2 && i < 6; r.setVertexBuffer(1, ibChunk[i]);
     drawCells(r, c.start, c.lo, c.hi, 3, meshes[14 + i], 0, 0, i > 5 ? 30 : big ? 40 : 96);

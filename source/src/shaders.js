@@ -629,8 +629,6 @@ fn prop(id: i32, op: vec3f, on: vec3f, mc: f32, h: f32, pfw: f32, sd: f32, cv: f
     case 57 { m.a = vec3f(.34, .3, .21) * (.7 + .35 * vn2d(op.xy * 90. + op.z * 70.)) * (1. - .3 * ss(.6, .8, vn2d(op.xy * 25.))); m.gl = .04; m.bp = .05; }   // faded cream routed paint
     case 67 { m.a = vec3f(.08, .11, .10) * (.7 + .6 * vn2d(op.xz * 60. + op.y * 37.)); m.bp = 1.8; m.tl = .25; }
     case 68 { m.a = vec3f(.07, .10, .065) * (.7 + .6 * vn2d(op.xz * 70. + op.y * 41.)); m.bp = 1.8; m.tl = .25; }
-    case 44 { m.a = vec3f(.11, .105, .115) * (.85 + .3 * mc); m.bp = .4; m.n = vec3f(sin(op.x * 300. + op.z * 200.), 0., cos(op.y * 260.)) * .05; }   // dark wool sleeve, a little knit texture
-    case 43 { m.a = vec3f(.30, .19, .10) * (.8 + .3 * mc); m.gl = .2; m.bp = .3; }   // leather work glove
     case 60 { m.a = vec3f(.11, .15, .07) * (.75 + .4 * vn2d(op.xz * 30. + op.y * 22.)) * (.8 + .3 * h); m.gl = .15; m.bp = .05; }    // cactus
     case 61 { let fb = fract(sin(dot(floor(op.xz * vec2f(55., 47.)), vec2f(12.9, 78.2))) * 43758.5);
       m.a = vec3f(.20, .16, .13) * (.5 + .5 * h) * (.65 + .55 * fb); m.bp = 1.2; m.n = vec3f(sin(op.x * 120. + op.y * 6.), 0., cos(op.z * 110. - op.y * 5.)) * .3; }       // juniper bark
@@ -780,10 +778,7 @@ fn weather(m: ptr<function, PM>, id: i32, op: vec3f, on: vec3f, pfw: f32, cv: f3
   if (mat == 2) { let pid = i32(round(i.ao * 127.)); let tf = g.lant.xyz - i.wp; let df = length(tf);
     let refl = pid == 42; // the tin (guard wires, reflector: thin and back to back) stays unlit: lit, it strobes in stripes // the reflector (two faces back to back): left dark
     if (df < .26 && pid >= 40 && pid <= 42 && !refl) { c += alb * LANTC * g.lant.w * .012 * sat(dot(N, tf / df) * .75 + .25) / (df * df + .006) * ss(.26, .18, df); }
-    // your glove and sleeve catch the globe's warm glow from below (they are just above and behind it)
-    // (lit from below and the side by the globe, and by the bright pool of sand under it: the sleeve's round shows)
-    if (pid == 43 || pid == 44) { let up = sat(-N.y * .5 + .5); let rim = pow(1. - sat(dot(N, V)), 2.);
-      c += alb * LANTC * g.lant.w * (.06 * sat(dot(N, tf / df) * .6 + .4) / (df * df + .03) + .3 * up + .45 * rim) * ss(1.1, .4, df); } }
+  }
   // the lantern's flame, seen through its glass
   if (mat == 2 && i32(round(i.ao * 127.)) == 41) {
     // the flame seen through the glass: a small teardrop above the wick, yellow core, orange edge, and a soft glow round it
