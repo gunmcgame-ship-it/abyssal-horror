@@ -518,8 +518,16 @@ fn prop(id: i32, op: vec3f, on: vec3f, mc: f32, h: f32, pfw: f32, sd: f32, cv: f
     case 24 { let wv = .5 + .5 * sin(op.x * 900.) * sin(op.z * 900.); m.a = vec3f(.36, .33, .25) * (.9 + .1 * wv) * (1. - .25 * ss(.02, .0, abs(fract(op.x / .9) - .5) - .47)); m.bp = 0.; }   // canvas groundsheet, seamed
     case 40 { m.a = vec3f(.42, .05, .03); m.gl = .5; m.bp = .1; }              // lantern: red paint
     case 41 { m.a = vec3f(.04); m.gl = .4; m.bp = 0.;                           // lantern: clear glass globe, faintly lit from inside
-      m.e = LANTC * g.lant.w * (.012 + .022 * ss(.06, -.03, op.y) + .1 * exp(-(op.y + .01) * (op.y + .01) / .0009)); } // brightest round the flame
-    case 42 { m.a = vec3f(.30, .30, .31); m.gl = .6; m.mt = .8; m.bp = .05; } // lantern: tin and wire
+      // brightest round the flame; above the reflector's rim (the part you see from behind it) the flame's light plays on
+      // the glass in moving tongues, so the fire behind the tin is plain to see
+      let ft = g.cam.w; let ang = atan2(op.z, op.x); let fk = .65 + .35 * vn2d(vec2f(ft * 9., 3.));
+      let tng = sat(.55 + .45 * sin(ang * 3. + ft * 7.) * sin(ang * 2. - ft * 5.3 + 1.) + .3 * (vn2d(vec2f(ang * 4. + ft * 3., op.y * 60. - ft * 11.)) - .5));
+      m.e = LANTC * g.lant.w * (.012 + .022 * ss(.06, -.03, op.y) + .1 * exp(-(op.y + .01) * (op.y + .01) / .0009))
+        + mix(vec3f(1., .38, .08), vec3f(1., .72, .35), tng) * g.lant.w * .12 * fk * ss(.35, .95, tng) * ss(-.004, .016, op.y) * ss(.07, .025, op.y); }
+    case 42 { m.a = vec3f(.30, .30, .31); m.gl = .6; m.mt = .8; m.bp = .05;   // lantern: tin and wire
+      // the reflector's top edge catches the flame below it: a thin hot line along the rim, flickering with the flame
+      let rq = length(op.xz); if (rq > .079 && rq < .091 && op.y > -.002 && op.y < .012) {
+        m.e = LANTC * g.lant.w * .12 * ss(-.002, .009, op.y) * (.6 + .4 * vn2d(vec2f(g.cam.w * 9., 3.))) * (.7 + .3 * sin(atan2(op.z, op.x) * 5. + g.cam.w * 6.)); } }
     case 25 { m.a = vec3f(.19, .21, .12) * (1. - .3 * ss(.03, .0, abs(fract(op.z / .16) - .5) - .45)); m.bp = .3; m.n = vec3f(sin(op.z * 40.), 0., cos(op.x * 31.)) * .06; } // sleeping bag: olive drab, quilted
     case 26 { let px = step(.5, fract(op.x / .09)); let pz = step(.5, fract(op.z / .09));                   // sleeping bag lining: red plaid flannel
       m.a = mix(vec3f(.40, .05, .04), vec3f(.10, .03, .03), (px + pz) * .35) + vec3f(.12, .10, .02) * ss(.02, .0, abs(fract(op.x / .09) - .25) - .01); m.bp = .2; }
@@ -724,7 +732,10 @@ fn weather(m: ptr<function, PM>, id: i32, op: vec3f, on: vec3f, pfw: f32, cv: f3
   if (mat == 2 && i32(round(i.ao * 127.)) == 41) {
     // the flame seen through the glass: a small teardrop above the wick, yellow core, orange edge, and a soft glow round it
     let fd = normalize(g.lant.xyz - g.cam.xyz); let dl = distance(g.lant.xyz, g.cam.xyz); let dv = (-V - fd) * dl;
-    let fx = dot(dv, g.right.xyz); let fy = dot(dv, g.up.xyz) + .004;
+    // it lives: stretches and shrinks, leans in the draught, its tip wavering faster than its base
+    let ft = g.cam.w; let fh = 1. + .22 * sin(ft * 11.) * sin(ft * 6.3 + .5) + .1 * (vn2d(vec2f(ft * 14., 7.)) - .5);
+    var fy = (dot(dv, g.up.xyz) + .004) / fh;
+    let fx = dot(dv, g.right.xyz) - (.0011 * sin(ft * 8.3) + .0007 * sin(ft * 17.) ) * ss(-.004, .022, fy);
     let wd = .0055 * (1. - .7 * ss(-.004, .022, fy)) + .0008;
     let fl = exp(-(fx * fx) / (wd * wd) - pow(max(abs(fy - .008) - .012, 0.), 2.) / .00002);
     c += mix(vec3f(1., .45, .12), vec3f(1., .85, .55), ss(.2, .8, fl)) * g.lant.w * .43 * fl + LANTC * g.lant.w * .027 * exp(-(fx * fx + fy * fy) / .0009);
