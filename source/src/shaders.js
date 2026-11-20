@@ -482,7 +482,7 @@ fn prop(id: i32, op: vec3f, on: vec3f, mc: f32, h: f32, pfw: f32, sd: f32, cv: f
       let cr = max(ss(.05, .0, c1), ss(.035, .0, c2)) * ss(.003, .0012, pfw);
       let r = length(op.xz);
       m.a = vec3f(.035, .031, .028) * (.75 + .5 * vn2d(q * .3)) * (1. - .75 * cr);
-      m.a = mix(m.a, vec3f(.22, .21, .2), ss(.75, .95, on.y) * ss(.68, .8, vn2d((op.xz * 140.) % 97.)) * .5);
+      m.a = mix(m.a, vec3f(.2, .19, .18), ss(.75, .95, on.y) * ss(.66, .82, vn2d((op.xz * 45.) % 97.)) * .15);
       m.gl = .12 * (1. - cr); m.bp = .25; m.n = vec3f(c1 - .25, 0., c2 - .25) * .25;
       m.e = vec3f(1., .25, .04) * cr * ss(.42, .18, r) * g.fire.w * .06 * (.6 + .4 * sin(g.cam.w * 1.7 + op.x * 23. + op.z * 19.)); }
     case 15 { m.a = vec3f(.03, .02, .015); m.bp = 1.2;                          // embers in the fire bed
@@ -602,7 +602,9 @@ fn prop(id: i32, op: vec3f, on: vec3f, mc: f32, h: f32, pfw: f32, sd: f32, cv: f
       let ch = step(.18, cf) * step(cf, .82) * step(0., cr) * step(cr, 1.) * step(abs(px), .125);
       let gl = step(.5, hs(cx * 3.1 + floor(cr * 5.) * 7.3 + floor(cf * 3.) * 1.7 + select(0., 5.7, rear)));
       m.a = mix(vec3f(.025, .024, .022), vec3f(.55, .42, .08), min(1., rim + ch * gl)); m.gl = .35; m.bp = 0.; }
-    case 71 { let st = vn2d(vec2f((op.x + op.z) * 60., op.y * 6.)); m.a = vec3f(.12, .095, .07) * (.7 + .5 * st); m.gl = .01; m.bp = .1; }   // weathered stick wood                         // glochid tufts
+    case 71 {   // weathered stick: grey and split along the grain, dark in the fissures
+      let st = vn2d(vec2f((op.x + op.z) * 60., op.y * 6.)); let fis = 1. - ss(0., .08, abs(vn2d(vec2f((op.x - op.z) * 140. % 97., op.y * 9.)) - .5));
+      m.a = vec3f(.085, .07, .055) * (.7 + .5 * st) * (1. - .6 * fis); m.gl = .01; m.bp = .1; m.n = vec3f(st - .5, 0., fis - .5) * .2; }
     case 65 { m.a = vec3f(.15, .03, .09); m.gl = .1; m.bp = .2; }             // prickly pear fruit
     case 66 { let pl = fract(sin(dot(floor(vec2f(op.x + op.z, op.y * .6) * 18.), vec2f(12.9, 78.2))) * 43758.5);
       m.a = vec3f(.21, .16, .13) * (.55 + .5 * h) * (.7 + .45 * pl); m.bp = 1.6; }       // pinyon bark

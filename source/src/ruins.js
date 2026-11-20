@@ -405,7 +405,9 @@ function buildTraces(gy, solid, obsPush) {
   // the ash: a fine grid laid on the sand itself, so it has no edge; the shader fades it out into the sand
   P(m, 58); { const N = 22, R = 0.5, g2 = []; for (let i = 0; i <= N; i++) { const row = []; for (let j = 0; j <= N; j++) { const x = fx + (i / N * 2 - 1) * R, z = fz + (j / N * 2 - 1) * R; row.push(m.v(x, gy(x, z) + 0.006 + 0.008 * max(0, 1 - hypot(x - fx, z - fz) / 0.35), z)); } g2.push(row); }
     for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) m.quad(g2[i][j], g2[i][j + 1], g2[i + 1][j + 1], g2[i + 1][j]); }
-  for (let i = 0; i < 14; i++) { const a = rnd() * TAU, r0 = sqrt(rnd()) * 0.32, b = rnd() * TAU, l = rr(0.03, 0.12); P(m, 14); cyl(m, [fx + cos(a) * r0, g + 0.012, fz + sin(a) * r0], [fx + cos(a) * r0 + cos(b) * l, g + 0.012 + rr(0, 0.015), fz + sin(a) * r0 + sin(b) * l], rr(0.008, 0.022), 6); }
+  // lumps of charcoal left in the ash: broken, blocky, half sunk
+  const lump = [0, 1, 2].map((v) => tag(icosphere(1, (x, y, z) => { const r = 0.75 + 0.5 * fbm(x * 1.7 + v * 5, y * 1.7, z * 1.7, 2); return [x * r, y * r, z * r]; }), 14));
+  for (let i = 0; i < 14; i++) { const a = rnd() * TAU, r0 = sqrt(rnd()) * 0.32, l = rr(0.015, 0.06), r = rr(0.008, 0.02); put(m, lump[i % 3], fx + cos(a) * r0, g + 0.006, fz + sin(a) * r0, rnd() * TAU, [l, r * 0.8, r * 1.3]); }
   // three sticks pushed in from the edge as it burned down: charred where they lay in the fire, grey weathered wood
   // outside it, each crooked
   for (let i = 0; i < 3; i++) {
